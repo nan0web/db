@@ -1,0 +1,42 @@
+{
+	"name": "@nan0web/db",
+	"version": "1.0.0",
+	"description": "Every data becomes a database. Agnostic document database and data manipulation utilities.",
+	"main": "./src/index.js",
+	"types": "./types/index.d.ts",
+	"type": "module",
+	"scripts": {
+		"build": "tsc",
+		"test": "node --test"
+	},
+	"exports": {
+		".": {
+			"import": "./src/index.js",
+			"types": "./types/index.d.ts"
+		},
+		"./*": {
+			"import": "./src/utils/*.js",
+			"types": "./types/utils/*.d.ts"
+		}
+	},
+	"keywords": [
+		"data",
+		"flatten",
+		"unflatten",
+		"merge",
+		"object",
+		"utility"
+	],
+	"author": "YaRaSlove [ЯRаСлав]",
+	"license": "ISC",
+	"devDependencies": {
+		"@nan0web/types": "link:../types"
+	},
+	"peerDependencies": {
+		"@nan0web/types": "^1.0.0"
+	},
+	"dependencies": {
+		"@nan0web/db-fs": "link:../db-fs",
+		"nanoweb-http": "^1.2.0"
+	}
+}
