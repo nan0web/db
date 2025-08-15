@@ -10,6 +10,8 @@ class Data {
 	static ARRAY_WRAPPER = '[]'
 	/** @type {number} */
 	static MAX_DEEP_UNFLATTEN = 99
+	/** @type {string} */
+	static REFERENCE_KEY = "$ref"
 
 	/**
 	 * Resets the array wrapper to default value.
@@ -208,11 +210,83 @@ class Data {
 		}
 		return newTarget
 	}
+
+	/**
+	 * Merges two flat [path, value] arrays into one flat array.
+	 * Handles $ref objects by expanding their properties into the path.
+	 * Later entries override earlier ones.
+	 *
+	 * @static
+	 * @param {Array<[string, any]>} target - Base flat data entries.
+	 * @param {Array<[string, any]>} source - Override flat data entries.
+	 * @param {{ referenceKey?: string }} options - Merge options.
+	 * @returns {Array<[string, any]>} Merged flat entries.
+	 */
+	static mergeFlat(target, source, { referenceKey = Data.REFERENCE_KEY } = {}) {
+		const map = new Map()
+
+		/**
+		 * Add an entry to the map.
+		 * @param {[string, any]} entry - Tuple of key and value.
+		 * @param {boolean} overwrite - Whether to overwrite existing keys.
+		 */
+		const add = (entry, overwrite) => {
+			const [rawKey, rawVal] = entry
+			if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal)) {
+				let baseKey = rawKey
+				// Handle references $ref – merge object into parent path.
+				if (referenceKey && rawKey.endsWith(Data.OBJECT_DIVIDER + referenceKey)) {
+					baseKey = rawKey.slice(0, -4 - Data.OBJECT_DIVIDER.length)
+				}
+				for (const prop in rawVal) {
+					if (Object.hasOwn(rawVal, prop)) {
+						const fullKey = `${baseKey}${Data.OBJECT_DIVIDER}${prop}`
+						if (overwrite || !map.has(fullKey)) {
+							map.set(fullKey, rawVal[prop])
+						}
+					}
+				}
+			} else {
+				if (overwrite || !map.has(rawKey)) {
+					map.set(rawKey, rawVal)
+				}
+			}
+		}
+
+		// Base data first.
+		for (const entry of target) {
+			add(entry, false)
+		}
+		// Override data second.
+		for (const entry of source) {
+			add(entry, true)
+		}
+
+		// Return as array of [key, value] tuples.
+		return Array.from(map.entries()).sort((a, b) => String(a[0]).localeCompare(b[0]))
+	}
+
+	static getParentKey(key) {
+		const arr = key.split(Data.OBJECT_DIVIDER)
+		arr.pop()
+		return arr.join(Data.OBJECT_DIVIDER)
+	}
+
+	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
+		if (!Array.isArray(flat)) flat = Object.entries(Data.flatten(flat))
+		const path = "" === parentKey ? "" : parentKey + Data.OBJECT_DIVIDER
+		const keyPath = key + Data.OBJECT_DIVIDER
+		return flat.filter(
+			([k]) => k.startsWith(path) && k !== key && !k.startsWith(keyPath)
+		)
+	}
 }
 
 export const flatten = Data.flatten
 export const unflatten = Data.unflatten
 export const merge = Data.merge
 export const find = Data.find
+export const mergeFlat = Data.mergeFlat
+export const flatSiblings = Data.flatSiblings
 
 export default Data

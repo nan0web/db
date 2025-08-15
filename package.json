@@ -30,13 +30,11 @@
 	"author": "YaRaSlove [ЯRаСлав]",
 	"license": "ISC",
 	"devDependencies": {
-		"@nan0web/types": "link:../types"
+		"@nan0web/db-fs": "workspace:*",
+		"@nan0web/types": "workspace:*"
 	},
 	"peerDependencies": {
+		"@nan0web/db-fs": "^1.0.0",
 		"@nan0web/types": "^1.0.0"
-	},
-	"dependencies": {
-		"@nan0web/db-fs": "link:../db-fs",
-		"nanoweb-http": "^1.2.0"
 	}
 }

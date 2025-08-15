@@ -1,9 +1,36 @@
 export default DB;
+export class GetOpts {
+    /**
+     * @param {object} input
+     * @returns {GetOpts}
+     */
+    static from(input: object): GetOpts;
+    constructor(input?: {});
+    defaultValue: undefined;
+}
+export class FetchOptions {
+    /**
+     * @param {object} input
+     * @returns {FetchOptions}
+     */
+    static from(input: object): FetchOptions;
+    constructor(input?: {});
+    globals: boolean;
+    inherit: boolean;
+    refs: boolean;
+    defaultValue: undefined;
+    allowDirs: boolean;
+}
 /**
  * Base database class for document storage and retrieval
  * @class
  */
 declare class DB {
+    static Data: typeof Data;
+    static Directory: typeof Directory;
+    static GetOpts: typeof GetOpts;
+    static FetchOptions: typeof FetchOptions;
+    static DATA_EXTNAMES: string[];
     /**
      * Creates a new DB instance from properties if object provided
      * @param {object|DB} props - Properties or DB instance
@@ -23,7 +50,7 @@ declare class DB {
      * @param {string} [input.root="."]
      * @param {string} [input.cwd="."]
      * @param {boolean} [input.connected=false]
-     * @param {Map<string, DocumentEntry | false>} [input.data=new Map()]
+     * @param {Map<string, any | false>} [input.data=new Map()]
      * @param {Map<string, DocumentStat>} [input.meta=new Map()]
      * @param {DB[]} [input.dbs=[]]
      */
@@ -31,14 +58,14 @@ declare class DB {
         root?: string | undefined;
         cwd?: string | undefined;
         connected?: boolean | undefined;
-        data?: Map<string, false | DocumentEntry> | undefined;
+        data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
         dbs?: DB[] | undefined;
     });
     /** @type {string} */
     encoding: string;
-    /** @type {Map<string, DocumentEntry | false>} */
-    data: Map<string, DocumentEntry | false>;
+    /** @type {Map<string, any | false>} */
+    data: Map<string, any | false>;
     /** @type {Map<string, DocumentStat>} */
     meta: Map<string, DocumentStat>;
     /** @type {boolean} */
@@ -49,6 +76,8 @@ declare class DB {
     cwd: string;
     /** @type {DB[]} */
     dbs: DB[];
+    /** @type {Map<string, any>} */
+    _inheritanceCache: Map<string, any>;
     /**
      * Returns whether the database directory has been loaded
      * @returns {boolean}
@@ -58,6 +87,49 @@ declare class DB {
      * and works with fully loaded DocumentEntry or DocumentStat data
      */
     get loaded(): boolean;
+    /**
+     * Returns Data helper class that is assign to DB or its extension.
+     * Define your own Data provider to extend its logic, no need to extend getter.
+     * ```js
+     * class DataExtended extends DB {
+     *   static OBJECT_DIVIDER = "."
+     * }
+     * class DBExtended extends DB {
+     *   static Data = DataExtended
+     * }
+     * ```
+     * @returns {typeof Data}
+     */
+    get Data(): typeof Data;
+    /**
+     * Returns static.Directory that is assign to DB or its extension.
+     * Define your own static.Directory, no need to extend getter.
+     * ```js
+     * class DirectoryExtended extends Directory {
+     *   static FILE = "$"
+     *   static DATA_EXTNAMES = [".md", ".csv"]
+     * }
+     * class DBExtended extends DB {
+     *   static Directory = DirectoryExtended
+     * }
+     * ```
+     * @returns {typeof Directory}
+     */
+    get Directory(): typeof Directory;
+    /**
+     * Returns static.GetOpts that is assign to DB or its extension.
+     * Define your own static.GetOpts, no need to extend getter.
+     * ```js
+     * class GetOptsExtended extends GetOpts {
+     *   defaultValue = ""
+     * }
+     * class DBExtended extends DB {
+     *   static GetOpts = GetOptsExtended
+     * }
+     * ```
+     * @returns {typeof GetOpts}
+     */
+    get GetOpts(): typeof GetOpts;
     /**
      * Attaches another DB instance
      * @param {DB} db - Database to attach
@@ -148,9 +220,10 @@ declare class DB {
     /**
      * Gets document content
      * @param {string} uri - Document URI
+     * @param {object | GetOpts} [opts] - Options.
      * @returns {Promise<any>} Document content
      */
-    get(uri: string): Promise<any>;
+    get(uri: string, opts?: object | GetOpts): Promise<any>;
     /**
      * Sets document content
      * @param {string} uri - Document URI
@@ -171,6 +244,7 @@ declare class DB {
      * @returns {Promise<string>} Resolved absolute path
      */
     resolve(...args: string[]): Promise<string>;
+    normalize(...args: any[]): string;
     /**
      * Resolves path segments to absolute path synchronously
      * @param  {...string} args - Path segments
@@ -286,7 +360,43 @@ declare class DB {
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
     }): AsyncGenerator<StreamEntry, void, unknown>;
+    /**
+     * Gets inheritance data for a given path
+     * @param {string} path - Document path
+     * @returns {Promise<any>} Inheritance data
+     */
+    getInheritance(path: string): Promise<any>;
+    /**
+     * @param {string} uri
+     * @param {object | FetchOptions} [opts]
+     */
+    fetch(uri: string, opts?: object | FetchOptions): Promise<any>;
+    /**
+     * Merges data from multiple sources following nano-db-fetch patterns
+     * @param {string} uri - The URI to fetch and merge data for
+     * @param {FetchOptions} [opts] - Fetch options
+     * @returns {Promise<any>} Merged data object
+     */
+    fetchMerged(uri: string, opts?: FetchOptions | undefined): Promise<any>;
+    _findReferenceKeys(flat: any): any;
+    _getParentReferenceKey(key: any): any;
+    /**
+     * Handles document references and resolves them recursively
+     * @param {object} data - Document data with potential references
+     * @param {string} [basePath] - Base path for resolving relative references
+     * @returns {Promise<object>} Data with resolved references
+     */
+    resolveReferences(data: object, basePath?: string | undefined): Promise<object>;
+    /**
+     * Processes document extensions and merges data recursively
+     * @param {object} data - Document data with potential extensions
+     * @param {string} [basePath] - Base path for resolving relative extensions
+     * @returns {Promise<object>} Merged extended data
+     */
+    processExtensions(data: object, basePath?: string | undefined): Promise<object>;
 }
-import DocumentEntry from "./DocumentEntry.js";
 import DocumentStat from "./DocumentStat.js";
+import Data from "./Data.js";
+import Directory from "./Directory.js";
+import DocumentEntry from "./DocumentEntry.js";
 import StreamEntry from "./StreamEntry.js";

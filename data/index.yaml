@@ -1,0 +1,5 @@
+$directory:
+  maxEntriesOnLoad: 12
+  entriesAs: text
+entries:
+  $ref: index.txt

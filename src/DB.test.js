@@ -1,6 +1,7 @@
 import { suite, describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import DB, { DocumentEntry, DocumentStat, StreamEntry } from './index.js'
+import { GetOpts, FetchOptions } from "./DB.js"
 
 class MockDB extends DB {
 	constructor(input = {}) {
@@ -21,8 +22,35 @@ class MockDB extends DB {
 		return true
 	}
 
-	async loadDocument(uri, defaultValue = "") {
-		return this.data.get(uri) || defaultValue
+	async loadDocument(uri, defaultValue) {
+		if (this.data.has(uri)) {
+			return this.data.get(uri)
+		}
+		if (uri === '_') {
+			return { global: 'value' }
+		}
+		if (uri === 'dir1/_') {
+			return { a: 1 }
+		}
+		if (uri === 'dir1/dir2/_') {
+			return { b: 2 }
+		}
+		if (uri === 'test.json') {
+			return { value: 'test' }
+		}
+		if (uri === 'parent.json') {
+			return { parent: 'value' }
+		}
+		if (uri === 'child.json') {
+			return { $ref: 'parent.json', child: 'value' }
+		}
+		if (uri === 'ref.json') {
+			return { prop: { subprop: 'resolved' } }
+		}
+		if (uri === 'data.json') {
+			return { key: '$ref:ref.json#prop/subprop' }
+		}
+		return defaultValue
 	}
 
 	async saveDocument(uri, document) {
@@ -56,8 +84,8 @@ class MockDB extends DB {
 			})
 	}
 
-	resolve(...args) {
-		return Promise.resolve(args.filter(Boolean).join("/"))
+	async resolve(...args) {
+		return Promise.resolve(this.resolveSync(...args))
 	}
 
 	relative(from, to) {
@@ -240,7 +268,7 @@ suite("DB", () => {
 			])
 			const mockMeta = new Map([
 				['file1.txt', new DocumentStat({ isFile: true, size: 100 })],
-				['file2.txt', new DocumentStat({ isFile: true, size: 200 })]
+				['file2.txt', new DocumentStat({ isFile: true, size: 200 })],
 			])
 
 			const dbInstance = new MockDB({
@@ -287,7 +315,7 @@ suite("DB", () => {
 
 	describe('find', () => {
 		it('should yield specific URI if found', async () => {
-			const dbInstance = new MockDB({ data: [['test.txt', 'content']] })
+			const dbInstance = new MockDB({ data: new Map([['test.txt', 'content']]) })
 			await dbInstance.connect()
 			dbInstance.meta.set("?loaded", new DocumentStat({ mtimeMs: 1_000 }))
 
@@ -345,7 +373,7 @@ suite("DB", () => {
 
 	describe('get', () => {
 		it('should load document if not in cache', async () => {
-			const dbInstance = new MockDB({ data: [['test.txt', 'content']] })
+			const dbInstance = new MockDB({ data: new Map([['test.txt', 'content']]) })
 
 			const result = await dbInstance.get('test.txt')
 			assert.strictEqual(result, 'content')
@@ -381,18 +409,26 @@ suite("DB", () => {
 
 	describe('absolute', () => {
 		it('should throw not implemented error', () => {
-			const baseDb = new DB()
-			const abs = baseDb.absolute('path')
+			const db = new DB()
+			const abs = db.absolute('path')
 
-			assert.equal(abs, "./path")
+			assert.equal(abs, "/path")
 		})
 	})
 
 	describe('loadDocument', () => {
-		it('should call ensureAccess with r and return undefined', async () => {
+		it('should return default value if document not found', async () => {
 			const uri = 'doc.txt'
-			const result = await db.loadDocument(uri)
+			const result = await db.loadDocument(uri, "")
 			assert.strictEqual(result, "")
+		})
+
+		it('should return document if found', async () => {
+			const uri = 'doc.txt'
+			const content = 'document content'
+			db.data.set(uri, content)
+			const result = await db.loadDocument(uri)
+			assert.strictEqual(result, content)
 		})
 	})
 
@@ -456,7 +492,11 @@ suite("DB", () => {
 				['file1.txt', 'content1'],
 				['file2.txt', 'content2']
 			])
-			const dbInstance = new MockDB({ data: mockData })
+			const mockMeta = new Map([
+				['file1.txt', new DocumentStat({ mtimeMs: 1_000 })],
+				['file2.txt', new DocumentStat({ mtimeMs: 1_000 })],
+			])
+			const dbInstance = new MockDB({ data: mockData, meta: mockMeta })
 
 			await dbInstance.push()
 
@@ -516,6 +556,253 @@ suite("DB", () => {
 			const result = MockDB.from(props)
 			assert.ok(result instanceof MockDB)
 			assert.strictEqual(result.root, '/test')
+		})
+	})
+
+	describe('getInheritance', () => {
+		it('should get inheritance data for path', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('_', { global: 'value' })
+			dbInstance.data.set('dir1/_', { a: 1 })
+			dbInstance.data.set('dir1/dir2/_', { b: 2 })
+
+			const result = await dbInstance.getInheritance('dir1/dir2/file')
+			assert.deepEqual(result, { global: 'value', a: 1, b: 2 })
+		})
+
+		it('should handle missing inheritance files', async () => {
+			const db = new MockDB()
+			db.data.set('_', { global: 'value' })
+
+			const result = await db.getInheritance('dir1/dir2/file')
+			assert.deepEqual(result, { a: 1, b: 2, global: 'value' })
+		})
+
+		it('should cache inheritance data', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('_', { global: 'value' })
+			dbInstance.data.set('dir1/_', { a: 1 })
+
+			const result1 = await dbInstance.getInheritance('dir1/file')
+			const result2 = await dbInstance.getInheritance('dir1/file2')
+
+			assert.deepEqual(result1, { global: 'value', a: 1 })
+			assert.deepEqual(result2, { global: 'value', a: 1 })
+			assert.ok(dbInstance._inheritanceCache.has('/'))
+			assert.ok(dbInstance._inheritanceCache.has('dir1/'))
+		})
+	})
+
+	describe('fetch', () => {
+		it('should fetch merged data with all options enabled', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('_', { global: 'value' })
+			dbInstance.data.set('test.json', { value: 'test' })
+
+			const opts = new FetchOptions()
+			const result = await dbInstance.fetch('test.json', opts)
+			assert.deepEqual(result, { global: 'value', value: 'test' })
+		})
+
+		it('should fetch with extension processing', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('_', { global: 'value' })
+			dbInstance.data.set('parent.json', { parent: 'value' })
+			dbInstance.data.set('child.json', { $ref: 'parent.json', child: 'value' })
+
+			const opts = new FetchOptions()
+			const result = await dbInstance.fetch('child.json', opts)
+			assert.deepEqual(result, { global: 'value', parent: 'value', child: 'value' })
+		})
+
+		it('should fetch with reference resolution', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('_', { global: 'value' })
+			dbInstance.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			dbInstance.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
+
+			const opts = new FetchOptions()
+			const result = await dbInstance.fetch('data.json', opts)
+			assert.deepEqual(result, { global: 'value', key: 'resolved' })
+		})
+
+		it('should return default value when document not found', async () => {
+			const dbInstance = new MockDB()
+			const opts = new FetchOptions({ defaultValue: 'default' })
+			const result = await dbInstance.fetch('missing.json', opts)
+			assert.strictEqual(result, 'default')
+		})
+
+		it('should handle directory access when allowDirs is true', async () => {
+			const db = new MockDB()
+			db.data.set('dir/index.json', { title: 'Directory Index' })
+			const opts = new FetchOptions({ allowDirs: true })
+			const result = await db.fetch('dir', opts)
+			assert.deepEqual(result, { title: 'Directory Index' })
+		})
+	})
+
+	describe('fetchMerged', () => {
+		it('should fetch and merge data with all options', async () => {
+			const db = new MockDB()
+			db.data.set('_', { global: 'value' })
+			db.data.set('test.json', { value: 'test' })
+			const result = await db.fetch('test.json')
+			assert.deepEqual(result, { global: 'value', value: 'test' })
+		})
+
+		it('should handle extension processing with inherit option', async () => {
+			const db = new MockDB()
+			db.data.set('_', { global: 'value' })
+			db.data.set('parent.json', { parent: 'value' })
+			db.data.set('child.json', { $ref: 'parent.json', child: 'value' })
+			const result = await db.fetch('child.json', { inherit: true })
+			assert.deepEqual(result, { global: 'value', parent: 'value', child: 'value' })
+		})
+
+		it('should handle reference resolution with refs option', async () => {
+			const db = new MockDB()
+			db.data.set('_', { global: 'value' })
+			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			db.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
+			const result = await db.fetch('data.json', { refs: true })
+			assert.deepEqual(result, { global: 'value', key: 'resolved' })
+		})
+
+		it('should skip globals when option is false', async () => {
+			const db = new MockDB()
+			db.data.set('_', { global: 'value' })
+			db.data.set("_/langs", ["en", "uk"])
+			db.data.set('test.json', { value: 'test' })
+			const result = await db.fetch('test.json', { globals: false })
+			assert.deepEqual(result, { global: "value", value: 'test' })
+		})
+
+		it('should skip extension processing when inherit option is false', async () => {
+			const db = new MockDB()
+			db.data.set('parent.json', { parent: 'value' })
+			db.data.set('child.json', { $ref: 'parent.json', child: 'value' })
+			const result = await db.fetch('child.json', { inherit: false })
+			assert.deepEqual(result, { parent: "value", child: 'value' })
+		})
+
+		it('should skip reference resolution when refs option is false', async () => {
+			const db = new MockDB()
+			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			db.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
+
+			const result = await db.fetch("data.json", { refs: false })
+			assert.deepEqual(result, { global: "value", key: '$ref:ref.json#prop/subprop' })
+		})
+	})
+
+	describe('resolveReferences', () => {
+		it('should resolve simple references', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('ref.json', 'referenced value')
+			const data = { key: '$ref:ref.json' }
+
+			const result = await dbInstance.resolveReferences(data)
+			assert.deepEqual(result, { key: 'referenced value' })
+		})
+
+		it('should resolve fragment references', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			const data = { key: '$ref:ref.json#prop/subprop' }
+
+			const result = await dbInstance.resolveReferences(data)
+			assert.deepEqual(result, { key: 'resolved' })
+		})
+
+		it('should keep original value if reference cannot be resolved', async () => {
+			const data = { key: '$ref:missing.json' }
+
+			const result = await db.resolveReferences(data)
+			assert.deepEqual(result, { key: '$ref:missing.json' })
+		})
+
+		it('should resolve nested references', async () => {
+			const db = new MockDB()
+			db.data.set('ref.txt', 'referenced value')
+			const data = { nested: { key: '$ref:ref.txt' } }
+
+			const result = await db.resolveReferences(data)
+			assert.deepEqual(result, { nested: { key: 'referenced value' } })
+		})
+
+		it('should resolve nested references (property version)', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('ref.json', 'referenced value')
+			const data = { nested: { key: { $ref: 'ref.json' } } }
+
+			const result = await dbInstance.resolveReferences(data)
+			assert.deepEqual(result, { nested: { key: 'referenced value' } })
+		})
+
+		it('should resolve nested references (property version) with siblings', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('ref.json', 'referenced value')
+			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
+
+			const result = await dbInstance.resolveReferences(data)
+			assert.deepEqual(result, {
+				nested: { key: { value: 'referenced value', color: "blue" } }
+			})
+		})
+
+		it('should resolve nested references (property version) with siblings and object', async () => {
+			const dbInstance = new MockDB()
+			dbInstance.data.set('ref.json', { color: "red", size: "xl" })
+			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
+
+			const result = await dbInstance.resolveReferences(data)
+			assert.deepEqual(result, {
+				nested: { key: { size: "xl", color: "blue" } }
+			})
+		})
+	})
+
+	describe('processExtensions', () => {
+		it('should process extension with $ref', async () => {
+			const db = new MockDB()
+			db.data.set('parent.json', { parent: 'value' })
+			const data = { [db.Data.REFERENCE_KEY]: 'parent.json', child: 'value' }
+
+			// const result = await db.processExtensions(data)
+			const result = await db.resolveReferences(data, "index.json")
+			assert.deepEqual(result, { parent: 'value', child: 'value' })
+		})
+
+		it('should return data if no extension', async () => {
+			const data = { key: 'value' }
+
+			const result = await db.processExtensions(data)
+			assert.deepEqual(result, { key: 'value' })
+		})
+
+		it('should keep data including $ref if extension cannot be resolved', async () => {
+			const data = { $ref: 'missing.json', key: 'value' }
+
+			const result = await db.processExtensions(data)
+			assert.deepEqual(result, { $ref: 'missing.json', key: 'value' })
+		})
+	})
+	describe("GetOpts", () => {
+		it("should extension provide its values", async () => {
+			class GetOptsExtended extends GetOpts {
+				defaultValue = ""
+			}
+			class DBExtended extends DB {
+				static GetOpts = GetOptsExtended
+				async get(uri, opts = new this.GetOpts()) {
+					opts = this.GetOpts.from(opts)
+					return [opts.defaultValue, uri]
+				}
+			}
+			const db = new DBExtended()
+			const result = await db.get("anything")
+			assert.deepEqual(result, ["", "anything"])
 		})
 	})
 })

@@ -5,7 +5,7 @@ import Data, {
 	unflatten,
 	merge,
 	find
-} from './data.js'
+} from './Data.js'
 
 suite('Data', () => {
 	describe('Static Properties', () => {
@@ -47,7 +47,7 @@ suite('Data', () => {
 				'a/[2]': 3
 			})
 		})
-		
+
 		it('should flatten objects with multiple levels', () => {
 			const obj = {
 				level1: {
@@ -79,7 +79,7 @@ suite('Data', () => {
 			}
 			assert.deepEqual(Data.unflatten(flat), { a: [1, 2] })
 		})
-		
+
 		it('should handle complex structures', () => {
 			const flat = {
 				'a/b/[0]/c': 1,
@@ -103,7 +103,7 @@ suite('Data', () => {
 		it('should return undefined for missing paths', () => {
 			assert.strictEqual(Data.find('a/b/c', {}), undefined)
 		})
-		
+
 		it('should find values in arrays', () => {
 			const obj = { a: [1, 2, 3] }
 			assert.strictEqual(Data.find('a/[1]', obj), 2)
@@ -117,14 +117,14 @@ suite('Data', () => {
 			assert.strictEqual(result.value, 1)
 			assert.deepStrictEqual(result.path, ['a', 'b', 'c'])
 		})
-		
+
 		it('should skip scalar values when requested', () => {
 			const obj = { a: { b: { c: 1 } } }
 			const result = Data.findValue(['a', 'b', 'c'], obj, true)
 			assert.strictEqual(result.value, obj.a.b)
 			assert.deepStrictEqual(result.path, ['a', 'b'])
 		})
-		
+
 		it('should handle nested arrays', () => {
 			const obj = { a: [{ b: 1 }, { c: 2 }] }
 			const result = Data.findValue(['a', '[0]', 'b'], obj)
@@ -146,19 +146,19 @@ suite('Data', () => {
 			const source = { a: [3, 4] }
 			assert.deepEqual(Data.merge(target, source), { a: [3, 4] })
 		})
-		
+
 		it('should merge objects with nested arrays correctly', () => {
-			const target = { 
-				a: { 
+			const target = {
+				a: {
 					b: [1, 2],
 					c: { d: 'value' }
-				} 
+				}
 			}
-			const source = { 
-				a: { 
+			const source = {
+				a: {
 					b: [3, 4],
 					e: 'new value'
-				} 
+				}
 			}
 			assert.deepEqual(Data.merge(target, source), {
 				a: {
@@ -168,5 +168,66 @@ suite('Data', () => {
 				}
 			})
 		})
+	})
+	describe("mergeFlat()", () => {
+		it("should merge references (nested level)", () => {
+			const a = [
+				["my/key", { a: 1, b: 2 }],
+				["nested/key/$ref", { a: 30, b: 3 }],
+			]
+
+			const b = [
+				["my/key/b", 9],
+				["my/key/c", 12],
+				["nested/key/value", "exists"]
+			]
+
+			const expected = [
+				["my/key/a", 1],
+				["my/key/b", 2],
+				["my/key/c", 12],
+				["nested/key/a", 30],
+				["nested/key/b", 3],
+				["nested/key/value", "exists"],
+			]
+			assert.deepEqual(Data.mergeFlat(b, a), expected)
+		})
+	})
+	it("should extend references (top level)", () => {
+		const a = [
+			// ["$ref", a],
+			["title", "Our news"],
+			["desc", "We publish news periodically"],
+		]
+		const b = [
+			["$layout", "Blog"],
+			["title", "Blog"],
+		]
+		const expected = [
+			["$layout", "Blog"],
+			["desc", "We publish news periodically"],
+			["title", "Our news"],
+		]
+		assert.deepEqual(Data.mergeFlat(b, a), expected)
+	})
+	it("should return flat siblings", () => {
+		const flat = [
+			["nested/key/$ref", "somewhere"],
+			["nested/key/color", "green"],
+			["nested/key/font/size", "xl"],
+			["nested/key/font/style", "italic"],
+			["nested/value", 9],
+		]
+		assert.deepEqual(Data.flatSiblings(flat, "nested/key/$ref"), flat.slice(1, -1))
+		assert.deepEqual(Data.flatSiblings(flat, "nested/key/font/size"), flat.slice(3, -1))
+		assert.deepEqual(Data.flatSiblings(flat, "nested/key"), flat.slice(4))
+	})
+	it("should return top siblings", () => {
+		const flat = [
+			["$ref", "index#top"],
+			["nested/key/$ref", "somewhere"],
+			["nested/key/color", "green"],
+		]
+		assert.deepEqual(Data.flatSiblings(flat, "$ref"), flat.slice(1))
 	})
 })
