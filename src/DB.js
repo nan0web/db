@@ -293,11 +293,11 @@ class DB {
 			const entries = await this.listDir(uri, { depth, skipStat, skipSymbolicLink })
 			const later = []
 			for (const entry of entries) {
-				let path = await this.resolve(uri, entry.name)
+				let path = this.resolveSync(uri, entry.name)
 				if (!filter(new FilterString(path))) {
 					continue
 				}
-				this.data.set(path, false)
+				this.data.set(path, this.data.get(path) ?? false)
 				this.meta.set(path, entry.stat)
 				const element = new DocumentEntry({ name: entry.name, stat: entry.stat, depth, path })
 				if (entry.stat.isDirectory) {
@@ -318,7 +318,8 @@ class DB {
 					yield* this.readDir(path, { depth: depth + 1, skipStat, skipSymbolicLink, filter })
 				}
 			}
-		} else {
+		}
+		else if (stat.exists) {
 			const name = this.relative(this.root, uri)
 			this.data.set(uri, false)
 			this.meta.set(uri, stat)
@@ -397,7 +398,7 @@ class DB {
 	 */
 	async get(uri, opts = new this.GetOpts()) {
 		opts = this.GetOpts.from(opts)
-		if (uri.startsWith("/")) uri = uri.slice(1)
+		uri = this.normalize(uri)
 		await this.ensureAccess(uri, "r")
 		if (!this.data.has(uri) || false === this.data.get(uri)) {
 			const data = await this.loadDocument(uri, opts.defaultValue)
@@ -444,6 +445,11 @@ class DB {
 		return args.filter(Boolean).join("/")
 	}
 
+	/**
+	 * Normalize path segments to absolute path
+	 * @param  {...string} args - Path segments
+	 * @returns {string} Normalized path
+	 */
 	normalize(...args) {
 		const segments = args.filter(Boolean).join("/").split("/")
 		const normalizedSegments = []
@@ -451,7 +457,7 @@ class DB {
 		for (const segment of segments) {
 			if (segment === "..") {
 				normalizedSegments.pop()
-			} else if (segment !== ".") {
+			} else if (![".", ""].includes(segment)) {
 				normalizedSegments.push(segment)
 			}
 		}
@@ -480,36 +486,57 @@ class DB {
 	}
 
 	/**
-	 * Loads a document
+	 * Loads a document.
+	 * Must be overwritten to has the proper file or database document read operation.
+	 * In a basic class it just loads already saved data in the db.data map.
 	 * @param {string} uri - Document URI
-	 * @param {any} [defaultValue=""] - Default value if document not found
+	 * @param {any} [defaultValue] - Default value if document not found
 	 * @returns {Promise<any>}
 	 */
-	async loadDocument(uri, defaultValue = "") {
+	async loadDocument(uri, defaultValue = undefined) {
 		await this.ensureAccess(uri, "r")
-		throw new Error("Not implemented")
+		const abs = this.absolute(await this.resolve(uri))
+		const rel = abs.startsWith("/") ? abs.slice(1) : abs
+		if (this.data.has(rel)) {
+			return this.data.get(rel)
+		}
+		return defaultValue
 	}
 
 	/**
-	 * Saves a document
+	 * Saves a document.
+	 * Must be overwritten to has the proper file or database document save operation.
+	 * In a basic class it just sets a document in the db.data map and db.meta map.
 	 * @param {string} uri - Document URI
 	 * @param {any} document - Document data
 	 * @returns {Promise<boolean>}
 	 */
 	async saveDocument(uri, document) {
 		await this.ensureAccess(uri, "w")
-		throw new Error("Not implemented")
+		const abs = this.normalize(await this.resolve(uri))
+		this.data.set(abs, document)
+		const stat = DocumentStat.from(this.meta.get(abs) ?? {})
+		stat.isFile = true
+		stat.mtimeMs = Date.now()
+		stat.size = Buffer.byteLength(JSON.stringify(document))
+		this.meta.set(abs, stat)
+		return false
 	}
 
 	/**
-	 * Creates DocumentStat for a specific document
+	 * Reads a statisitics into DocumentStat for a specific document.
+	 * Must be overwritten to has the proper file or database document stat operation.
+	 * In a basic class it just returns a document stat from the db.meta map if exists.
 	 * @note Must be overwritten by platform-specific implementation
 	 * @param {string} uri - Document URI
 	 * @returns {Promise<DocumentStat>}
 	 */
 	async statDocument(uri) {
+		if ("." === uri) uri = "./"
 		await this.ensureAccess(uri)
-		throw new Error("Not implemented")
+		const isDir = uri.endsWith("/")
+		const abs = (this.normalize(await this.resolve(uri)) || ".") + (isDir ? "/" : "")
+		return DocumentStat.from(this.meta.get(abs) ?? {})
 	}
 
 	/**
@@ -609,7 +636,7 @@ class DB {
 	 * @param {number} [options.depth] - Depth to list
 	 * @param {boolean} [options.skipStat] - Skip statistics collection
 	 * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
-	 * @returns {Promise<{name: string, stat: DocumentStat, isDirectory: boolean}[]>} Directory entries
+	 * @returns {Promise<DocumentEntry[]>} Directory entries
 	 */
 	async listDir(uri, { depth = 0, skipStat = false, skipSymbolicLink = false } = {}) {
 		throw new Error("Not implemented")
@@ -756,25 +783,12 @@ class DB {
 	}
 
 	/**
-	 * Creates a new DB instance from properties if object provided
-	 * @param {object|DB} props - Properties or DB instance
-	 * @returns {DB}
-	 */
-	static from(props) {
-		if (props instanceof DB) return props
-		return new this(props)
-	}
-
-	/**
 	 * Gets inheritance data for a given path
 	 * @param {string} path - Document path
 	 * @returns {Promise<any>} Inheritance data
 	 */
 	async getInheritance(path) {
-		const segments = path.split('/').filter(segment => segment !== '')
-		const inheritanceChain = segments.map((_, index) =>
-			segments.slice(0, index + 1).join('/') + '/'
-		)
+		const inheritanceChain = this.Data.getPathParents(path, "/")
 
 		// Load root inheritance data
 		if (!this._inheritanceCache.has('/')) {
@@ -804,8 +818,57 @@ class DB {
 	}
 
 	/**
+	 * Gets global variables for a given path, global variables are stored in _/ subdirectory
+	 * @param {string} path - Document path
+	 * @returns {Promise<any>} Global variables data
+	 */
+	async getGlobals(path) {
+		let globals = {}
+
+		try {
+			const paths = this.Data.getPathParents(path, "/" + this.Directory.GLOBALS)
+			for (let uri of paths) {
+				if (uri.startsWith("/")) uri = uri.slice(1)
+				const stream = this.readDir(uri)
+				for await (const entry of stream) {
+					// Only process files (not directories) in the _/ directory
+					if (entry.isFile) {
+						const key = this.resolveSync(uri, entry.name)
+						const value = await this.loadDocument(key)
+						if (undefined !== value) {
+							globals[entry.name] = value
+						}
+					}
+				}
+			}
+			// const parts = path.split("/").filter(Boolean)
+			// const parentUri = this.resolveSync(parts.join("/"), "..", this.Directory.GLOBALS)
+		} catch (err) {
+			// If no _/ directory or error reading it, continue with empty object
+		}
+
+		// // Handle nested global scope
+		// const segments = path.split('/').filter(segment => segment !== '')
+		// for (let i = 0; i < segments.length; i++) {
+		// 	const dirPath = segments.slice(0, i + 1).join('/')
+		// 	try {
+		// 		const dirGlobalData = await this.loadDocument(dirPath + '/' + this.Directory.FILE, {})
+		// 		if (dirGlobalData && typeof dirGlobalData === 'object') {
+		// 			globals = this.Data.merge(globals, dirGlobalData)
+		// 		}
+		// 	} catch (err) {
+		// 		// If no scoped globals, continue
+		// 	}
+		// }
+
+		return globals
+	}
+
+	/**
+	 * Fetch document with inheritance, globals and references processing
 	 * @param {string} uri
 	 * @param {object | FetchOptions} [opts]
+	 * @returns {Promise<any>}
 	 */
 	async fetch(uri, opts = new FetchOptions()) {
 		opts = FetchOptions.from(opts)
@@ -918,9 +981,10 @@ class DB {
 			}
 		}
 
-		// Merge inherited data if enabled
+		// Merge global variables if enabled
 		if (opts.globals) {
-			// @todo add similar to getInheritance function to getGlobals()
+			const globals = await this.getGlobals(uri)
+			data = this.Data.merge(globals, data)
 		}
 
 		// Resolve references if enabled
@@ -967,21 +1031,24 @@ class DB {
 			try {
 				// Handle absolute and relative paths
 				// const base = basePath ? await this.resolve(basePath)
-				const absolutePath = this.absolute(
+				const abs = this.normalize(
 					refPath.startsWith('/') ? refPath : await this.resolve(basePath, '..', refPath)
 				)
 
 				// Handle fragment references like contacts.json#address/zip
-				if (absolutePath.includes('#')) {
-					const [filePath, fragment] = absolutePath.split('#')
+				if (abs.includes('#')) {
+					const [filePath, fragment] = abs.split('#')
 					const fullData = await this.get(filePath)
 					const refValue = this.Data.find(fragment.split('/'), fullData)
 					flat[key] = refValue
 				} else {
-					const refValue = await this.get(absolutePath)
+					const refValue = await this.get(abs)
 					if (undefined !== refValue) {
 						let parentKey = this._getParentReferenceKey(key)
 						if (parentKey === key) parentKey = ""
+						/**
+						 * @type {Array<Array<string, any>>}
+						 */
 						const siblings = this.Data.flatSiblings(Object.entries(flat), key, parentKey).map(
 							([k, val]) => parentKey ? [k.slice((parentKey + this.Data.OBJECT_DIVIDER).length), val] : [k, val]
 						)
@@ -1014,50 +1081,13 @@ class DB {
 	}
 
 	/**
-	 * Processes document extensions and merges data recursively
-	 * @param {object} data - Document data with potential extensions
-	 * @param {string} [basePath] - Base path for resolving relative extensions
-	 * @returns {Promise<object>} Merged extended data
+	 * Creates a new DB instance from properties if object provided
+	 * @param {object|DB} input - Properties or DB instance
+	 * @returns {DB}
 	 */
-	async processExtensions(data, basePath = '') {
-		if (typeof data !== 'object' || data === null) {
-			return data
-		}
-
-		const extendedData = Array.isArray(data) ? [...data] : { ...data }
-
-		if (Array.isArray(extendedData) && "string" === typeof extendedData[0]?.$ref) {
-			// @todo complete the array extensnion
-		}
-
-		if (extendedData.$ref && typeof extendedData.$ref === 'string') {
-			const parentUri = extendedData.$ref.startsWith('/')
-				? extendedData.$ref
-				: await this.resolve(basePath, '..', extendedData.$ref)
-			try {
-				const parentData = await this.get(parentUri)
-				if ("object" === typeof parentData) {
-					// Process extensions in parent data recursively
-					const processedParentData = await this.processExtensions(parentData, parentUri)
-					// Remove the ref property and merge parent data
-					delete extendedData.$ref
-					// Merge parent data with current data (current data takes precedence)
-					return this.Data.merge(processedParentData, extendedData)
-				}
-			} catch (err) {
-				// If parent can't be loaded, keep original data including the $ref property
-			}
-			return extendedData
-		}
-
-		// Recursively process nested objects for references
-		for (const [key, value] of Object.entries(extendedData)) {
-			if (typeof value === 'object' && value !== null) {
-				extendedData[key] = await this.processExtensions(value, basePath)
-			}
-		}
-
-		return extendedData
+	static from(input) {
+		if (input instanceof DB) return input
+		return new this(input)
 	}
 }
 

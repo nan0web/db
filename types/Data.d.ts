@@ -37,18 +37,27 @@ export function find(path: string | string[], obj: any): any;
  * Later entries override earlier ones.
  *
  * @static
- * @param {Array<[string, any]>} target - Base flat data entries.
- * @param {Array<[string, any]>} source - Override flat data entries.
+ * @param {Array<Array<string, any>>} target - Base flat data entries.
+ * @param {Array<Array<string, any>>} source - Override flat data entries.
  * @param {{ referenceKey?: string }} options - Merge options.
- * @returns {Array<[string, any]>} Merged flat entries.
+ * @returns {Array<Array<string, any>>} Merged flat entries.
  */
-export function mergeFlat(target: Array<[string, any]>, source: Array<[string, any]>, { referenceKey }?: {
+export function mergeFlat(target: Array<Array<string, any>>, source: Array<Array<string, any>>, { referenceKey }?: {
     referenceKey?: string;
-}): Array<[string, any]>;
-export function flatSiblings(flat: any, key: any, parentKey?: any): any;
+}): Array<Array<string, any>>;
+/**
+ * Gets flat sibling entries of a specific key.
+ * @static
+ * @param {Array<Array<string, any>>|Object} flat - Flattened data.
+ * @param {string} key - The target key to find siblings for.
+ * @param {string} [parentKey] - Optional parent key to avoid recomputation.
+ * @returns {Array<Array<string, any>>} Flat sibling entries.
+ */
+export function flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string | undefined): Array<Array<string, any>>;
 export default Data;
 /**
  * Data manipulation utilities for flattening/unflattening objects and deep merging.
+ * Every data is stored somewhere, so manipulating with paths and parent items also provided.
  * @class
  */
 declare class Data {
@@ -134,14 +143,37 @@ declare class Data {
      * Later entries override earlier ones.
      *
      * @static
-     * @param {Array<[string, any]>} target - Base flat data entries.
-     * @param {Array<[string, any]>} source - Override flat data entries.
+     * @param {Array<Array<string, any>>} target - Base flat data entries.
+     * @param {Array<Array<string, any>>} source - Override flat data entries.
      * @param {{ referenceKey?: string }} options - Merge options.
-     * @returns {Array<[string, any]>} Merged flat entries.
+     * @returns {Array<Array<string, any>>} Merged flat entries.
      */
-    static mergeFlat(target: Array<[string, any]>, source: Array<[string, any]>, { referenceKey }?: {
+    static mergeFlat(target: Array<Array<string, any>>, source: Array<Array<string, any>>, { referenceKey }?: {
         referenceKey?: string;
-    }): Array<[string, any]>;
-    static getParentKey(key: any): any;
-    static flatSiblings(flat: any, key: any, parentKey?: any): any;
+    }): Array<Array<string, any>>;
+    /**
+     * Gets the parent key of a flattened key path.
+     * @static
+     * @param {string} key - The key path.
+     * @returns {string} The parent key path.
+     */
+    static getParentKey(key: string): string;
+    /**
+     * Gets flat sibling entries of a specific key.
+     * @static
+     * @param {Array<Array<string, any>>|Object} flat - Flattened data.
+     * @param {string} key - The target key to find siblings for.
+     * @param {string} [parentKey] - Optional parent key to avoid recomputation.
+     * @returns {Array<Array<string, any>>} Flat sibling entries.
+     */
+    static flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string | undefined): Array<Array<string, any>>;
+    /**
+     * Gets all parent paths of a given path.
+     * @static
+     * @param {string} path - The path to get parents of.
+     * @param {string} [suffix=""] - Suffix to append to each parent path.
+     * @param {boolean} [avoidRoot=false] - Whether to exclude the root path.
+     * @returns {string[]} Array of parent paths.
+     */
+    static getPathParents(path: string, suffix?: string | undefined, avoidRoot?: boolean | undefined): string[];
 }

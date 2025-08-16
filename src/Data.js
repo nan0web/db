@@ -1,5 +1,6 @@
 /**
  * Data manipulation utilities for flattening/unflattening objects and deep merging.
+ * Every data is stored somewhere, so manipulating with paths and parent items also provided.
  * @class
  */
 class Data {
@@ -146,12 +147,12 @@ class Data {
 					curr = String(parseInt(match[1], 10))
 				}
 				if (null !== next && next.match(noRegExp)) {
-					parent[curr] = parent[curr] || []
+					if (!Array.isArray(parent[curr])) parent[curr] = []
 				}
 				else if ('object' === typeof parent && null !== parent) {
-					parent[curr] = parent[curr] || {}
+					if (null === parent[curr] || 'object' !== typeof parent[curr]) parent[curr] = {}
 				}
-				else {
+				else if (parent !== result) {
 					throw new TypeError(`Element is not an object in ${path.join(Data.OBJECT_DIVIDER)}`)
 				}
 				path.push(curr)
@@ -177,7 +178,7 @@ class Data {
 					const parentValue = Data.find(p, result)
 					parentValue[path] = data[flatKey]
 				} else {
-					throw new Error(`Value key not found: ${key} => ${keys.join(Data.OBJECT_DIVIDER)}`)
+					result[key] = data[flatKey]
 				}
 			}
 		}
@@ -217,17 +218,17 @@ class Data {
 	 * Later entries override earlier ones.
 	 *
 	 * @static
-	 * @param {Array<[string, any]>} target - Base flat data entries.
-	 * @param {Array<[string, any]>} source - Override flat data entries.
+	 * @param {Array<Array<string, any>>} target - Base flat data entries.
+	 * @param {Array<Array<string, any>>} source - Override flat data entries.
 	 * @param {{ referenceKey?: string }} options - Merge options.
-	 * @returns {Array<[string, any]>} Merged flat entries.
+	 * @returns {Array<Array<string, any>>} Merged flat entries.
 	 */
 	static mergeFlat(target, source, { referenceKey = Data.REFERENCE_KEY } = {}) {
 		const map = new Map()
 
 		/**
 		 * Add an entry to the map.
-		 * @param {[string, any]} entry - Tuple of key and value.
+		 * @param {Array<string, any>} entry - Tuple of key and value.
 		 * @param {boolean} overwrite - Whether to overwrite existing keys.
 		 */
 		const add = (entry, overwrite) => {
@@ -236,8 +237,9 @@ class Data {
 				let baseKey = rawKey
 				// Handle references $ref – merge object into parent path.
 				if (referenceKey && rawKey.endsWith(Data.OBJECT_DIVIDER + referenceKey)) {
-					baseKey = rawKey.slice(0, -4 - Data.OBJECT_DIVIDER.length)
+					baseKey = rawKey.slice(0, -referenceKey.length - Data.OBJECT_DIVIDER.length)
 				}
+				// @ts-ignore
 				for (const prop in rawVal) {
 					if (Object.hasOwn(rawVal, prop)) {
 						const fullKey = `${baseKey}${Data.OBJECT_DIVIDER}${prop}`
@@ -266,12 +268,26 @@ class Data {
 		return Array.from(map.entries()).sort((a, b) => String(a[0]).localeCompare(b[0]))
 	}
 
+	/**
+	 * Gets the parent key of a flattened key path.
+	 * @static
+	 * @param {string} key - The key path.
+	 * @returns {string} The parent key path.
+	 */
 	static getParentKey(key) {
 		const arr = key.split(Data.OBJECT_DIVIDER)
 		arr.pop()
 		return arr.join(Data.OBJECT_DIVIDER)
 	}
 
+	/**
+	 * Gets flat sibling entries of a specific key.
+	 * @static
+	 * @param {Array<Array<string, any>>|Object} flat - Flattened data.
+	 * @param {string} key - The target key to find siblings for.
+	 * @param {string} [parentKey] - Optional parent key to avoid recomputation.
+	 * @returns {Array<Array<string, any>>} Flat sibling entries.
+	 */
 	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
 		if (!Array.isArray(flat)) flat = Object.entries(Data.flatten(flat))
 		const path = "" === parentKey ? "" : parentKey + Data.OBJECT_DIVIDER
@@ -279,6 +295,27 @@ class Data {
 		return flat.filter(
 			([k]) => k.startsWith(path) && k !== key && !k.startsWith(keyPath)
 		)
+	}
+
+	/**
+	 * Gets all parent paths of a given path.
+	 * @static
+	 * @param {string} path - The path to get parents of.
+	 * @param {string} [suffix=""] - Suffix to append to each parent path.
+	 * @param {boolean} [avoidRoot=false] - Whether to exclude the root path.
+	 * @returns {string[]} Array of parent paths.
+	 */
+	static getPathParents(path, suffix = "", avoidRoot = false) {
+		const segments = path.split('/').filter(Boolean)
+		const result = segments.slice(0, -1).map(
+			/**
+			 * @param {*} _
+			 * @param {number} index
+			 * @returns {string}
+			 */
+			(_, index) => segments.slice(0, index + 1).join('/') + suffix
+		)
+		return avoidRoot ? result : [suffix, ...result]
 	}
 }
 

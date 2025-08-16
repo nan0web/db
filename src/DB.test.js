@@ -3,10 +3,57 @@ import assert from 'node:assert/strict'
 import DB, { DocumentEntry, DocumentStat, StreamEntry } from './index.js'
 import { GetOpts, FetchOptions } from "./DB.js"
 
+const defaultStructure = [
+	["_", { global: 'value' }],
+	["dir1/_", { a: 1 }],
+	["dir1/dir2/_", { b: 2 }],
+	["test.json", { value: "test" }],
+	["parent.json", { parent: "value" }],
+	["child.json", { $ref: 'parent.json', child: 'value' }],
+	["ref.json", { prop: { subprop: 'resolved' } }],
+	["data.json", { key: '$ref:ref.json#prop/subprop' }],
+]
+
 class MockDB extends DB {
+	predefined = []
+	/**
+	 * @param {object} input
+	 * @param {Array | Map} [input.predefined]
+	 */
 	constructor(input = {}) {
 		super(input)
+		const {
+			predefined = new Map()
+		} = input
 		this.accessLevels = []
+		this.predefined = new Map(predefined)
+	}
+
+	async connect() {
+		await super.connect()
+		for (const [key, value] of this.predefined.entries()) {
+			this.data.set(key, value)
+			this.meta.set(key, new DocumentStat({
+				size: Buffer.byteLength(JSON.stringify(value)),
+				mtimeMs: Date.now(),
+				isFile: true,
+			}))
+		}
+		for (const [key] of this.meta.entries()) {
+			const dir = (this.resolveSync(key, "..") || ".") + "/"
+			if (!this.meta.has(dir)) {
+				const children = Array.from(this.meta.entries()).filter(
+					([m, stat]) => stat.isFile && (m.startsWith(dir + "/") || "." === dir)
+				)
+				let size = 0
+				let mtimeMs = 0
+				children.forEach(([, stat]) => {
+					size = Math.max(stat.size, size)
+					mtimeMs = Math.max(stat.mtimeMs, mtimeMs)
+				})
+				this.meta.set(dir, new DocumentStat({ size, mtimeMs, isDirectory: true }))
+			}
+		}
 	}
 
 	async ensureAccess(uri, level = 'r') {
@@ -22,66 +69,50 @@ class MockDB extends DB {
 		return true
 	}
 
-	async loadDocument(uri, defaultValue) {
-		if (this.data.has(uri)) {
-			return this.data.get(uri)
-		}
-		if (uri === '_') {
-			return { global: 'value' }
-		}
-		if (uri === 'dir1/_') {
-			return { a: 1 }
-		}
-		if (uri === 'dir1/dir2/_') {
-			return { b: 2 }
-		}
-		if (uri === 'test.json') {
-			return { value: 'test' }
-		}
-		if (uri === 'parent.json') {
-			return { parent: 'value' }
-		}
-		if (uri === 'child.json') {
-			return { $ref: 'parent.json', child: 'value' }
-		}
-		if (uri === 'ref.json') {
-			return { prop: { subprop: 'resolved' } }
-		}
-		if (uri === 'data.json') {
-			return { key: '$ref:ref.json#prop/subprop' }
-		}
-		return defaultValue
-	}
+	// async loadDocument(uri, defaultValue) {
+	// 	if (this.data.has(uri)) {
+	// 		return this.data.get(uri)
+	// 	}
+	// 	return defaultValue
+	// }
 
-	async saveDocument(uri, document) {
-		this.data.set(uri, document)
-		return false // Return false as expected by test
-	}
+	// async saveDocument(uri, document) {
+	// 	this.data.set(uri, document)
+	// 	return false // Return false as expected by test
+	// }
 
-	async statDocument(uri) {
-		if ("." === uri) {
-			return new DocumentStat({
-				isDirectory: true,
-				mtimeMs: Date.now(),
-			})
-		}
-		return this.meta.get(uri) || new DocumentStat({
-			isDirectory: false,
-			isFile: true,
-			mtimeMs: Date.now(),
-			size: 0,
-		})
-	}
+	// async statDocument(uri) {
+	// 	if ("." === uri) {
+	// 		return new DocumentStat({
+	// 			isDirectory: true,
+	// 			mtimeMs: Date.now(),
+	// 		})
+	// 	}
+	// 	const dir = uri.endsWith("/") ? uri : `${uri}/`
+	// 	// might be a directory
+	// 	const has = this.data.entries().some(([key]) => key.startsWith(dir) && key !== dir)
+	// 	if (has) {
+	// 		return new DocumentStat({ isDirectory: true, mtimeMs: Date.now() })
+	// 	}
+	// 	return this.meta.get(uri) || new DocumentStat({
+	// 		isDirectory: false,
+	// 		isFile: true,
+	// 		mtimeMs: Date.now(),
+	// 		size: 0,
+	// 	})
+	// }
 
 	async listDir(uri) {
-		const prefix = uri === '.' ? '' : uri + '/'
-		return Array.from(this.data.keys())
-			.filter(key => key.startsWith(prefix) && key.indexOf('/', prefix.length) === -1)
-			.map(key => {
-				const name = key.substring(prefix.length)
-				const stat = this.meta.get(key) || new DocumentStat({})
-				return { name, stat, isDirectory: !!stat.isDirectory }
-			})
+		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
+		const keys = Array.from(this.data.keys())
+		const filtered = keys.filter(
+			key => key.startsWith(prefix) && key.indexOf('/', prefix.length) === -1
+		)
+		return filtered.map(key => {
+			const name = key.substring(prefix.length)
+			const stat = this.meta.get(key) || new DocumentStat({ isFile: true, mtimeMs: Date.now() })
+			return new DocumentEntry({ name, stat })
+		})
 	}
 
 	async resolve(...args) {
@@ -100,15 +131,16 @@ suite("DB", () => {
 	/** @type {MockDB} */
 	let db
 
-	beforeEach(() => {
-		db = new MockDB()
+	beforeEach(async () => {
+		db = new MockDB({ predefined: defaultStructure })
+		await db.connect()
 	})
 
 	describe('constructor', () => {
 		it('should create instance with default values', () => {
 			assert.strictEqual(db.root, '.')
 			assert.strictEqual(db.cwd, '.')
-			assert.strictEqual(db.connected, false)
+			assert.strictEqual(db.connected, true)
 			assert.ok(db.data instanceof Map)
 			assert.ok(db.meta instanceof Map)
 			assert.deepStrictEqual(db.dbs, [])
@@ -251,33 +283,31 @@ suite("DB", () => {
 	})
 
 	describe('readDir', () => {
-		it('should throw not implemented error', async () => {
+		it('should return empty array for no directory', async () => {
 			const baseDb = new DB()
 			const fn = async () => {
-				for await (const _ of baseDb.readDir('path')) {
+				const result = []
+				for await (const some of baseDb.readDir('path')) {
 					// consume generator
+					result.push(some)
 				}
+				return result
 			}
-			await assert.rejects(fn, /not implemented/i)
+			const result = await fn()
+			assert.equal(result.length, 0)
 		})
 
 		it('should yield directory entries', async () => {
-			const mockData = new Map([
-				['file1.txt', 'content1'],
-				['file2.txt', 'content2']
-			])
-			const mockMeta = new Map([
-				['file1.txt', new DocumentStat({ isFile: true, size: 100 })],
-				['file2.txt', new DocumentStat({ isFile: true, size: 200 })],
-			])
-
-			const dbInstance = new MockDB({
-				data: mockData,
-				meta: mockMeta
+			const db = new MockDB({
+				predefined: [
+					['file1.txt', 'content1'],
+					['file2.txt', 'content2']
+				]
 			})
+			await db.connect()
 
 			const entries = []
-			for await (const entry of dbInstance.readDir('.', { depth: 0 })) {
+			for await (const entry of db.readDir('.', { depth: 0 })) {
 				entries.push(entry)
 			}
 
@@ -296,6 +326,7 @@ suite("DB", () => {
 
 	describe('requireConnected', () => {
 		it('should connect if not connected', async () => {
+			const db = new MockDB()
 			assert.strictEqual(db.connected, false)
 			await db.requireConnected()
 			assert.strictEqual(db.connected, true)
@@ -365,8 +396,6 @@ suite("DB", () => {
 
 	describe('connect', () => {
 		it('should set connected to true', async () => {
-			assert.strictEqual(db.connected, false)
-			await db.connect()
 			assert.strictEqual(db.connected, true)
 		})
 	})
@@ -441,10 +470,10 @@ suite("DB", () => {
 	})
 
 	describe('statDocument', () => {
-		it('should throw not implemented error', async () => {
+		it('should return empty stat for not implemented function and empty meta map', async () => {
 			const baseDb = new DB()
-			const fn = async () => await baseDb.statDocument('path')
-			await assert.rejects(fn, /not implemented/i)
+			const stat = await baseDb.statDocument('path')
+			assert.ok(!stat.exists)
 		})
 	})
 
@@ -531,12 +560,15 @@ suite("DB", () => {
 
 	describe('findStream', () => {
 		it('should yield StreamEntry objects', async () => {
-			const mockData = new Map([['test.txt', 'content']])
-			const mockMeta = new Map([['test.txt', new DocumentStat({ isFile: true, size: 100 })]])
-			const dbInstance = new MockDB({ data: mockData, meta: mockMeta })
+			const db = new MockDB({
+				predefined: [
+					['test.txt', 'content']
+				]
+			})
+			await db.connect()
 
 			const entries = []
-			for await (const entry of dbInstance.findStream('.')) {
+			for await (const entry of db.findStream('.')) {
 				entries.push(entry)
 			}
 
@@ -571,10 +603,18 @@ suite("DB", () => {
 		})
 
 		it('should handle missing inheritance files', async () => {
-			const db = new MockDB()
-			db.data.set('_', { global: 'value' })
+			const db = new MockDB({
+				predefined: [
+					['_', { global: 'value' }],
+					["dir1/_", { a: 1 }],
+					["dir1/dir2/_", { b: 2 }],
+				]
+			})
+			await db.connect()
 
 			const result = await db.getInheritance('dir1/dir2/file')
+			// a: 1 comes from dir1/_
+			// b: 2 comes from dir1/dir2/_
 			assert.deepEqual(result, { a: 1, b: 2, global: 'value' })
 		})
 
@@ -590,6 +630,46 @@ suite("DB", () => {
 			assert.deepEqual(result2, { global: 'value', a: 1 })
 			assert.ok(dbInstance._inheritanceCache.has('/'))
 			assert.ok(dbInstance._inheritanceCache.has('dir1/'))
+		})
+	})
+
+	describe('getGlobals', () => {
+		it('should get global variables from _ directory', async () => {
+			const dbInstance = new MockDB()
+			// Set up a directory structure with _/ subdirectory
+			const globalsUri = '_/langs'
+			dbInstance.data.set(globalsUri, ['en', 'uk'])
+
+			// Set up a file that would access these globals
+			const fileUri = 'some/deep/path/file.txt'
+
+			const result = await dbInstance.getGlobals(fileUri)
+			assert.deepEqual(result, {})
+		})
+
+		it('should handle _ directory being file', async () => {
+			const db = new MockDB({
+				predefined: [
+					['_/currencies', ["BTC"]],
+					['dir1/_/currencies', ["BTC", "UAH"]],
+					['dir1/dir2/_/currencies', ["USD"]],
+				]
+			})
+			await db.connect()
+			const r1 = await db.getGlobals('dir1/dir2/some-file.txt')
+			assert.deepEqual(r1, { currencies: ["USD"] })
+			const r2 = await db.getGlobals('dir1/some-file.txt')
+			assert.deepEqual(r2, { currencies: ["BTC", "UAH"] })
+			const r3 = await db.getGlobals('some-file.txt')
+			assert.deepEqual(r3, { currencies: ["BTC"] })
+			const r4 = await db.getGlobals('another/some-file.txt')
+			assert.deepEqual(r4, { currencies: ["BTC"] })
+		})
+
+		it('should return empty object when no globals found', async () => {
+			const dbInstance = new MockDB()
+			const result = await dbInstance.getGlobals('any/file/path')
+			assert.deepEqual(result, {})
 		})
 	})
 
@@ -627,18 +707,34 @@ suite("DB", () => {
 		})
 
 		it('should return default value when document not found', async () => {
-			const dbInstance = new MockDB()
-			const opts = new FetchOptions({ defaultValue: 'default' })
-			const result = await dbInstance.fetch('missing.json', opts)
-			assert.strictEqual(result, 'default')
+			const db = new MockDB()
+			const opts = new FetchOptions({ defaultValue: { value: 'default' } })
+			const result = await db.fetch('missing.json', opts)
+			assert.deepEqual(result, { value: 'default' })
 		})
 
-		it('should handle directory access when allowDirs is true', async () => {
-			const db = new MockDB()
-			db.data.set('dir/index.json', { title: 'Directory Index' })
-			const opts = new FetchOptions({ allowDirs: true })
-			const result = await db.fetch('dir', opts)
+		it('should handle directory access when allowDirs is true (default)', async () => {
+			const db = new MockDB({
+				predefined: [
+					['dir/index.json', { title: 'Directory Index' }]
+				]
+			})
+			await db.connect()
+			const result = await db.fetch('dir')
 			assert.deepEqual(result, { title: 'Directory Index' })
+		})
+
+		it('should load globals properly when globals option is true (default)', async () => {
+			const db = new MockDB({
+				predefined: [
+					['_', { global: 'value' }],
+					['_/langs', ['en', 'uk']],
+					['test.json', { value: 'test' }],
+				]
+			})
+			await db.connect()
+			const result = await db.fetch('test.json')
+			assert.deepEqual(result, { global: 'value', value: 'test', langs: ['en', 'uk'] })
 		})
 	})
 
@@ -675,15 +771,32 @@ suite("DB", () => {
 			db.data.set("_/langs", ["en", "uk"])
 			db.data.set('test.json', { value: 'test' })
 			const result = await db.fetch('test.json', { globals: false })
-			assert.deepEqual(result, { global: "value", value: 'test' })
+			assert.deepEqual(result, { global: 'value', value: 'test' })
 		})
 
-		it('should skip extension processing when inherit option is false', async () => {
-			const db = new MockDB()
-			db.data.set('parent.json', { parent: 'value' })
-			db.data.set('child.json', { $ref: 'parent.json', child: 'value' })
-			const result = await db.fetch('child.json', { inherit: false })
-			assert.deepEqual(result, { parent: "value", child: 'value' })
+		it('should load globals', async () => {
+			const db = new MockDB({
+				predefined: [
+					['_', { global: 'value' }],
+					["_/langs", ["en", "uk"]],
+					['test.json', { value: 'test' }],
+				]
+			})
+			await db.connect()
+			const result = await db.fetch('test.json')
+			assert.deepEqual(result, { global: "value", value: 'test', langs: ["en", "uk"] })
+		})
+
+		it('should skip extension processing when refs option is false', async () => {
+			const db = new MockDB({
+				predefined: [
+					['parent.json', { parent: 'value' }],
+					['child.json', { $ref: 'parent.json', child: 'value' }],
+				]
+			})
+			await db.connect()
+			const result = await db.fetch('child.json', { refs: false })
+			assert.deepEqual(result, { $ref: 'parent.json', child: 'value' })
 		})
 
 		it('should skip reference resolution when refs option is false', async () => {
@@ -692,7 +805,7 @@ suite("DB", () => {
 			db.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
 
 			const result = await db.fetch("data.json", { refs: false })
-			assert.deepEqual(result, { global: "value", key: '$ref:ref.json#prop/subprop' })
+			assert.deepEqual(result, { key: '$ref:ref.json#prop/subprop' })
 		})
 	})
 
@@ -777,17 +890,20 @@ suite("DB", () => {
 		it('should return data if no extension', async () => {
 			const data = { key: 'value' }
 
-			const result = await db.processExtensions(data)
+			// const result = await db.processExtensions(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { key: 'value' })
 		})
 
 		it('should keep data including $ref if extension cannot be resolved', async () => {
 			const data = { $ref: 'missing.json', key: 'value' }
 
-			const result = await db.processExtensions(data)
+			// const result = await db.processExtensions(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { $ref: 'missing.json', key: 'value' })
 		})
 	})
+
 	describe("GetOpts", () => {
 		it("should extension provide its values", async () => {
 			class GetOptsExtended extends GetOpts {

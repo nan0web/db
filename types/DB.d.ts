@@ -33,10 +33,10 @@ declare class DB {
     static DATA_EXTNAMES: string[];
     /**
      * Creates a new DB instance from properties if object provided
-     * @param {object|DB} props - Properties or DB instance
+     * @param {object|DB} input - Properties or DB instance
      * @returns {DB}
      */
-    static from(props: object | DB): DB;
+    static from(input: object | DB): DB;
     /**
      * Creates a new DB instance from input object
      * that can include configuration for:
@@ -244,7 +244,12 @@ declare class DB {
      * @returns {Promise<string>} Resolved absolute path
      */
     resolve(...args: string[]): Promise<string>;
-    normalize(...args: any[]): string;
+    /**
+     * Normalize path segments to absolute path
+     * @param  {...string} args - Path segments
+     * @returns {string} Normalized path
+     */
+    normalize(...args: string[]): string;
     /**
      * Resolves path segments to absolute path synchronously
      * @param  {...string} args - Path segments
@@ -259,21 +264,27 @@ declare class DB {
      */
     absolute(...args: string[]): string;
     /**
-     * Loads a document
+     * Loads a document.
+     * Must be overwritten to has the proper file or database document read operation.
+     * In a basic class it just loads already saved data in the db.data map.
      * @param {string} uri - Document URI
-     * @param {any} [defaultValue=""] - Default value if document not found
+     * @param {any} [defaultValue] - Default value if document not found
      * @returns {Promise<any>}
      */
     loadDocument(uri: string, defaultValue?: any): Promise<any>;
     /**
-     * Saves a document
+     * Saves a document.
+     * Must be overwritten to has the proper file or database document save operation.
+     * In a basic class it just sets a document in the db.data map and db.meta map.
      * @param {string} uri - Document URI
      * @param {any} document - Document data
      * @returns {Promise<boolean>}
      */
     saveDocument(uri: string, document: any): Promise<boolean>;
     /**
-     * Creates DocumentStat for a specific document
+     * Reads a statisitics into DocumentStat for a specific document.
+     * Must be overwritten to has the proper file or database document stat operation.
+     * In a basic class it just returns a document stat from the db.meta map if exists.
      * @note Must be overwritten by platform-specific implementation
      * @param {string} uri - Document URI
      * @returns {Promise<DocumentStat>}
@@ -328,17 +339,13 @@ declare class DB {
      * @param {number} [options.depth] - Depth to list
      * @param {boolean} [options.skipStat] - Skip statistics collection
      * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
-     * @returns {Promise<{name: string, stat: DocumentStat, isDirectory: boolean}[]>} Directory entries
+     * @returns {Promise<DocumentEntry[]>} Directory entries
      */
     listDir(uri: string, { depth, skipStat, skipSymbolicLink }?: {
         depth?: number | undefined;
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
-    }): Promise<{
-        name: string;
-        stat: DocumentStat;
-        isDirectory: boolean;
-    }[]>;
+    }): Promise<DocumentEntry[]>;
     /**
      * Push stream of progress state
      * @param {string} uri - Starting URI
@@ -367,8 +374,16 @@ declare class DB {
      */
     getInheritance(path: string): Promise<any>;
     /**
+     * Gets global variables for a given path, global variables are stored in _/ subdirectory
+     * @param {string} path - Document path
+     * @returns {Promise<any>} Global variables data
+     */
+    getGlobals(path: string): Promise<any>;
+    /**
+     * Fetch document with inheritance, globals and references processing
      * @param {string} uri
      * @param {object | FetchOptions} [opts]
+     * @returns {Promise<any>}
      */
     fetch(uri: string, opts?: object | FetchOptions): Promise<any>;
     /**
@@ -387,13 +402,6 @@ declare class DB {
      * @returns {Promise<object>} Data with resolved references
      */
     resolveReferences(data: object, basePath?: string | undefined): Promise<object>;
-    /**
-     * Processes document extensions and merges data recursively
-     * @param {object} data - Document data with potential extensions
-     * @param {string} [basePath] - Base path for resolving relative extensions
-     * @returns {Promise<object>} Merged extended data
-     */
-    processExtensions(data: object, basePath?: string | undefined): Promise<object>;
 }
 import DocumentStat from "./DocumentStat.js";
 import Data from "./Data.js";

@@ -4,6 +4,7 @@ function Filter() {
 
 class Directory {
 	static FILE = "_"
+	static GLOBALS = "_/"
 	static INDEX = "index"
 	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".csv"]
 	get entries() {
