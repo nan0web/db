@@ -1,9 +1,9 @@
 import { FilterString, oneOf } from "@nan0web/types"
+import Data from "./Data.js"
+import Directory from "./Directory.js"
 import DocumentStat from "./DocumentStat.js"
 import DocumentEntry from "./DocumentEntry.js"
 import StreamEntry from "./StreamEntry.js"
-import Data from "./Data.js"
-import Directory from "./Directory.js"
 
 class GetOpts {
 	defaultValue = undefined
@@ -138,6 +138,17 @@ class DB {
 	}
 
 	/**
+	 * Returns constructor options to save and restore database instance later.
+	 * @returns {Record<string, any>}
+	 */
+	get options() {
+		return {
+			cwd: this.cwd,
+			root: this.root,
+		}
+	}
+
+	/**
 	 * Returns Data helper class that is assign to DB or its extension.
 	 * Define your own Data provider to extend its logic, no need to extend getter.
 	 * ```js
@@ -222,6 +233,7 @@ class DB {
 		const prefix = String(uri).replace(/\/+$/, '') + "/"
 		return new Class({
 			root: root + uri,
+			cwd: this.cwd,
 			data: new Map(Array.from(this.data.entries()).filter(
 				([key]) => key.startsWith(prefix)
 			).map(([key, value]) => [key.replace(prefix, ""), value])),
@@ -500,7 +512,27 @@ class DB {
 		if (this.data.has(rel)) {
 			return this.data.get(rel)
 		}
+		const extname = this.extname(rel)
+		if (!extname) {
+			for (const ext of this.Directory.DATA_EXTNAMES) {
+				const data = await this.loadDocument(rel + ext, null)
+				if (null !== data) {
+					return data
+				}
+			}
+		}
 		return defaultValue
+	}
+
+	/**
+	 * Loads a document using a specific extension handler.
+	 * @param {string} ext The extension of the document.
+	 * @param {string} uri The URI to load the document from.
+	 * @param {any} defaultValue The default value to return if the document does not exist.
+	 * @returns {Promise<any>} The loaded document or the default value.
+	 */
+	async loadDocumentAs(ext, uri, defaultValue) {
+		return await this.loadDocument(uri, defaultValue)
 	}
 
 	/**
@@ -564,11 +596,11 @@ class DB {
 	}
 
 	/**
-	 * Ensures access for given URI and level
+	 * Ensures access for given URI and level, if not @throws an error.
 	 * @note Must be overwritten by platform specific application
 	 * @param {string} uri - Document URI
 	 * @param {string} [level='r'] Access level
-	 * @returns {Promise<boolean>}
+	 * @returns {Promise<void>}
 	 */
 	async ensureAccess(uri, level = "r") {
 		if (!oneOf("r", "w", "d")(level)) {
@@ -579,7 +611,6 @@ class DB {
 				"d = delete",
 			].join("\n"))
 		}
-		return true
 	}
 
 	/**

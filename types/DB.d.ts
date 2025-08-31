@@ -88,6 +88,11 @@ declare class DB {
      */
     get loaded(): boolean;
     /**
+     * Returns constructor options to save and restore database instance later.
+     * @returns {Record<string, any>}
+     */
+    get options(): Record<string, any>;
+    /**
      * Returns Data helper class that is assign to DB or its extension.
      * Define your own Data provider to extend its logic, no need to extend getter.
      * ```js
@@ -273,6 +278,14 @@ declare class DB {
      */
     loadDocument(uri: string, defaultValue?: any): Promise<any>;
     /**
+     * Loads a document using a specific extension handler.
+     * @param {string} ext The extension of the document.
+     * @param {string} uri The URI to load the document from.
+     * @param {any} defaultValue The default value to return if the document does not exist.
+     * @returns {Promise<any>} The loaded document or the default value.
+     */
+    loadDocumentAs(ext: string, uri: string, defaultValue: any): Promise<any>;
+    /**
      * Saves a document.
      * Must be overwritten to has the proper file or database document save operation.
      * In a basic class it just sets a document in the db.data map and db.meta map.
@@ -307,13 +320,13 @@ declare class DB {
      */
     dropDocument(uri: string): Promise<boolean>;
     /**
-     * Ensures access for given URI and level
+     * Ensures access for given URI and level, if not @throws an error.
      * @note Must be overwritten by platform specific application
      * @param {string} uri - Document URI
      * @param {string} [level='r'] Access level
-     * @returns {Promise<boolean>}
+     * @returns {Promise<void>}
      */
-    ensureAccess(uri: string, level?: string | undefined): Promise<boolean>;
+    ensureAccess(uri: string, level?: string | undefined): Promise<void>;
     /**
      * Synchronize data with persistent storage
      * @param {string|undefined} [uri] Optional specific URI to save
