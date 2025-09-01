@@ -51,5 +51,11 @@
 	"peerDependencies": {
 		"@nan0web/db-fs": "^1.0.0",
 		"@nan0web/types": "^1.0.0"
-	}
+	},
+	"files": [
+		"src/",
+		"types/",
+		"package.json",
+		"README.md"
+	]
 }
