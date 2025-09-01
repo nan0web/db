@@ -1,156 +1,191 @@
-# NaN•Web DB
+# @nan0web/db
 
-Every data is a database.  
-Connect everything to a database: website, local data, ftp data.
-Everything can be fetched, updated or deleting if you have access rights.
+|[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
+|---|---|---|---|---|
+ |🟢 `98.4%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `91.8%` |✅ d.ts 📜 system.md 🕹️ playground |— |
 
-You can attach any friends (shared) database to your own as a branch, for instance `mnt/MyWebsite.com/pics`.  
-And you can extract any of your branches to other databases `const extractedDb = db.extract("pics")`.
+Agnostic document database and data manipulation utilities. Designed to be
+flexible, minimal and powerful — the tool that supports any data format and
+nested hierarchy with reference resolution, inheritance and global variables.
 
-## Project Goals
+Inspired by `zero-is-not-a-number` rule of nan0web:
+> Every data becomes a database.
 
-- Provide a universal database abstraction layer for any data source
-- Enable seamless integration between different data storage systems
-- Simplify data manipulation with powerful utilities
-- Support hierarchical data organization with branches
-- Implement secure access control
+Based on real use-cases, supports:
+- object flattening/unflattening
+- deep merging with reference handling
+- async directory listing (for fs & fetch layers)
+- stream-based progress during traversal
 
-## Features
+See how it works in [playground](#playground).
 
-- **Universal Interface**: Same API for filesystems, HTTP resources, and more
-- **Branching**: Attach/detach databases as branches
-- **Data Extraction**: Isolate subsets of data into new DB instances
-- **Streaming Support**: Process large datasets efficiently
-- **Access Control**: Fine-grained permissions (read/write/delete)
-- **Data Utilities**: Flattening, unflattening, deep merging
-- **Type Safety**: Full JSDoc annotations with TypeScript support
-- **Progress Tracking**: Real-time progress monitoring for long operations
-- **Inheritance Processing**: Merge global values and data from parent directories 
-- **Reference Resolution**: Resolve references to other documents or their parts by URI
-- **Directory Indexing**: Store and manage directory listings in various formats
-- **Extensible Architecture**: Platform-specific implementations through inheritance
+## Installation
 
-## API Overview
-
-```js
-import DB from '@nan0web/db'
-
-// Create database instance
-const db = new DB({ root: '/data' })
-
-// Basic operations
-await db.get('document.txt')
-await db.set('document.txt', 'content')
-await db.stat('document.txt')
-
-// Branch management
-const branch = db.extract('subfolder')
-db.attach(externalDB)
-
-// Streaming with progress
-for await (const entry of db.findStream('*.txt', { 
-	sort: 'size', 
-	order: 'desc' 
-})) {
-	console.log(`Progress: ${entry.progress * 100}%`)
-	console.log(entry.file.name)
-}
+How to install with npm?
+```bash
+npm install @nan0web/db
 ```
 
-## Core Classes
+How to install with pnpm?
+```bash
+pnpm add @nan0web/db
+```
 
-### DB (Base database class)
-The foundation for all database operations with common functionality.
-- `fetch(uri, opts)` – Load document with processing of inheritance, globals and references
-- `get(uri, opts)` – Get document content with caching
-- `set(uri, data)` – Set document content
-- `stat(uri)` – Get document statistics with caching
-- `loadDocument(uri, defaultValue)` – Load document from storage (platform-specific)
-- `saveDocument(uri, document)` – Save document to storage (platform-specific)
-- `statDocument(uri)` – Get document stats from storage (platform-specific)
-- `dropDocument(uri)` – Delete document from storage (platform-specific)
-- `ensureAccess(uri, level)` – Check access permissions for URI
-- `connect()` – Connect to database (platform-specific)
-- `disconnect()` – Disconnect from database
-- `readDir(uri, options)` – Read directory contents as async generator
-- `find(uri, depth)` – Find documents matching criteria
-- `push(uri)` – Synchronize data with persistent storage
-- `moveDocument(from, to)` – Move document between URIs
-- `getInheritance(path)` – Get inherited data from parent directories
-- `getGlobals(path)` – Get scoped variables from `_` directories
-- `resolveReferences(data, basePath)` – Process all references recursively
+How to install with yarn?
+```bash
+yarn add @nan0web/db
+```
 
-### DocumentEntry
-Represents a document in the database with metadata and path information.
-- `name` – Document name
-- `stat` – Document statistics (DocumentStat instance)
-- `depth` – Directory depth level
-- `path` – Full document path
-- `parent` – Parent directory path
-- `fulfilled` – Whether processing is complete
-- `isDirectory`, `isFile`, `isSymbolicLink` – Type checking methods
+## Quick Start
 
-### DocumentStat
-Document metadata and statistics representation.
-- `mtimeMs`, `atimeMs`, `ctimeMs`, `btimeMs` – Time statistics in milliseconds
-- `size`, `mode`, `uid`, `gid` – File size and permissions
-- `isFile`, `isDirectory`, `isSymbolicLink` – File type indicators
-- `exists` – Check if document exists
-- `error` – Error information if operation failed
+How to load JSON document?
+```js
+import DB from "@nan0web/db"
+const db = new DB()
+const doc = await db.loadDocumentAs(".json", "doc", { key: "value" })
+console.info(doc) // ← { key: "value" }
+```
+### Example: Using `get()` with default fallback
 
-### StreamEntry
-Progress-aware streaming interface for directory operations.
-- `file` – Current DocumentEntry
-- `files` – All processed files
-- `dirs` – Directory map
-- `top` – Top-level directory map
-- `errors` – Error map
-- `progress` – Progress ratio (0-1)
-- `totalSize` – Size statistics object
+How to get or return default?
+```js
+import DB from "@nan0web/db"
+const db = new DB()
+const result = await db.get("missing-file.json", { defaultValue: {} })
+console.info(result) // ← {}
+```
+### Example: Loading known document
 
-### Data
-Powerful data manipulation utilities for object transformation.
-- `flatten(obj)` – Flatten nested object into path-value pairs
-- `unflatten(flat)` – Unflatten path-value pairs into nested object
-- `merge(target, source)` – Deep merge objects
-- `find(path, obj)` – Find value by path in an object
-- `mergeFlat(target, source)` - Merge two arrays of flat path-value tuples
-- `flatSiblings(flat, key)` - Get sibling entries of a specific path
-- `getPathParents(path)` - List all parent paths of a given path
+How to get specific document?
+```js
+import DB from "@nan0web/db"
+const db = new DB({ data: new Map([["file.txt", "text"]]) })
+const result = await db.get("file.txt")
+console.info(result) // ← "text"
+```
+## Usage with Real Context
 
-### Directory
-Configuration for directory handling and naming conventions.
-- `FILE` – Directory configuration file name (default: "_")
-- `GLOBALS` – Global variables directory (default: "_/")
-- `INDEX` – Index file name (default: "index")
-- `DATA_EXTNAMES` – Supported data file extensions
+### Resolving references and global vars
 
-### DirectoryIndex
-Directory listing management with multiple storage formats.
-- `entriesColumns` – Column definitions for indexed entries
-- `entriesAs` – Storage format ("array", "object", "rows", "text")
-- `maxEntriesOnLoad` – Maximum entries to load at once
-- `encode(entries, target)` – Encode entries to specified format
-- `decode(source, target)` – Decode entries from specified format
+How to use document reference system?
+```js
+import DB from "@nan0web/db"
+const db = new DB({
+	data: new Map([
+		["_/index.json", { global: "value" }],
+		["data.json", { "$ref": "_/index.json", key: "val" }]
+	])
+})
+const res = await db.fetch("data.json")
+console.info(res) // ← { global: "value", key: "val" }
+```
+## Playground
 
-## Use Cases
+CLI sandbox for safe experiments:
+```bash
+git clone https://github.com/nan0web/db.git
+cd db
+npm install
+npm run playground
+```
 
-- Unified file management across local and remote systems
-- Data synchronization between different storage backends
-- Building custom database solutions
-- Processing hierarchical data structures
-- Implementing access-controlled data layers
+## API Reference
 
-## Extensions
+The heart of the package includes core tools to manage hierarchical data structures.
 
-You can see the other layers extending this abstraction:
-- [nan0web/db-fs](https://nan0web.yaro.page/db-fs.html) - Database with a standard file management `node:fs`.
-- [nan0web/db-fetch](https:/nan0web.yaro.page/db-fetch.html) - Database with a standard file management with `window.fetch`, for saving and deleting operations requires a server side for post and delete methods.
+### `db.get(uri, GetOpts)`
+Loads/returns document content from its URI.
 
-## LICENSE
+* **Parameters**
+  * `uri` *(string)* – Document URI.
+  * `GetOpts.defaultValue` *(any)* – fallback if doc not found
 
-- [ISC](./LICENSE)
+* **Returns**
+  * *(any)* – Document content or default value.
 
-## CONTRIBUTION
+How to get document value?
+```js
+import DB from "@nan0web/db"
+const db = new DB({ data: new Map([["x.file", "hello"]]) })
+const result = await db.get("x.file")
+console.info(result) // ← "hello"
+```
+### `db.fetch(uri, FetchOptions)`
+Like get, plus advanced features: refs, vars, inherit rules processing.
 
-- [Join and contribute](./CONTRIBUTING.md)
+Supports extension lookup, e.g. find `.json` even when omitted.
+
+How to load extended data?
+```js
+import DB from "@nan0web/db"
+const db = new DB({ data: new Map([["file.json", { value: "loaded" }]]) })
+const result = await db.fetch("file")
+console.info(result) // ← { value: "loaded" }
+```
+### `db.set(uri, data)`
+Sets document content and marks metadata updates.
+
+How to save new content?
+```js
+import DB from "@nan0web/db"
+const db = new DB()
+const res = await db.set("file.text", "save me!")
+console.info(res) // ← "save me!"
+console.info(db.data.get("file.text")) // ← "save me!"
+```
+### `db.push(uri?)`
+Syncs memory changes to external files or services.
+
+How to sync to storage?
+```js
+import DB from "@nan0web/db"
+const db = new DB()
+await db.set("./app.json", { version: "1.0" })
+const changed = await db.push()
+console.info(changed) // ← ["./app.json"]
+```
+### `Data.flatten(data)`
+Flattens nested object into paths as keys.
+
+How to flatten object?
+```js
+import { Data } from "@nan0web/db"
+const flat = Data.flatten({ x: { a: [1, 2, { b: 3 }] }})
+console.info(flat) // ← { 'x/a/[0]': 1, 'x/a/[1]': 2, 'x/a/[2]/b': 3 }
+```
+### `Data.unflatten(data)`
+Reconstructs nested structure from flat keys.
+
+How to unflatten data?
+```js
+import { Data } from "@nan0web/db"
+const nested = Data.unflatten({
+	"x/y/z": 7,
+	"arr/[0]/title": "first",
+	"arr/[1]/title": "second"
+})
+console.info(nested) // ← { x: { y: { z: 7 } }, arr: [ { title: 'first' }, { title: 'second' } ] }
+```
+### `Data.merge(a, b)`
+Deep merges two objects, handling array conflicts by replacing.
+
+How to merge deeply?
+```js
+import { Data } from "@nan0web/db"
+const a = { x: { one: 1 }, arr: [0] }
+const b = { y: "two", x: { two: 2 }, arr: [1] }
+const merged = Data.merge(a, b)
+console.info(merged) // ← { x: { one: 1, two: 2 }, y: 'two', arr: [ 1 ] }
+```
+## Java•Script types & Autocomplete
+Package is fully typed with jsdoc and d.ts.
+
+How many d.ts files should cover the source?
+
+## Contributing
+
+How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
+
+## License
+
+ISC LICENSE – [see full text](https://github.com/nan0web/db/blob/main/LICENSE)

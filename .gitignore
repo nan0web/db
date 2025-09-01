@@ -1,3 +1,5 @@
+/.datasets/
+/.coverage/
 chat/
 node_modules/
 test-auth-data/
