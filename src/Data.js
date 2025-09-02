@@ -63,7 +63,13 @@ class Data {
 					? `${Data.ARRAY_WRAPPER[0]}${key}${Data.ARRAY_WRAPPER[1]}` : key
 				const propName = parent ? `${parent}${Data.OBJECT_DIVIDER}${corrKey}` : corrKey
 				if (typeof obj[key] === 'object' && null !== obj[key]) {
-					Data.flatten(obj[key], propName, res)
+					// Check if it's an empty object or array
+					if ((Array.isArray(obj[key]) && obj[key].length === 0) ||
+							(!Array.isArray(obj[key]) && Object.keys(obj[key]).length === 0)) {
+						res[propName] = obj[key]
+					} else {
+						Data.flatten(obj[key], propName, res)
+					}
 				} else {
 					res[propName] = obj[key]
 				}
@@ -134,7 +140,10 @@ class Data {
 		const result = {}
 		const noRegExp = new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`)
 
-		for (let flatKey in data) {
+		// Sort keys to ensure we create objects before assigning properties to them
+		const sortedKeys = Object.keys(data).sort()
+
+		for (let flatKey of sortedKeys) {
 			const keys = flatKey.split(Data.OBJECT_DIVIDER)
 			/** @type {string[]} */
 			const path = []
@@ -176,7 +185,12 @@ class Data {
 				if ('object' === typeof v) {
 					const path = flatKey.slice(p.join(Data.OBJECT_DIVIDER).length + 1)
 					const parentValue = Data.find(p, result)
-					parentValue[path] = data[flatKey]
+					// Check if parentValue is actually an object before trying to set property
+					if (typeof parentValue === 'object' && parentValue !== null) {
+						parentValue[path] = data[flatKey]
+					} else {
+						throw new TypeError(`Cannot set property '${path}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`)
+					}
 				} else {
 					result[key] = data[flatKey]
 				}

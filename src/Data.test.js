@@ -66,6 +66,14 @@ suite('Data', () => {
 				'level1/array/[1]': 2
 			})
 		})
+
+		it('should store empty objects', () => {
+			const obj = { code: "UAH", rates: {} }
+			assert.deepEqual(Data.flatten(obj), {
+				"code": "UAH",
+				"rates": {}
+			})
+		})
 	})
 
 	describe('unflatten()', () => {
