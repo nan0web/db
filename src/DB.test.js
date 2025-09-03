@@ -736,6 +736,21 @@ suite("DB", () => {
 			const result = await db.fetch('test.json')
 			assert.deepEqual(result, { global: 'value', value: 'test', langs: ['en', 'uk'] })
 		})
+
+		it("should not go into infinite loop", async () => {
+			const db = new MockDB({
+				predefined: [
+					["_", { "nav": [{ href: "index.html", title: "Home" }] }],
+					["typography.json", { "$content": [{ h1: "Typography" }] }],
+				]
+			})
+			await db.connect()
+			const result = await db.fetch("typography.json")
+			assert.deepEqual(result, {
+				nav: [{ href: "index.html", title: "Home" }],
+				$content: [{ h1: "Typography" }]
+			})
+		})
 	})
 
 	describe('fetchMerged', () => {
@@ -845,20 +860,28 @@ suite("DB", () => {
 		})
 
 		it('should resolve nested references (property version)', async () => {
-			const dbInstance = new MockDB()
-			dbInstance.data.set('ref.json', 'referenced value')
+			const db = new MockDB({
+				predefined: [
+					['ref.json', 'referenced value']
+				]
+			})
+			await db.connect()
 			const data = { nested: { key: { $ref: 'ref.json' } } }
 
-			const result = await dbInstance.resolveReferences(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { nested: { key: 'referenced value' } })
 		})
 
 		it('should resolve nested references (property version) with siblings', async () => {
-			const dbInstance = new MockDB()
-			dbInstance.data.set('ref.json', 'referenced value')
+			const db = new MockDB({
+				predefined: [
+					["ref.json", "referenced value"]
+				]
+			})
+			await db.connect()
 			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
 
-			const result = await dbInstance.resolveReferences(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, {
 				nested: { key: { value: 'referenced value', color: "blue" } }
 			})

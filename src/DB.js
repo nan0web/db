@@ -1043,7 +1043,6 @@ class DB {
 		const path = this.Data.OBJECT_DIVIDER + inKey
 		return key.endsWith(path) ? key.split(path)[0] : key
 	}
-
 	/**
 	 * Handles document references and resolves them recursively
 	 * @param {object} data - Document data with potential references
@@ -1060,10 +1059,18 @@ class DB {
 		// Process all references in the data object
 		for (const [key, refPath] of refKeys) {
 			try {
+				// Normalize refPath: it may be a string or an object like { $ref: 'file.json' }
+				let refString = refPath
+				if (typeof refPath === 'object' && refPath !== null && this.Data.REFERENCE_KEY in refPath) {
+					refString = refPath[this.Data.REFERENCE_KEY]
+				}
+				if (typeof refString !== 'string') {
+					// If still not a string, skip processing this reference
+					continue
+				}
 				// Handle absolute and relative paths
-				// const base = basePath ? await this.resolve(basePath)
 				const abs = this.normalize(
-					refPath.startsWith('/') ? refPath : await this.resolve(basePath, '..', refPath)
+					refString.startsWith('/') ? refString : await this.resolve(basePath, '..', refString)
 				)
 
 				// Handle fragment references like contacts.json#address/zip
@@ -1076,7 +1083,7 @@ class DB {
 					const refValue = await this.get(abs)
 					if (undefined !== refValue) {
 						let parentKey = this._getParentReferenceKey(key)
-						if (parentKey === key) parentKey = ""
+						if (parentKey === key) parentKey = ''
 						/**
 						 * @type {Array<Array<string, any>>}
 						 */
@@ -1084,6 +1091,7 @@ class DB {
 							([k, val]) => parentKey ? [k.slice((parentKey + this.Data.OBJECT_DIVIDER).length), val] : [k, val]
 						)
 
+						let clearKeys = ""
 						if (siblings.length > 0) {
 							const value = "object" === typeof refValue ? (refValue ?? {}) : { value: refValue }
 							if ("" === parentKey) {
@@ -1096,15 +1104,22 @@ class DB {
 								flat[parentKey] = Object.fromEntries(
 									this.Data.mergeFlat(Object.entries(value), siblings)
 								)
+								clearKeys = parentKey
 							}
 						} else {
-							flat["" === parentKey ? key : parentKey] = refValue
+							clearKeys = "" === parentKey ? key : parentKey
+							flat[clearKeys] = refValue
+						}
+						if (clearKeys) {
+							Object.keys(flat).filter(
+								k => k.startsWith(clearKeys + this.Data.OBJECT_DIVIDER)
+							).map(k => delete flat[key])
 						}
 					}
 				}
 			} catch (err) {
 				// If reference can't be resolved, keep original value
-				// Don't modify the value, keep it as original reference string
+				// Don't modify the value, keep it as original reference string or object
 			}
 		}
 
