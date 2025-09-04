@@ -53,6 +53,7 @@ declare class DB {
      * @param {Map<string, any | false>} [input.data=new Map()]
      * @param {Map<string, DocumentStat>} [input.meta=new Map()]
      * @param {DB[]} [input.dbs=[]]
+     * @param {Console | NoConsole} [input.console=new NoConsole()]
      */
     constructor(input?: {
         root?: string | undefined;
@@ -61,6 +62,7 @@ declare class DB {
         data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
         dbs?: DB[] | undefined;
+        console?: Console | NoConsole | undefined;
     });
     /** @type {string} */
     encoding: string;
@@ -92,6 +94,8 @@ declare class DB {
      * @returns {Record<string, any>}
      */
     get options(): Record<string, any>;
+    /** @returns {Console | NoConsole} */
+    get console(): Console | NoConsole;
     /**
      * Returns Data helper class that is assign to DB or its extension.
      * Define your own Data provider to extend its logic, no need to extend getter.
@@ -415,8 +419,10 @@ declare class DB {
      * @returns {Promise<object>} Data with resolved references
      */
     resolveReferences(data: object, basePath?: string | undefined): Promise<object>;
+    #private;
 }
 import DocumentStat from "./DocumentStat.js";
+import { NoConsole } from "@nan0web/log";
 import Data from "./Data.js";
 import Directory from "./Directory.js";
 import DocumentEntry from "./DocumentEntry.js";

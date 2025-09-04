@@ -434,6 +434,18 @@ suite("DB", () => {
 			const path = await db.resolve("a/b", "c")
 			assert.equal(path, "a/b/c")
 		})
+		it("should resolve / directories", async () => {
+			const path = await db.resolve("api", "/users")
+			assert.equal(path, "users")
+		})
+		it("should resolve .. directories", async () => {
+			const path = await db.resolve("api/v1/", "../users")
+			assert.equal(path, "api/users")
+		})
+		it("should resolve .. in 3 args", async () => {
+			const path = await db.resolve("api/v1", "..", "users")
+			assert.equal(path, "api/users")
+		})
 	})
 
 	describe('absolute', () => {
