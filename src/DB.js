@@ -90,7 +90,8 @@ class DB {
 	 * - working directory,
 	 * - data and metadata maps,
 	 * - connection status,
-	 * - attached databases.
+	 * - attached databases,
+	 * - console for the debug, silent = true by default.
 	 *
 	 * @param {object} input
 	 * @param {string} [input.root="."]
@@ -109,7 +110,7 @@ class DB {
 			meta = new Map(),
 			connected = false,
 			dbs = [],
-			console = new NoConsole(),
+			console = new NoConsole({ silent: true }),
 		} = input
 		this.root = root
 		this.cwd = cwd
@@ -1052,7 +1053,8 @@ class DB {
 		// Process extensions recursively if enabled
 		if (opts.inherit) {
 			if (data && typeof data === 'object') {
-				const parentUri = await this.resolve(uri, "..", this.Directory.FILE)
+				let parentUri = await this.resolve(uri, "..", this.Directory.FILE)
+				if (parentUri.startsWith("/")) parentUri = parentUri.slice(1)
 
 				try {
 					const parentData = await this.get(parentUri)
