@@ -163,7 +163,7 @@ class DocumentStat {
 	 * @returns {boolean}
 	 */
 	get exists() {
-		return Boolean(this.blksize || this.mtimeMs)
+		return Boolean(this.blksize || this.mtimeMs || this.size)
 	}
 
 	/**

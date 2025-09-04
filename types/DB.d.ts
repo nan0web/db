@@ -44,7 +44,8 @@ declare class DB {
      * - working directory,
      * - data and metadata maps,
      * - connection status,
-     * - attached databases.
+     * - attached databases,
+     * - console for the debug, silent = true by default.
      *
      * @param {object} input
      * @param {string} [input.root="."]

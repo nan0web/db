@@ -974,7 +974,7 @@ class DB {
 					let extname
 					do {
 						extname = arr.shift()
-						const path = uri + "/" + this.Directory.INDEX + extname
+						const path = this.resolveSync(uri, this.Directory.INDEX + extname)
 						const stat = await this.statDocument(path)
 						if (stat.exists) {
 							return await this.fetchMerged(path, opts)
