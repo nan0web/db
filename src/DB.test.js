@@ -118,13 +118,6 @@ class MockDB extends DB {
 	async resolve(...args) {
 		return Promise.resolve(this.resolveSync(...args))
 	}
-
-	relative(from, to) {
-		if (from === this.root) {
-			return to.startsWith(from + "/") ? to.substring(from.length + 1) : to
-		}
-		return to
-	}
 }
 
 suite("DB", () => {
@@ -225,31 +218,35 @@ suite("DB", () => {
 	})
 
 	describe('extract', () => {
-		it('should create new DB with subset of data', () => {
+		it('should create new DB with subset of data', async () => {
 			const mockData = new Map([
-				['dir/file1.txt', 'content1'],
-				['dir/file2.txt', 'content2'],
-				['other.txt', 'other']
+				['root/dir/file1.txt', 'content1'],
+				['root/dir/file2.txt', 'content2'],
+				['root/other.txt', 'other']
 			])
 			const mockMeta = new Map([
-				['dir/file1.txt', new DocumentStat({ size: 100 })],
-				['dir/file2.txt', new DocumentStat({ size: 200 })],
-				['other.txt', new DocumentStat({ size: 300 })]
+				['root/dir/file1.txt', new DocumentStat({ size: 100 })],
+				['root/dir/file2.txt', new DocumentStat({ size: 200 })],
+				['root/other.txt', new DocumentStat({ size: 300 })]
 			])
 
-			const dbInstance = new MockDB({
+			const db = new MockDB({
 				root: '/root',
 				data: mockData,
 				meta: mockMeta,
 			})
 
-			const extracted = dbInstance.extract('dir/')
-
+			const extracted = db.extract('dir/')
+			const file1 = await extracted.loadDocument("file1.txt", "")
+			const file2 = await extracted.fetch("file2.txt")
 			assert.strictEqual(extracted.root, '/root/dir/')
 			assert.strictEqual(extracted.data.size, 2)
 			assert.strictEqual(extracted.meta.size, 2)
-			assert.ok(extracted.data.has('file1.txt'))
-			assert.ok(extracted.data.has('file2.txt'))
+			assert.strictEqual(file1, "content1")
+			assert.strictEqual(file2, "content2")
+			assert.ok(extracted.data.has('root/dir/file1.txt'))
+			assert.ok(extracted.data.has('root/dir/file2.txt'))
+			assert.ok(!extracted.data.has('root/other.txt'))
 		})
 	})
 
@@ -269,9 +266,19 @@ suite("DB", () => {
 	})
 
 	describe('relative', () => {
-		it('should throw not implemented error', () => {
-			const baseDb = new DB()
-			assert.throws(() => baseDb.relative('from', 'to'), /not implemented/i)
+		it('should return uri if from and to are absolute and from starts with to', async () => {
+			const result = db.relative("/root/api", "/root/")
+			assert.strictEqual(result, "api")
+		})
+
+		it('should return uri if from and to are absolute and from do not starts with to', async () => {
+			const result = db.relative("/root/api", "/root2/")
+			assert.strictEqual(result, "/root2/")
+		})
+
+		it('should return uri if to is relative', async () => {
+			const result = db.relative("root/api", "/root2/")
+			assert.strictEqual(result, "/root2/")
 		})
 	})
 

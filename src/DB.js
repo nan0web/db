@@ -73,11 +73,11 @@ class DB {
 	/** @type {boolean} */
 	connected = false
 	/** @type {string} */
-	root
+	root = "."
 	/** @type {string} */
 	cwd = "."
 	/** @type {DB[]} */
-	dbs
+	dbs = []
 	/** @type {Console | NoConsole} */
 	#console
 	/** @type {Map<string, any>} */
@@ -104,12 +104,12 @@ class DB {
 	 */
 	constructor(input = {}) {
 		const {
-			root = ".",
-			cwd = ".",
-			data = new Map(),
-			meta = new Map(),
-			connected = false,
-			dbs = [],
+			root = this.root,
+			cwd = this.cwd,
+			data = this.data,
+			meta = this.meta,
+			connected = this.connected,
+			dbs = this.dbs,
 			console = new NoConsole({ silent: true }),
 		} = input
 		this.root = root
@@ -252,16 +252,21 @@ class DB {
 		this.#console.debug("Extracting database at URI", { uri })
 		const root = String("." === this.root ? "" : this.root + "/").replace(/\/{2,}/g, "/")
 		const Class = /** @type {typeof DB} */ (this.constructor)
-		const prefix = String(uri).replace(/\/+$/, '') + "/"
+		const abs = this.absolute(uri)
+		let prefix = String(abs).replace(/\/+$/, '') + "/"
+		if (prefix.startsWith("/")) prefix = prefix.slice(1)
+		const extractor = entries => new Map(entries.map(([key, value]) => {
+			if (key.startsWith(prefix)) {
+				return [key, value]
+			}
+			return false
+		}).filter(Boolean))
+
 		return new Class({
 			root: root + uri,
 			cwd: this.cwd,
-			data: new Map(Array.from(this.data.entries()).filter(
-				([key]) => key.startsWith(prefix)
-			).map(([key, value]) => [key.replace(prefix, ""), value])),
-			meta: new Map(Array.from(this.meta.entries()).filter(
-				([key]) => key.startsWith(prefix)
-			).map(([key, value]) => [key.replace(prefix, ""), value])),
+			data: extractor(this.data.entries()),
+			meta: extractor(this.meta.entries()),
 		})
 	}
 
@@ -280,14 +285,16 @@ class DB {
 	/**
 	 * Relative path resolver for file systems.
 	 * Must be implemented by platform specific code
-	 * @throws Not implemented in base class
 	 * @param {string} from Base directory path
 	 * @param {string} to Target directory path
 	 * @returns {string} Relative path
 	 */
-	relative(from, to) {
-		this.#console.error("relative() method not implemented in base DB class")
-		throw new Error("Not implemented")
+	relative(from, to = this.root) {
+		if (from.startsWith("/") && to.startsWith("/")) {
+			if (!to.endsWith("/")) to += "/"
+			return from.startsWith(to) ? from.substring(to.length) : to
+		}
+		return to
 	}
 
 	/**
@@ -530,7 +537,7 @@ class DB {
 	 */
 	resolveSync(...args) {
 		this.#console.debug("Resolving path synchronously", { args })
-		return this.normalize(...args)
+		return this.normalize(this.cwd, this.root, ...args)
 	}
 
 	/**
@@ -554,17 +561,20 @@ class DB {
 	 * @returns {Promise<any>}
 	 */
 	async loadDocument(uri, defaultValue = undefined) {
+		// uri = await this.resolve(uri)
 		this.#console.debug("Loading document", { uri })
-		await this.ensureAccess(uri, "r")
-		const abs = this.absolute(await this.resolve(uri))
-		const rel = abs.startsWith("/") ? abs.slice(1) : abs
-		if (this.data.has(rel)) {
-			return this.data.get(rel)
+		uri = this.normalize(uri)
+		// const abs = this.absolute(uri)
+		let abs = this.absolute(uri)
+		if (abs.startsWith("/")) abs = abs.slice(1)
+		await this.ensureAccess(abs, "r")
+		if (this.data.has(abs)) {
+			return this.data.get(abs)
 		}
-		const extname = this.extname(rel)
+		const extname = this.extname(abs)
 		if (!extname) {
 			for (const ext of this.Directory.DATA_EXTNAMES) {
-				const data = await this.loadDocument(rel + ext, null)
+				const data = await this.loadDocument(uri + ext, null)
 				if (null !== data) {
 					return data
 				}
@@ -741,7 +751,7 @@ class DB {
 	 * @param {object} options - Stream options
 	 * @param {Function} [options.filter] - Filter function
 	 * @param {number} [options.limit] - Limit number of entries
-	 * @param {'name'|'mtime'|'size'} [options.sort] - Sort criteria
+	 * @param {'name'|'mtime'|'size'} [options.sort] - The sort criteria
 	 * @param {'asc'|'desc'} [options.order] - Sort order
 	 * @param {boolean} [options.skipStat] - Skip statistics
 	 * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links

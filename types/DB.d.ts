@@ -168,12 +168,11 @@ declare class DB {
     /**
      * Relative path resolver for file systems.
      * Must be implemented by platform specific code
-     * @throws Not implemented in base class
      * @param {string} from Base directory path
      * @param {string} to Target directory path
      * @returns {string} Relative path
      */
-    relative(from: string, to: string): string;
+    relative(from: string, to?: string): string;
     /**
      * Get string representation of the database
      * @returns {string}
@@ -370,7 +369,7 @@ declare class DB {
      * @param {object} options - Stream options
      * @param {Function} [options.filter] - Filter function
      * @param {number} [options.limit] - Limit number of entries
-     * @param {'name'|'mtime'|'size'} [options.sort] - Sort criteria
+     * @param {'name'|'mtime'|'size'} [options.sort] - The sort criteria
      * @param {'asc'|'desc'} [options.order] - Sort order
      * @param {boolean} [options.skipStat] - Skip statistics
      * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
