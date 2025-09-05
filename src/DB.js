@@ -252,8 +252,8 @@ class DB {
 		this.#console.debug("Extracting database at URI", { uri })
 		const root = String("." === this.root ? "" : this.root + "/").replace(/\/{2,}/g, "/")
 		const Class = /** @type {typeof DB} */ (this.constructor)
-		const abs = this.absolute(uri)
-		let prefix = String(abs).replace(/\/+$/, '') + "/"
+		const norm = this.resolveSync(this.root, this.normalize(uri))
+		let prefix = String(norm).replace(/\/+$/, '') + "/"
 		if (prefix.startsWith("/")) prefix = prefix.slice(1)
 		const extractor = entries => new Map(entries.map(([key, value]) => {
 			if (key.startsWith(prefix)) {
