@@ -127,6 +127,12 @@ suite('Data', () => {
 			const obj = { a: [1, 2, 3] }
 			assert.strictEqual(Data.find('a/[1]', obj), 2)
 		})
+
+		it("should find array items", () => {
+			const obj = { a: [1, 2, 3] }
+			assert.strictEqual(Data.find(['a', '[0]'], obj), 1)
+			assert.strictEqual(Data.find('a/0', obj), 1)
+		})
 	})
 
 	describe('findValue()', () => {

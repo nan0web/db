@@ -86,7 +86,7 @@ class Data {
 	 * @returns {*} The found value or undefined.
 	 */
 	static find(path, obj) {
-		const arrPath = Array.isArray(path) ? path : path.split(Data.OBJECT_DIVIDER)
+		const arrPath = Array.isArray(path) ? path : path.split(this.OBJECT_DIVIDER)
 		let acc = obj
 		for (let key of arrPath) {
 			if (acc === undefined) return undefined
@@ -180,7 +180,7 @@ class Data {
 			} else if (null !== value && 'object' === typeof value) {
 				value[key] = data[flatKey]
 			} else {
-				const parentPath = keys.slice(0, keys.length - 1)
+				const parentPath = path.slice(0, -1)
 				const { value: v, path: p } = Data.findValue(parentPath, result, true)
 				if ('object' === typeof v) {
 					const path = flatKey.slice(p.join(Data.OBJECT_DIVIDER).length + 1)
@@ -192,7 +192,7 @@ class Data {
 						throw new TypeError(`Cannot set property '${path}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`)
 					}
 				} else {
-					result[key] = data[flatKey]
+					result[flatKey] = data[flatKey]
 				}
 			}
 		}
@@ -333,11 +333,11 @@ class Data {
 	}
 }
 
-export const flatten = Data.flatten
-export const unflatten = Data.unflatten
-export const merge = Data.merge
-export const find = Data.find
-export const mergeFlat = Data.mergeFlat
-export const flatSiblings = Data.flatSiblings
+export const flatten = Data.flatten.bind(Data)
+export const unflatten = Data.unflatten.bind(Data)
+export const merge = Data.merge.bind(Data)
+export const find = Data.find.bind(Data)
+export const mergeFlat = Data.mergeFlat.bind(Data)
+export const flatSiblings = Data.flatSiblings.bind(Data)
 
 export default Data

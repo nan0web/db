@@ -1003,7 +1003,7 @@ class DB {
 		// If extension is not supported, try to load as is
 		if (!this.Directory.DATA_EXTNAMES.includes(ext)) {
 			try {
-				return await this.loadDocument(uri, opts.defaultValue)
+				return await this.loadDocumentAs(".txt", uri, opts.defaultValue)
 			} catch (/** @type {any} */ err) {
 				// If loading fails, return default value
 				this.#console.warn("Error loading document with unsupported extension", { uri, error: err.message })
