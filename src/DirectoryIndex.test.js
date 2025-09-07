@@ -8,7 +8,7 @@ suite('DirectoryIndex', () => {
 		it('should create instance with default values', () => {
 			const index = new DirectoryIndex()
 			assert.deepStrictEqual(index.entries, [])
-			assert.deepStrictEqual(index.entriesColumns, [])
+			assert.deepStrictEqual(index.entriesColumns, ["type", "name", "mtimeMs.36", "size.36"])
 			assert.strictEqual(index.entriesAs, DirectoryIndex.ENTRIES_AS_ARRAY)
 			assert.strictEqual(index.maxEntriesOnLoad, 12)
 		})

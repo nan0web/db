@@ -1,67 +1,23 @@
 import { FilterString, oneOf } from "@nan0web/types"
 import { NoConsole } from "@nan0web/log"
-import Data from "./Data.js"
-import Directory from "./Directory.js"
-import DocumentStat from "./DocumentStat.js"
-import DocumentEntry from "./DocumentEntry.js"
-import StreamEntry from "./StreamEntry.js"
-
-class GetOpts {
-	defaultValue = undefined
-	constructor(input = {}) {
-		const {
-			defaultValue = this.defaultValue,
-		} = input
-		this.defaultValue = defaultValue
-	}
-	/**
-	 * @param {object} input
-	 * @returns {GetOpts}
-	 */
-	static from(input) {
-		if (input instanceof GetOpts) return input
-		return new GetOpts(input)
-	}
-}
-
-class FetchOptions {
-	globals = true
-	inherit = true
-	refs = true
-	defaultValue = undefined
-	allowDirs = true
-	constructor(input = {}) {
-		const {
-			globals = true,
-			inherit = true,
-			refs = true,
-			defaultValue = undefined,
-			allowDirs = true,
-		} = input
-		this.globals = Boolean(globals)
-		this.inherit = Boolean(inherit)
-		this.refs = Boolean(refs)
-		this.defaultValue = defaultValue
-		this.allowDirs = Boolean(allowDirs)
-	}
-	/**
-	 * @param {object} input
-	 * @returns {FetchOptions}
-	 */
-	static from(input) {
-		if (input instanceof FetchOptions) return input
-		return new FetchOptions(input)
-	}
-}
+import Data from "../Data.js"
+import Directory from "../Directory.js"
+import DirectoryIndex from "../DirectoryIndex.js"
+import DocumentStat from "../DocumentStat.js"
+import DocumentEntry from "../DocumentEntry.js"
+import StreamEntry from "../StreamEntry.js"
+import GetOptions from "./GetOptions.js"
+import FetchOptions from "./FetchOptions.js"
 
 /**
  * Base database class for document storage and retrieval
  * @class
  */
-class DB {
+export default class DB {
 	static Data = Data
 	static Directory = Directory
-	static GetOpts = GetOpts
+	static Index = DirectoryIndex
+	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
 	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".html", ".xml"]
 	/** @type {string} */
@@ -78,6 +34,8 @@ class DB {
 	cwd = "."
 	/** @type {DB[]} */
 	dbs = []
+	/** @type {Map} */
+	predefined = new Map()
 	/** @type {Console | NoConsole} */
 	#console
 	/** @type {Map<string, any>} */
@@ -99,6 +57,7 @@ class DB {
 	 * @param {boolean} [input.connected=false]
 	 * @param {Map<string, any | false>} [input.data=new Map()]
 	 * @param {Map<string, DocumentStat>} [input.meta=new Map()]
+	 * @param {Map<string, any>} [input.predefined=new Map()] - Data for memory operations.
 	 * @param {DB[]} [input.dbs=[]]
 	 * @param {Console | NoConsole} [input.console=new NoConsole()]
 	 */
@@ -110,6 +69,7 @@ class DB {
 			meta = this.meta,
 			connected = this.connected,
 			dbs = this.dbs,
+			predefined = this.predefined,
 			console = new NoConsole({ silent: true }),
 		} = input
 		this.root = root
@@ -130,6 +90,7 @@ class DB {
 		if (!this.dbs.every(d => d instanceof DB)) {
 			throw new Error("Not all items in dbs are DB instances")
 		}
+		this.predefined = new Map(predefined)
 		this.#console.info("DB instance created", { root: this.root, cwd: this.cwd })
 	}
 
@@ -198,20 +159,20 @@ class DB {
 		return /** @type {typeof DB} */ (this.constructor).Directory
 	}
 	/**
-	 * Returns static.GetOpts that is assign to DB or its extension.
-	 * Define your own static.GetOpts, no need to extend getter.
+	 * Returns static.GetOptions that is assign to DB or its extension.
+	 * Define your own static.GetOptions, no need to extend getter.
 	 * ```js
-	 * class GetOptsExtended extends GetOpts {
+	 * class GetOptionsExtended extends GetOptions {
 	 *   defaultValue = ""
 	 * }
 	 * class DBExtended extends DB {
-	 *   static GetOpts = GetOptsExtended
+	 *   static GetOptions = GetOptionsExtended
 	 * }
 	 * ```
-	 * @returns {typeof GetOpts}
+	 * @returns {typeof GetOptions}
 	 */
-	get GetOpts() {
-		return /** @type {typeof DB} */ (this.constructor).GetOpts
+	get GetOptions() {
+		return /** @type {typeof DB} */ (this.constructor).GetOptions
 	}
 	/**
 	 * Attaches another DB instance
@@ -318,61 +279,58 @@ class DB {
 	 * @param {number} [options.depth=0] Depth to read recursively
 	 * @param {boolean} [options.skipStat=false] Skip collecting statistics
 	 * @param {boolean} [options.skipSymbolicLink=false] Skip symbolic links
-	 * @param {Function} [options.filter=identity] Filter by pattern or callback
+	 * @param {Function} [options.filter] Filter by pattern or callback
 	 * @yields {DocumentEntry}
 	 * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
 	 */
-	async *readDir(uri = ".", options = {}) {
+	async *readDir(uri, options = {}) {
 		const {
-			depth = 0,
 			skipStat = false,
 			skipSymbolicLink = false,
-			filter = (uri) => true,
+			filter,
+			depth = 0,
 		} = options
-		this.#console.debug("Reading directory", { uri, depth, skipStat, skipSymbolicLink })
-		await this.ensureAccess(uri, "r")
-		if (!filter(new FilterString(uri))) {
-			this.#console.debug("URI filtered out", { uri })
+
+		const dirUri = await this.resolve(uri)
+
+		const indexPath = this.resolveSync(dirUri, 'index.jsonl')
+		if (depth >= 0 && this.data.has(indexPath)) {
+			const index = this.data.get(indexPath)
+			const list = Array.isArray(index) ? index : []
+			for (const item of list) {
+				yield new DocumentEntry(item)
+			}
 			return
 		}
-		const stat = await this.statDocument(uri)
-		if (stat.isDirectory) {
-			const entries = await this.listDir(uri, { depth, skipStat, skipSymbolicLink })
-			const later = []
-			for (const entry of entries) {
-				let path = this.resolveSync(uri, entry.name)
-				if (!filter(new FilterString(path))) {
-					continue
-				}
-				this.data.set(path, this.data.get(path) ?? false)
-				this.meta.set(path, entry.stat)
-				const element = new DocumentEntry({ name: entry.name, stat: entry.stat, depth, path })
-				if (entry.stat.isDirectory) {
-					yield element
-				} else {
-					later.push(element)
+
+		const indexTxtPath = this.resolveSync(dirUri, 'index.txt')
+		if (depth >= 0 && this.data.has(indexTxtPath)) {
+			const content = this.data.get(indexTxtPath)
+			const index = new DirectoryIndex()
+			const list = index.decode(content, DirectoryIndex.ENTRIES_AS_TEXT)
+			for (const [name, stat] of list) {
+				const path = this.resolveSync(dirUri, name)
+				yield new DocumentEntry({ path, name: name, stat: stat })
+			}
+			if (depth > 0) {
+				for (const [name, item] of list) {
+					if (item.isDirectory) {
+						const subdir = this.resolveSync(dirUri, name)
+						yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+					}
 				}
 			}
-			for (const entry of later) {
-				yield entry
-			}
-			for (const entry of entries) {
-				if (skipSymbolicLink && entry.stat.isSymbolicLink) {
-					continue
-				}
-				if (entry.stat.isDirectory) {
-					const path = await this.resolve(uri, entry.name)
-					yield* this.readDir(path, { depth: depth + 1, skipStat, skipSymbolicLink, filter })
-				}
-			}
+			return
 		}
-		else if (stat.exists) {
-			const name = this.relative(this.root, uri)
-			this.data.set(uri, false)
-			this.meta.set(uri, stat)
-			if (filter(new FilterString(uri))) {
-				yield new DocumentEntry({ name, stat, depth, path: uri })
+
+		try {
+			const list = await this.listDir(uri)
+			for (const entry of list) {
+				const stat = this.meta.get(entry.path)
+				yield new DocumentEntry({ stat, path: entry.path })
 			}
+		} catch (/** @type {any} */err) {
+			this.#console.warn(`Failed to list directory: ${dirUri}`, err)
 		}
 	}
 
@@ -441,6 +399,31 @@ class DB {
 	 */
 	async connect() {
 		this.#console.info("Connecting to database")
+		for (const [key, value] of this.predefined.entries()) {
+			this.data.set(key, value)
+			const isDir = key.endsWith("/")
+			this.meta.set(key, new DocumentStat({
+				size: Buffer.byteLength(JSON.stringify(value)),
+				mtimeMs: Date.now(),
+				isFile: !isDir,
+				isDirectory: isDir,
+			}))
+		}
+		for (const [key] of this.meta.entries()) {
+			const dir = (this.resolveSync(key, "..") || ".") + "/"
+			if (!this.meta.has(dir)) {
+				const children = Array.from(this.meta.entries()).filter(
+					([m, stat]) => stat.isFile && (m.startsWith(dir + "/") || "." === dir)
+				)
+				let size = 0
+				let mtimeMs = 0
+				children.forEach(([, stat]) => {
+					size = Math.max(stat.size, size)
+					mtimeMs = Math.max(stat.mtimeMs, mtimeMs)
+				})
+				this.meta.set(dir, new DocumentStat({ size, mtimeMs, isDirectory: true }))
+			}
+		}
 		this.connected = true
 		this.#console.info("Database connected")
 	}
@@ -448,19 +431,23 @@ class DB {
 	/**
 	 * Gets document content
 	 * @param {string} uri - Document URI
-	 * @param {object | GetOpts} [opts] - Options.
+	 * @param {object | GetOptions} [opts] - Options.
 	 * @returns {Promise<any>} Document content
 	 */
-	async get(uri, opts = new this.GetOpts()) {
-		opts = this.GetOpts.from(opts)
+	async get(uri, opts = new this.GetOptions()) {
+		opts = this.GetOptions.from(opts)
 		uri = this.normalize(uri)
 		this.#console.debug("Getting document", { uri })
 		await this.ensureAccess(uri, "r")
 		if (!this.data.has(uri) || false === this.data.get(uri)) {
 			const data = await this.loadDocument(uri, opts.defaultValue)
+			this.#console.debug("Loaded (with no cache)", { uri, data })
 			this.data.set(uri, data)
+			return data
 		}
-		return this.data.get(uri)
+		const data = this.data.get(uri)
+		this.#console.debug("Loaded (from cache)", { uri, data })
+		return data
 	}
 
 	/**
@@ -519,12 +506,15 @@ class DB {
 		segments = segments.filter(Boolean).join("/").split("/")
 		const norms = []
 
+		let prev
 		for (const segment of segments) {
 			if (segment === "..") {
 				norms.pop()
+				if ("" !== prev) norms.pop()
 			} else if (![".", ""].includes(segment)) {
 				norms.push(segment)
 			}
+			prev = segment
 		}
 
 		return norms.join("/")
@@ -732,17 +722,21 @@ class DB {
 	}
 
 	/**
-	 * Lists directory entries
-	 * @param {string} uri - Directory URI
-	 * @param {Object} options - List options
-	 * @param {number} [options.depth] - Depth to list
-	 * @param {boolean} [options.skipStat] - Skip statistics collection
-	 * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
-	 * @returns {Promise<DocumentEntry[]>} Directory entries
+	 * Lists immediate entries in a directory by scanning meta keys.
+	 * @param {string} uri - The directory URI (e.g., "content", ".", "dir/")
+	 * @returns {Promise<DocumentEntry[]>}
+	 * @throws {Error} If directory does not exist
 	 */
-	async listDir(uri, { depth = 0, skipStat = false, skipSymbolicLink = false } = {}) {
-		this.#console.error("listDir() method not implemented in base DB class")
-		throw new Error("Not implemented")
+	async listDir(uri) {
+		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
+		const keys = Array.from(this.data.keys())
+		const filtered = keys.filter(
+			key => key.startsWith(prefix) && key.indexOf('/', prefix.length) === -1
+		)
+		return filtered.map(path => {
+			const stat = this.meta.get(path) || new DocumentStat({ isFile: true, mtimeMs: Date.now() })
+			return new DocumentEntry({ path, stat })
+		})
 	}
 
 	/**
@@ -1221,7 +1215,3 @@ class DB {
 		return new this(input)
 	}
 }
-
-export { GetOpts, FetchOptions }
-
-export default DB

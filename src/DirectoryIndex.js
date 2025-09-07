@@ -22,8 +22,9 @@ class DirectoryIndex {
 	static ENTRIES_AS_OBJECT = "object"
 	static ENTRIES_AS_ROWS = "rows"
 	static ENTRIES_AS_TEXT = "text"
+	static COLUMNS = ["type", "name", "mtimeMs.36", "size.36"]
 	/** @type {string[]} */
-	entriesColumns = []
+	entriesColumns = DirectoryIndex.COLUMNS
 	/** @type {string} */
 	entriesAs = DirectoryIndex.ENTRIES_AS_ARRAY
 	/** @type {Array<Array<string, DocumentStat>> | string[][] | string[] | string} */
@@ -46,7 +47,7 @@ class DirectoryIndex {
 	constructor(input = {}) {
 		const {
 			entries = [],
-			entriesColumns = [],
+			entriesColumns = this.entriesColumns,
 			entriesAs = this.ENTRIES_AS_ARRAY,
 			maxEntriesOnLoad = 12,
 			filter = new DirectoryIndexFilter(),
@@ -177,7 +178,7 @@ class DirectoryIndex {
 
 			return source.map(row => {
 				const values = Array.isArray(row) ? row : [row]
-				const stat = new DocumentStat()
+				const stat = {}
 				let name = ""
 
 				this.entriesColumns.forEach((col, index) => {
@@ -187,18 +188,18 @@ class DirectoryIndex {
 						col = arr[0]
 						radix = parseInt(arr[1])
 					}
-					if ("number" === typeof stat[col]) {
-						stat[col] = parseInt(values[index], radix)
-					}
-					else if ("name" === col) {
+					if ("name" === col) {
 						name = values[index]
 					}
-					else {
-						stat[col] = decodeURIComponent(values[index] || "")
+					else if ("string" === typeof values[index]) {
+						stat[col] = parseInt(values[index], radix)
+						if (isNaN(stat[col])) {
+							stat[col] = decodeURIComponent(values[index] || "")
+						}
 					}
 				})
 
-				return [name, stat]
+				return [name, new DocumentStat(stat)]
 			})
 		}
 

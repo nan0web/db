@@ -4,6 +4,7 @@ declare class DirectoryIndex {
     static ENTRIES_AS_OBJECT: string;
     static ENTRIES_AS_ROWS: string;
     static ENTRIES_AS_TEXT: string;
+    static COLUMNS: string[];
     /**
      * Creates DirectoryIndex instance from input
      * @param {object|DirectoryIndex} input - Properties or existing instance

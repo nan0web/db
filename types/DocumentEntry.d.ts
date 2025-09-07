@@ -18,7 +18,7 @@ declare class DocumentEntry {
      * @param {number} [input.depth=0]
      * @param {string} [input.path=""]
      * @param {string} [input.parent=""]
-     * @param {boolean} [input.fulfilled=false]
+     * @param {boolean | undefined} [input.fulfilled]
      */
     constructor(input?: {
         name?: string | undefined;

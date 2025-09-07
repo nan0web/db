@@ -1,3 +1,5 @@
+import { Enum } from "@nan0web/types"
+
 /**
  * Represents statistics for a document in the filesystem
  * @class
@@ -71,6 +73,7 @@ class DocumentStat {
 	 * @param {boolean} [input.isFIFO=false]
 	 * @param {boolean} [input.isSocket=false]
 	 * @param {boolean} [input.isSymbolicLink=false]
+	 * @param {boolean} [input.type=""] The file type if provided then used: F, D.
 	 * @param {Error|null} [input.error=null]
 	 */
 	constructor(input = {}) {
@@ -90,12 +93,13 @@ class DocumentStat {
 			rdev = 0,
 			uid = 0,
 			isBlockDevice = false,
-			isDirectory = false,
-			isFile = false,
+			isDirectory: isDirectoryInit = false,
+			isFile: isFileInit = false,
 			isFIFO = false,
 			isSocket = false,
 			isSymbolicLink = false,
 			error = null,
+			type = "",
 		} = input
 		this.atimeMs = atimeMs
 		this.btimeMs = btimeMs
@@ -111,6 +115,9 @@ class DocumentStat {
 		this.nlink = nlink
 		this.rdev = rdev
 		this.uid = uid
+		const realType = Enum("F", "D", "")(type)
+		const isFile = "F" === realType || isFileInit
+		const isDirectory = "D" === realType || isDirectoryInit
 		// @ts-ignore
 		this.isBlockDevice = "function" === typeof isBlockDevice ? isBlockDevice.bind(input)() : isBlockDevice
 		// @ts-ignore

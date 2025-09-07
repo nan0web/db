@@ -33,6 +33,7 @@ declare class DocumentStat {
      * @param {boolean} [input.isFIFO=false]
      * @param {boolean} [input.isSocket=false]
      * @param {boolean} [input.isSymbolicLink=false]
+     * @param {boolean} [input.type=""] The file type if provided then used: F, D.
      * @param {Error|null} [input.error=null]
      */
     constructor(input?: {
@@ -56,6 +57,7 @@ declare class DocumentStat {
         isFIFO?: boolean | undefined;
         isSocket?: boolean | undefined;
         isSymbolicLink?: boolean | undefined;
+        type?: boolean | undefined;
         error?: Error | null | undefined;
     });
     /** @type {number} */

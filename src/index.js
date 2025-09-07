@@ -1,4 +1,4 @@
-import DB from "./DB.js"
+import DB from "./DB/DB.js"
 import Directory from "./Directory.js"
 import DirectoryIndex from "./DirectoryIndex.js"
 import DocumentEntry from "./DocumentEntry.js"

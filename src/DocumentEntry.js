@@ -26,7 +26,7 @@ class DocumentEntry {
 	 * @param {number} [input.depth=0]
 	 * @param {string} [input.path=""]
 	 * @param {string} [input.parent=""]
-	 * @param {boolean} [input.fulfilled=false]
+	 * @param {boolean | undefined} [input.fulfilled]
 	 */
 	constructor(input = {}) {
 		const {
@@ -35,7 +35,7 @@ class DocumentEntry {
 			depth = 0,
 			path = "",
 			parent = "",
-			fulfilled = false
+			fulfilled: fulfilledInit = undefined
 		} = input
 
 		this.name = String(name)
@@ -43,11 +43,19 @@ class DocumentEntry {
 		this.depth = Number(depth)
 		this.path = String(path)
 		this.parent = String(parent)
-		this.fulfilled = Boolean(fulfilled)
 
 		if (!this.name && this.path) {
 			this.name = String(this.path.split("/").pop() ?? "")
 		}
+		if (!this.parent && this.name.includes("/")) {
+			const arr = this.name.split("/")
+			if (!this.depth) this.depth = arr.length
+			arr.pop()
+			this.parent = arr.join("/")
+		}
+		this.fulfilled = Boolean(
+			undefined === fulfilledInit ? this.path && this.stat.exists : fulfilledInit
+		)
 	}
 
 	/**
