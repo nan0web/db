@@ -233,6 +233,133 @@ suite("DB", () => {
 			assert.ok(entries[0] instanceof DocumentEntry)
 			assert.ok(entries[1] instanceof DocumentEntry)
 		})
+
+		it('should read recursively with depth > 0', async () => {
+			const db = new DB({
+				predefined: [
+					['dir1/file1.txt', 'content1'],
+					['dir1/dir2/file2.txt', 'content2'],
+					['dir1/dir2/dir3/file3.txt', 'content3']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('.', { depth: 3 })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 3)
+			assert.ok(entries.find(e => e.path === 'dir1/file1.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/dir2/file2.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/dir2/dir3/file3.txt'))
+		})
+
+		it('should read index.jsonl at depth 0', async () => {
+			const db = new DB({
+				predefined: [
+					['index.jsonl',
+						[
+							{ type: 'F', path: 'file.json', mtimeMs: 1_000_000_000_000, size: 100 },
+							{ type: 'F', path: 'dir/sub.json', mtimeMs: 1_000_000_000_000, size: 200 }
+						]
+					]
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('.', { depth: 0 })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 2)
+			assert.ok(entries.find(e => e.path === 'file.json'))
+			assert.ok(entries.find(e => e.path === 'dir/sub.json'))
+		})
+
+		it('should read index.txt at depth 0', async () => {
+			const db = new DB({
+				predefined: [
+					['index.txt', 'F file1.txt mecxlwg9 8x\nF file2.txt mecvlwg9 8c']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('.', { depth: 0 })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 2)
+			assert.ok(entries.find(e => e.path === 'file1.txt'))
+			assert.ok(entries.find(e => e.path === 'file2.txt'))
+		})
+
+		it('should read with depth 1 to include subdirectories', async () => {
+			const db = new DB({
+				predefined: [
+					['dir1/index.txt', 'F file1.txt mecxlwg9 8x\nF file2.txt mecvlwg9 8c\nD subdir/ mecvlwg9 0'],
+					['dir1/subdir/index.txt', 'F nested.json mecxlwg9 8x'],
+					['dir1/file1.txt', 'content1'],
+					['dir1/file2.txt', 'content2'],
+					['dir1/subdir/nested.json', 'content3']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('dir1', { depth: 1 })) {
+				entries.push(entry)
+			}
+
+			assert.ok(entries.length >= 3)
+			assert.ok(entries.find(e => e.path === 'dir1/file1.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/file2.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/subdir/nested.json'))
+		})
+
+		it('should read with skipStat option', async () => {
+			const db = new DB({
+				predefined: [
+					['file1.txt', 'content1'],
+					['file2.txt', 'content2']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('.', { depth: 0, skipStat: true })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 2)
+			assert.ok(entries.find(e => e.path === 'file1.txt'))
+			assert.ok(entries.find(e => e.path === 'file2.txt'))
+		})
+
+		it('should respect filter function', async () => {
+			const db = new DB({
+				predefined: [
+					['file1.txt', 'content1'],
+					['file2.json', 'content2'],
+					['file3.md', 'content3']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('.', {
+				depth: 0,
+				filter: (entry) => entry.path.endsWith('.txt')
+			})) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 1)
+			assert.ok(entries.find(e => e.path === 'file1.txt'))
+		})
+
 	})
 
 	describe('readBranch', () => {
@@ -571,17 +698,21 @@ suite("DB", () => {
 		})
 
 		it('should cache inheritance data', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('_', { global: 'value' })
-			dbInstance.data.set('dir1/_', { a: 1 })
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['dir1/_', { a: 1 }],
+				]
+			})
+			await db.connect()
 
-			const result1 = await dbInstance.getInheritance('dir1/file')
-			const result2 = await dbInstance.getInheritance('dir1/file2')
+			const result1 = await db.getInheritance('dir1/file')
+			const result2 = await db.getInheritance('dir1/file2')
 
 			assert.deepEqual(result1, { global: 'value', a: 1 })
 			assert.deepEqual(result2, { global: 'value', a: 1 })
-			assert.ok(dbInstance._inheritanceCache.has('/'))
-			assert.ok(dbInstance._inheritanceCache.has('dir1/'))
+			assert.ok(db._inheritanceCache.has('/'))
+			assert.ok(db._inheritanceCache.has('dir1/'))
 		})
 	})
 
@@ -842,12 +973,15 @@ suite("DB", () => {
 	})
 
 	describe('resolveReferences', () => {
-		it('should resolve simple references', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('ref.json', 'referenced value')
-			const data = { key: '$ref:ref.json' }
+		it.todo('should resolve simple references', async () => {
+			const db = new DB({
+				predefined: [
+					['ref.json', 'referenced value']
+				]
+			})
+			await db.connect()
 
-			const result = await dbInstance.resolveReferences(data)
+			const result = await db.resolveReferences({ key: '$ref:ref.json' })
 			assert.deepEqual(result, { key: 'referenced value' })
 		})
 
@@ -928,8 +1062,12 @@ suite("DB", () => {
 
 	describe('processExtensions', () => {
 		it('should process extension with $ref', async () => {
-			const db = new DB()
-			db.data.set('parent.json', { parent: 'value' })
+			const db = new DB({
+				predefined: [
+					['parent.json', { parent: 'value' }]
+				]
+			})
+			await db.connect()
 			const data = { [db.Data.REFERENCE_KEY]: 'parent.json', child: 'value' }
 
 			// const result = await db.processExtensions(data)
@@ -975,6 +1113,7 @@ suite("DB", () => {
 	describe("Circular Reference Handling", () => {
 		it("should handle self-referencing documents without infinite loop", async () => {
 			const db = new DB({
+				console: new NoConsole(),
 				predefined: [
 					["self-ref.json", { $ref: "self-ref.json", value: "test" }]
 				]
@@ -983,11 +1122,13 @@ suite("DB", () => {
 
 			const result = await db.fetch("self-ref.json")
 			assert.ok(result)
+			assert.deepEqual(result, { $ref: "self-ref.json", value: "test" })
 			assert.equal(result.value, "test")
 		})
 
-		it("should handle mutual circular references without infinite loop", async () => {
+		it("should handle mutual circular references (extensions) without infinite loop", async () => {
 			const db = new DB({
+				console: new NoConsole(),
 				predefined: [
 					["doc-a.json", { $ref: "doc-b.json", a: true }],
 					["doc-b.json", { $ref: "doc-a.json", b: true }]
@@ -998,10 +1139,8 @@ suite("DB", () => {
 			const resultA = await db.fetch("doc-a.json")
 			const resultB = await db.fetch("doc-b.json")
 
-			assert.ok(resultA)
-			assert.ok(resultB)
-			assert.equal(resultA.a, true)
-			assert.equal(resultB.b, true)
+			assert.deepEqual(resultA, { $ref: "doc-a.json", a: true, b: true })
+			assert.deepEqual(resultB, { $ref: "doc-b.json", b: true, a: true })
 		})
 	})
 

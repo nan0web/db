@@ -1,4 +1,4 @@
-import { FilterString, oneOf } from "@nan0web/types"
+import { clone, merge, oneOf } from "@nan0web/types"
 import { NoConsole } from "@nan0web/log"
 import Data from "../Data.js"
 import Directory from "../Directory.js"
@@ -298,7 +298,10 @@ export default class DB {
 			const index = this.data.get(indexPath)
 			const list = Array.isArray(index) ? index : []
 			for (const item of list) {
-				yield new DocumentEntry(item)
+				const entry = new DocumentEntry(item)
+				if (!filter || filter(entry)) {
+					yield entry
+				}
 			}
 			return
 		}
@@ -310,7 +313,10 @@ export default class DB {
 			const list = index.decode(content, DirectoryIndex.ENTRIES_AS_TEXT)
 			for (const [name, stat] of list) {
 				const path = this.resolveSync(dirUri, name)
-				yield new DocumentEntry({ path, name: name, stat: stat })
+				const entry = new DocumentEntry({ path, name: name, stat: stat })
+				if (!filter || filter(entry)) {
+					yield entry
+				}
 			}
 			if (depth > 0) {
 				for (const [name, item] of list) {
@@ -325,9 +331,33 @@ export default class DB {
 
 		try {
 			const list = await this.listDir(uri)
+			const files = []
+			const dirs = []
+
 			for (const entry of list) {
-				const stat = this.meta.get(entry.path)
-				yield new DocumentEntry({ stat, path: entry.path })
+				// Apply filter if provided
+				if (filter && !filter(entry)) {
+					continue
+				}
+
+				if (entry.isDirectory) {
+					dirs.push(entry)
+				} else {
+					files.push(entry)
+				}
+			}
+
+			// Yield directories first if depth > 0
+			if (depth > 0) {
+				for (const dir of dirs) {
+					const subdir = dir.path
+					yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+				}
+			}
+
+			// Yield files
+			for (const file of files) {
+				yield file
 			}
 		} catch (/** @type {any} */err) {
 			this.#console.warn(`Failed to list directory: ${dirUri}`, err)
@@ -409,8 +439,17 @@ export default class DB {
 				isDirectory: isDir,
 			}))
 		}
-		for (const [key] of this.meta.entries()) {
-			const dir = (this.resolveSync(key, "..") || ".") + "/"
+		for (const key of this.meta.keys()) {
+			let dir
+			if (key.endsWith("/")) {
+				dir = (this.resolveSync(key, "..") || ".") + "/"
+			} else {
+				const arr = key.split("/")
+				arr.pop()
+				dir = arr.join("/")
+				if (!dir) dir = "."
+				dir += "/"
+			}
 			if (!this.meta.has(dir)) {
 				const children = Array.from(this.meta.entries()).filter(
 					([m, stat]) => stat.isFile && (m.startsWith(dir + "/") || "." === dir)
@@ -729,10 +768,20 @@ export default class DB {
 	 */
 	async listDir(uri) {
 		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
-		const keys = Array.from(this.data.keys())
-		const filtered = keys.filter(
-			key => key.startsWith(prefix) && key.indexOf('/', prefix.length) === -1
-		)
+		const keys = Array.from(this.meta.keys())
+		const filtered = keys.filter(key => {
+			if (!key.startsWith(prefix)) return false
+			const tail = key.slice(prefix.length)
+			if (["./", ".", ""].includes(tail)) return false
+			const arr = tail.split("/")
+			const isDir = tail.endsWith("/")
+			if (isDir) {
+				if (arr.length === 2) return true
+			} else {
+				if (arr.length === 1) return true
+			}
+			return false
+		})
 		return filtered.map(path => {
 			const stat = this.meta.get(path) || new DocumentStat({ isFile: true, mtimeMs: Date.now() })
 			return new DocumentEntry({ path, stat })
@@ -905,7 +954,8 @@ export default class DB {
 		for (const dirPath of inheritanceChain) {
 			if (!this._inheritanceCache.has(dirPath)) {
 				try {
-					const dirData = await this.loadDocument(dirPath + this.Directory.FILE, {})
+					const uri = this.resolveSync(dirPath, this.Directory.FILE)
+					const dirData = await this.loadDocument(uri, {})
 					this._inheritanceCache.set(dirPath, dirData)
 					this.#console.debug("Directory inheritance data loaded", { dirPath })
 				} catch (/** @type {any} */ err) {
@@ -1042,58 +1092,57 @@ export default class DB {
 	}
 
 	/**
-	 * Merges data from multiple sources following nano-db-fetch patterns
+	 * Merges data from multiple sources following nano-db-fetch patterns.
 	 * @param {string} uri - The URI to fetch and merge data for
 	 * @param {FetchOptions} [opts] - Fetch options
+	 * @param {Set<string>} [visited] - For internal circular reference protection
 	 * @returns {Promise<any>} Merged data object
 	 */
-	async fetchMerged(uri, opts = new FetchOptions()) {
-		this.#console.debug("Fetching and merging document", { uri, opts })
+	async fetchMerged(uri, opts = new FetchOptions(), visited = new Set()) {
+		this.#console.debug("Fetching and merging document", { uri, opts, visited: Array.from(visited) })
 		opts = FetchOptions.from(opts)
+		const extname = this.extname(uri)
+		const isData = !extname || this.Directory.DATA_EXTNAMES.includes(extname)
+
+		// Prevent self-repeating
+		if (visited.has(uri)) {
+			this.#console.warn("Circular inheritance chain detected", { uri })
+			return opts.defaultValue
+		}
+		const nextVisited = new Set(visited).add(uri)
 
 		// Load the document first
-		let data = await this.get(uri, { defaultValue: opts.defaultValue })
+		let data = await this.loadDocument(uri)
 
-		// Process extensions recursively if enabled
-		if (opts.inherit) {
-			if (data && typeof data === 'object') {
-				let parentUri = await this.resolve(uri, "..", this.Directory.FILE)
-				if (parentUri.startsWith("/")) parentUri = parentUri.slice(1)
+		if (opts.inherit && data && typeof data === 'object') {
+			let parentUri = await this.resolve(uri, "..", this.Directory.FILE)
+			if (parentUri.startsWith("/")) parentUri = parentUri.slice(1)
 
-				try {
-					const parentData = await this.get(parentUri)
-					if (parentData && typeof parentData === 'object') {
-						// Remove the ref property and merge parent data
-						// delete data.$ref
-						// Process extensions in parent data recursively
-						if (parentUri.includes("/")) {
-							const processedParentData = await this.fetchMerged(parentUri, opts)
-							// Merge parent data with current data (current data takes precedence)
-							data = this.Data.merge(processedParentData, data)
-						} else {
-							data = this.Data.merge(parentData, data)
-						}
-					}
-				} catch (/** @type {any} */ err) {
-					this.#console.warn("Error processing inheritance", { parentUri, error: err.message })
-					// If parent can't be loaded, keep original data including the $ref property
+			try {
+				const parentData = await this.loadDocument(parentUri)
+				if (parentData && typeof parentData === 'object') {
+					// Recursively fetch parent with same opts and updated visited
+					const processedParentData = await this.fetchMerged(
+						parentUri,
+						opts,
+						nextVisited
+					)
+					data = this.Data.merge(processedParentData, data)
 				}
+			} catch (/** @type {any} */ err) {
+				this.#console.warn("Error processing inheritance", { parentUri, error: err.message })
 			}
 		}
 
-		// Merge global variables if enabled
-		if (opts.globals) {
+		if (opts.globals && isData && "object" === typeof data && null !== data) {
 			const globals = await this.getGlobals(uri)
 			data = this.Data.merge(globals, data)
-			this.#console.debug("Globals merged into data", { uri, globals })
 		}
 
-		// Resolve references if enabled
-		if (opts.refs) {
-			data = await this.resolveReferences(data, uri)
+		if (opts.refs && isData) {
+			data = await this.resolveReferences(data, uri, opts, nextVisited)
 		}
 
-		this.#console.debug("Document fetch merged completed", { uri, data })
 		return data || opts.defaultValue
 	}
 
@@ -1101,7 +1150,8 @@ export default class DB {
 		if (!Array.isArray(flat)) flat = Object.entries(this.Data.flatten(flat))
 		const inValue = this.Data.REFERENCE_KEY + ":"
 		const inKey = this.Data.REFERENCE_KEY
-		const isInKey = key => key.endsWith(this.Data.OBJECT_DIVIDER + inKey) || inKey === key
+		const path = this.Data.OBJECT_DIVIDER + inKey
+		const isInKey = key => key.endsWith(path) || inKey === key
 		return flat.filter(
 			([key, val]) => isInKey(key) || "string" === typeof val && val.startsWith(inValue)
 		).map(
@@ -1115,92 +1165,103 @@ export default class DB {
 		return key.endsWith(path) ? key.split(path)[0] : key
 	}
 	/**
-	 * Handles document references and resolves them recursively
+	 * Handles document references and resolves them recursively with circular reference protection.
 	 * @param {object} data - Document data with potential references
 	 * @param {string} [basePath] - Base path for resolving relative references
+	 * @param {object|FetchOptions} [opts] - Options that will be passed to fetch
+	 * @param {Set<string>} [visited] - Set of visited URIs to prevent circular references
 	 * @returns {Promise<object>} Data with resolved references
 	 */
-	async resolveReferences(data, basePath = '') {
-		this.#console.debug("Resolving references", { basePath, data })
+	async resolveReferences(data, basePath = '', opts = new FetchOptions(), visited = new Set()) {
+		this.#console.debug("Resolving references", { basePath, visited: Array.from(visited) })
+
 		if (typeof data !== 'object' || data === null) {
 			return data
 		}
+
 		const flat = this.Data.flatten(data)
 		const refKeys = this._findReferenceKeys(flat)
+		const newFlat = { ...flat }
 
-		// Process all references in the data object
 		for (const [key, refPath] of refKeys) {
 			try {
-				// Normalize refPath: it may be a string or an object like { $ref: 'file.json' }
 				let refString = refPath
 				if (typeof refPath === 'object' && refPath !== null && this.Data.REFERENCE_KEY in refPath) {
 					refString = refPath[this.Data.REFERENCE_KEY]
 				}
+
 				if (typeof refString !== 'string') {
-					// If still not a string, skip processing this reference
-					this.#console.warn("Invalid reference type, skipping", { key, refPath })
 					continue
 				}
-				// Handle absolute and relative paths
-				const abs = this.normalize(
-					refString.startsWith('/') ? refString : await this.resolve(basePath, '..', refString)
+
+				const absPath = refString.startsWith('/')
+					? this.normalize(refString)
+					: this.normalize(await this.resolve(basePath, '..', refString))
+
+				if (visited.has(absPath)) {
+					this.#console.warn("Circular reference skipped", { ref: absPath })
+					continue
+				}
+
+				let refValue
+
+				if (absPath.includes('#')) {
+					const [filePath, fragment] = absPath.split('#')
+					const targetData = await this.loadDocument(filePath)
+					refValue = this.Data.find(fragment.split('/').filter(Boolean), targetData) ?? undefined
+				} else {
+					refValue = await this.fetchMerged(absPath, opts, visited)
+				}
+
+				if (refValue === undefined) {
+					continue
+				}
+
+				const parentKey = this._getParentReferenceKey(key)
+				const siblings = this.Data.flatSiblings(Object.entries(newFlat), key, parentKey).map(
+					([k, val]) => parentKey
+						? [k.slice((parentKey + this.Data.OBJECT_DIVIDER).length), val]
+						: [k, val]
 				)
 
-				// Handle fragment references like contacts.json#address/zip
-				if (abs.includes('#')) {
-					const [filePath, fragment] = abs.split('#')
-					const fullData = await this.get(filePath)
-					const refValue = this.Data.find(fragment.split('/'), fullData)
-					flat[key] = refValue
-					this.#console.debug("Fragment reference resolved", { key, filePath, fragment })
-				} else {
-					const refValue = await this.get(abs)
-					if (undefined !== refValue) {
-						let parentKey = this._getParentReferenceKey(key)
-						if (parentKey === key) parentKey = ''
-						/**
-						 * @type {Array<Array<string, any>>}
-						 */
-						const siblings = this.Data.flatSiblings(Object.entries(flat), key, parentKey).map(
-							([k, val]) => parentKey ? [k.slice((parentKey + this.Data.OBJECT_DIVIDER).length), val] : [k, val]
-						)
-
-						let clearKeys = ""
-						if (siblings.length > 0) {
-							const value = "object" === typeof refValue ? (refValue ?? {}) : { value: refValue }
-							if ("" === parentKey) {
-								// extend, because of top-level $ref
-								delete flat[key]
-								for (const [k, v] of Object.entries(value)) {
-									flat[k] = v
-								}
-							} else {
-								flat[parentKey] = Object.fromEntries(
-									this.Data.mergeFlat(Object.entries(value), siblings)
-								)
-								clearKeys = parentKey
-							}
-						} else {
-							clearKeys = "" === parentKey ? key : parentKey
-							flat[clearKeys] = refValue
-						}
-						if (clearKeys) {
-							Object.keys(flat).filter(
-								k => k.startsWith(clearKeys + this.Data.OBJECT_DIVIDER)
-							).map(k => delete flat[key])
-						}
+				if (parentKey === '' && key === this.Data.REFERENCE_KEY) {
+					delete newFlat[key]
+					for (const [k, v] of Object.entries(refValue)) {
+						newFlat[k] = v
 					}
+				} else if (siblings.length > 0) {
+					newFlat[parentKey] = this.Data.merge(
+						typeof refValue === 'object' ? refValue : { value: refValue },
+						Object.fromEntries(siblings)
+					)
+					// Cleanup sibling keys
+					for (const [k] of siblings) {
+						delete newFlat[parentKey + this.Data.OBJECT_DIVIDER + k]
+					}
+				} else {
+					newFlat[parentKey || key] = refValue
 				}
+
+				// Cleanup child keys
+				const prefix = (parentKey || key) + this.Data.OBJECT_DIVIDER
+				Object.keys(newFlat).forEach(k => {
+					if (k.startsWith(prefix) && k !== (parentKey || key)) {
+						delete newFlat[k]
+					}
+				})
+
 			} catch (/** @type {any} */ err) {
-				this.#console.warn("Error resolving reference", { key, basePath, error: err.message })
-				// If reference can't be resolved, keep original value
-				// Don't modify the value, keep it as original reference string or object
+				this.#console.warn("Error resolving reference", { key, error: err.message })
 			}
 		}
+		if (flat[this.Data.REFERENCE_KEY] && "object" === typeof newFlat[this.Data.REFERENCE_KEY] && newFlat[this.Data.REFERENCE_KEY]) {
+			const base = clone(newFlat[this.Data.REFERENCE_KEY])
+			delete flat[this.Data.REFERENCE_KEY]
+			const obj = this.Data.unflatten(flat)
+			return merge(obj, base)
+		}
 
-		const resolvedData = this.Data.unflatten(flat)
-		this.#console.debug("References resolved", { basePath, resolvedData })
-		return resolvedData
+		return this.Data.unflatten(newFlat)
 	}
 
 	/**
