@@ -831,74 +831,6 @@ export default class DB {
 			return 0
 		}
 
-		/**
-		 * !!! INCORRECT PROGRESS CALCULATION !!!
-		 * @param {DocumentEntry[]} files
-		 * @returns {number}
-		 */
-		function getProgress(files) {
-			let progress = 0
-
-			/** @type {DocumentEntry} */
-			const last = files[files.length - 2] ?? null
-			const recent = files[files.length - 1]
-			if (recent.stat.isDirectory) {
-				dirs.set(recent.path, recent)
-			} else {
-				if ("" !== recent.parent && !dirs.has(recent.parent)) {
-					throw new Error(["Directory not found", recent.parent].join(": "))
-				}
-			}
-			if (last?.parent && last.parent !== recent.parent && dirs.has(last.parent)) {
-				const dir = dirs.get(last.parent)
-				if (dir) {
-					dir.fulfilled = true
-					const topDir = top.get(dir.name)
-					if (topDir) {
-						topDir.fulfilled = true
-					}
-				}
-			}
-			if (recent.depth > 0) {
-				// Calculate progress based on fulfillment of subdirectories the same way as top level directories.
-				// Find the top-level directory for this recent file.
-				let topLevelDirName = recent.name
-				/** @type {DocumentEntry | undefined} */
-				let dir = recent
-				while (dir?.parent && dirs.has(dir.parent)) {
-					dir = dirs.get(dir.parent)
-					if (dir) {
-						topLevelDirName = dir.name
-					}
-				}
-				// Mark the top-level directory as fulfilled if all its subdirectories are fulfilled.
-				if (top.has(topLevelDirName)) {
-					const topDir = top.get(topLevelDirName)
-					if (topDir) {
-						// Find all directories under this top-level directory.
-						const subDirs = Array.from(dirs.values()).filter(
-							d =>
-								d.name !== topLevelDirName &&
-								(d.parent === topLevelDirName || d.name.startsWith(topLevelDirName + "/"))
-						)
-						const allFulfilled =
-							subDirs.length > 0 && subDirs.every(d => d.fulfilled)
-						if (allFulfilled) {
-							topDir.fulfilled = true
-						}
-					}
-				}
-				const fulfilledDirs = Array.from(top.values()).filter(dir => dir.fulfilled)
-				progress = top.size ? fulfilledDirs.length / top.size : 0
-			}
-			else if (recent.stat.isDirectory) {
-				top.set(recent.name, recent)
-			}
-			// Calculate progress based on the number of fulfilled directories
-			const fulfilledDirs = Array.from(dirs.values()).filter(dir => dir.fulfilled)
-			progress = dirs.size ? fulfilledDirs.length / dirs.size : 0
-			return progress
-		}
 		const totalSize = { dirs: 0, files: 0 }
 
 		await this.ensureAccess(uri)
@@ -914,14 +846,13 @@ export default class DB {
 				totalSize.dirs += file.stat.size
 			}
 			totalSize.files += file.stat.isFile ? file.stat.size : 0
-			const progress = getProgress(files)
 			const entry = new StreamEntry({
 				file,
 				files: files.sort(sortFn),
 				dirs,
 				top,
 				errors,
-				progress,
+				progress: 0,
 				totalSize,
 			})
 			yield entry

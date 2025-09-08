@@ -47,8 +47,8 @@ class DocumentEntry {
 		if (!this.name && this.path) {
 			this.name = String(this.path.split("/").pop() ?? "")
 		}
-		if (!this.parent && this.name.includes("/")) {
-			const arr = this.name.split("/")
+		if (!this.parent && this.path.includes("/")) {
+			const arr = this.path.split("/")
 			if (!this.depth) this.depth = arr.length
 			arr.pop()
 			this.parent = arr.join("/")
