@@ -379,21 +379,24 @@ export default class DB {
      */
     fetch(uri: string, opts?: object | FetchOptions): Promise<any>;
     /**
-     * Merges data from multiple sources following nano-db-fetch patterns
+     * Merges data from multiple sources following nano-db-fetch patterns.
      * @param {string} uri - The URI to fetch and merge data for
      * @param {FetchOptions} [opts] - Fetch options
+     * @param {Set<string>} [visited] - For internal circular reference protection
      * @returns {Promise<any>} Merged data object
      */
-    fetchMerged(uri: string, opts?: FetchOptions | undefined): Promise<any>;
+    fetchMerged(uri: string, opts?: FetchOptions | undefined, visited?: Set<string> | undefined): Promise<any>;
     _findReferenceKeys(flat: any): any;
     _getParentReferenceKey(key: any): any;
     /**
-     * Handles document references and resolves them recursively
+     * Handles document references and resolves them recursively with circular reference protection.
      * @param {object} data - Document data with potential references
      * @param {string} [basePath] - Base path for resolving relative references
+     * @param {object|FetchOptions} [opts] - Options that will be passed to fetch
+     * @param {Set<string>} [visited] - Set of visited URIs to prevent circular references
      * @returns {Promise<object>} Data with resolved references
      */
-    resolveReferences(data: object, basePath?: string | undefined): Promise<object>;
+    resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
     #private;
 }
 import DocumentStat from "../DocumentStat.js";
