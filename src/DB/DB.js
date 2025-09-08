@@ -276,7 +276,7 @@ export default class DB {
 	 * @generator
 	 * @param {string} uri
 	 * @param {object} options
-	 * @param {number} [options.depth=0] Depth to read recursively
+	 * @param {number} [options.depth=-1] Depth to read recursively
 	 * @param {boolean} [options.skipStat=false] Skip collecting statistics
 	 * @param {boolean} [options.skipSymbolicLink=false] Skip symbolic links
 	 * @param {Function} [options.filter] Filter by pattern or callback
@@ -288,13 +288,13 @@ export default class DB {
 			skipStat = false,
 			skipSymbolicLink = false,
 			filter,
-			depth = 0,
+			depth = -1,
 		} = options
 
 		const dirUri = await this.resolve(uri)
 
 		const indexPath = this.resolveSync(dirUri, 'index.jsonl')
-		if (depth >= 0 && this.data.has(indexPath)) {
+		if (depth < 0 && this.data.has(indexPath)) {
 			const index = this.data.get(indexPath)
 			const list = Array.isArray(index) ? index : []
 			for (const item of list) {
@@ -307,7 +307,7 @@ export default class DB {
 		}
 
 		const indexTxtPath = this.resolveSync(dirUri, 'index.txt')
-		if (depth >= 0 && this.data.has(indexTxtPath)) {
+		if (this.data.has(indexTxtPath)) {
 			const content = this.data.get(indexTxtPath)
 			const index = new DirectoryIndex()
 			const list = index.decode(content, DirectoryIndex.ENTRIES_AS_TEXT)
@@ -318,7 +318,7 @@ export default class DB {
 					yield entry
 				}
 			}
-			if (depth > 0) {
+			if (Math.abs(depth) > 0) {
 				for (const [name, item] of list) {
 					if (item.isDirectory) {
 						const subdir = this.resolveSync(dirUri, name)
@@ -348,7 +348,7 @@ export default class DB {
 			}
 
 			// Yield directories first if depth > 0
-			if (depth > 0) {
+			if (Math.abs(depth) > 0) {
 				for (const dir of dirs) {
 					const subdir = dir.path
 					yield* this.readDir(subdir, { ...options, depth: depth - 1 })

@@ -269,7 +269,7 @@ suite("DB", () => {
 			await db.connect()
 
 			const entries = []
-			for await (const entry of db.readDir('.', { depth: 0 })) {
+			for await (const entry of db.readDir('.')) {
 				entries.push(entry)
 			}
 
@@ -1026,7 +1026,7 @@ suite("DB", () => {
 		it('should resolve nested references (property version) with siblings', async () => {
 			const db = new DB({
 				predefined: [
-					["ref.json", "referenced value"]
+					['ref.json', 'referenced value']
 				]
 			})
 			await db.connect()
@@ -1178,7 +1178,7 @@ suite("DB", () => {
 			await db.connect()
 
 			const entries = []
-			for await (const entry of db.readDir(".", { depth: 0 })) {
+			for await (const entry of db.readDir(".")) {
 				entries.push(entry)
 			}
 
@@ -1204,6 +1204,65 @@ suite("DB", () => {
 			assert.ok(entries.find(e => e.path === "file.json" && e.isFile))
 			assert.ok(entries.find(e => e.path === "subdir" && e.isDirectory))
 			assert.ok(entries.find(e => e.path === "subdir/nested.json"))
+		})
+
+		it('should read directory contents recursively without index files', async () => {
+			const db = new DB({
+				predefined: [
+					['dir1/file1.txt', 'content1'],
+					['dir1/dir2/file2.txt', 'content2'],
+					['dir1/dir2/dir3/file3.txt', 'content3'],
+					['other.txt', 'other']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('dir1', { depth: 3 })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 3)
+			assert.ok(entries.find(e => e.path === 'dir1/file1.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/dir2/file2.txt'))
+			assert.ok(entries.find(e => e.path === 'dir1/dir2/dir3/file3.txt'))
+		})
+
+		it('should read directory contents flat (depth=0) without index files', async () => {
+			const db = new DB({
+				predefined: [
+					['flat/file1.txt', 'content1'],
+					['flat/dir/file2.txt', 'content2'],
+					['flat/dir/subdir/file3.txt', 'content3']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('flat', { depth: 0 })) entries.push(entry)
+
+			assert.strictEqual(entries.length, 1)
+			assert.ok(entries.find(e => e.path === 'flat/file1.txt'))
+		})
+
+		it('should read directory contents limited by depth without index files', async () => {
+			const db = new DB({
+				predefined: [
+					['limited/file1.txt', 'content1'],
+					['limited/dir/file2.txt', 'content2'],
+					['limited/dir/subdir/file3.txt', 'content3']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.readDir('limited', { depth: 1 })) {
+				entries.push(entry)
+			}
+
+			assert.strictEqual(entries.length, 2)
+			assert.ok(entries.find(e => e.path === 'limited/file1.txt'))
+			assert.ok(entries.find(e => e.path === 'limited/dir/file2.txt'))
 		})
 	})
 })

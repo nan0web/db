@@ -168,7 +168,7 @@ export default class DB {
      * @generator
      * @param {string} uri
      * @param {object} options
-     * @param {number} [options.depth=0] Depth to read recursively
+     * @param {number} [options.depth=-1] Depth to read recursively
      * @param {boolean} [options.skipStat=false] Skip collecting statistics
      * @param {boolean} [options.skipSymbolicLink=false] Skip symbolic links
      * @param {Function} [options.filter] Filter by pattern or callback
