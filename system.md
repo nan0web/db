@@ -1,3 +1,9 @@
+---
+lang:
+	code: en
+	jsdoc: en
+	chat: *
+---
 # NaN•Web DB systen instructions
 
 Every data is a database.

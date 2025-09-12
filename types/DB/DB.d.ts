@@ -247,6 +247,8 @@ export default class DB {
      * @returns {string} Resolved absolute path
      */
     resolveSync(...args: string[]): string;
+    dirname(uri: any): string;
+    basename(uri: any): any;
     /**
      * Gets absolute path
      * @note Must be overwritten by platform-specific implementation

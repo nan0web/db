@@ -1312,4 +1312,26 @@ suite("DB", () => {
 			assert.ok(entries.find(e => e.path === 'limited/dir/file2.txt'))
 		})
 	})
+
+	describe("basename", () => {
+		it("should calculate file", () => {
+			assert.equal(db.basename("some/url/with/a-file.txt"), "a-file.txt")
+			assert.equal(db.basename("a-file.txt"), "a-file.txt")
+		})
+		it("should calculate directory", () => {
+			assert.equal(db.basename("some/url/with/"), "with/")
+			assert.equal(db.basename("/"), "/")
+		})
+	})
+
+	describe("dirname", () => {
+		it("should calculate file path", () => {
+			assert.equal(db.dirname("some/url/with/a-file.txt"), "some/url/with/")
+			assert.equal(db.dirname("a-file.txt"), "/")
+		})
+		it("should calculate directory path", () => {
+			assert.equal(db.dirname("some/url/with/"), "some/url/")
+			assert.equal(db.dirname("/"), "/")
+		})
+	})
 })

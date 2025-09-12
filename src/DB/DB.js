@@ -569,6 +569,25 @@ export default class DB {
 		return this.normalize(this.cwd, this.root, ...args)
 	}
 
+	dirname(uri) {
+		const parts = uri.split("/")
+		if (uri.endsWith("/")) {
+			return parts.length > 1 ? (parts.slice(0, parts.length - 2).join("/") + "/") : ""
+		}
+		if (parts.length > 1) {
+			return parts.slice(0, -1).join("/") + "/"
+		}
+		return "/"
+	}
+
+	basename(uri) {
+		const parts = uri.split("/")
+		if (uri.endsWith("/")) {
+			return parts.length > 1 ? (parts[parts.length - 2] + "/") : ""
+		}
+		return parts.pop() || ""
+	}
+
 	/**
 	 * Gets absolute path
 	 * @note Must be overwritten by platform-specific implementation
