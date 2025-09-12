@@ -52,12 +52,12 @@ describe('StreamEntry', () => {
 		assert.ok(entry.file instanceof DocumentEntry)
 		assert.ok(entry.files[0] instanceof DocumentEntry)
 	})
-	
+
 	it('should handle string representations', () => {
 		const fileEntry = new DocumentEntry({ name: 'file.txt', stat: { isFile: true } })
 		const dirEntry = new DocumentEntry({ name: 'directory', stat: { isDirectory: true } })
 		const linkEntry = new DocumentEntry({ name: 'link', stat: { isSymbolicLink: true } })
-		
+
 		assert.strictEqual(fileEntry.toString(), 'F file.txt')
 		assert.strictEqual(dirEntry.toString(), 'D directory')
 		assert.strictEqual(linkEntry.toString(), 'L link')

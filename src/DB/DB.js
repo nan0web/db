@@ -846,6 +846,14 @@ export default class DB {
 				totalSize.dirs += file.stat.size
 			}
 			totalSize.files += file.stat.isFile ? file.stat.size : 0
+
+			// Populate top entries (only immediate children of the root URI)
+			const relativePath = file.path.startsWith(uri) ? file.path.substring(uri.length) : file.path
+			const parts = relativePath.split('/').filter(Boolean)
+			if (parts.length === 1 || (relativePath.endsWith('/') && 2 === parts.length)) {
+				top.set(file.name, file)
+			}
+
 			const entry = new StreamEntry({
 				file,
 				files: files.sort(sortFn),

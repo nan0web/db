@@ -79,7 +79,7 @@ suite("DB", () => {
 		})
 
 		it('should return true when loaded', () => {
-			db.meta.set('?loaded', true)
+			db.meta.set('?loaded', new DocumentStat({ mtimeMs: Date.now() }))
 			assert.strictEqual(db.loaded, true)
 		})
 	})
@@ -546,6 +546,18 @@ suite("DB", () => {
 			const result = await db.loadDocument(uri)
 			assert.strictEqual(result, content)
 		})
+
+		it('should try extensions when none provided', async () => {
+			const db = new DB({
+				predefined: [
+					['file.json', { value: 'found' }]
+				]
+			})
+			await db.connect()
+
+			const result = await db.loadDocument('file')
+			assert.deepStrictEqual(result, { value: 'found' })
+		})
 	})
 
 	describe('saveDocument', () => {
@@ -653,6 +665,35 @@ suite("DB", () => {
 
 			assert.ok(entries[0] instanceof StreamEntry)
 		})
+
+		it('should correctly populate top entries', async () => {
+			const db = new DB({
+				predefined: [
+					['file1.txt', 'content1'],
+					['file2.txt', 'content2'],
+					['subdir/', null],
+					['subdir/file3.txt', 'content3'],
+					['subdir/nested/', null],
+					['subdir/nested/file4.txt', 'content4']
+				]
+			})
+			await db.connect()
+
+			const entries = []
+			for await (const entry of db.findStream('.', { depth: 2 })) {
+				entries.push(entry)
+			}
+
+			assert.ok(entries.length > 0)
+			// Check that top map includes top-level entries
+			const last = entries[entries.length - 1]
+			assert.ok(last.top.has('file1.txt'))
+			assert.ok(last.top.has('file2.txt'))
+			// Check that it doesn't include deeper entries
+			assert.ok(!last.top.has('subdir/file3.txt'))
+			assert.ok(!last.top.has('subdir/nested/'))
+		})
+
 	})
 
 	describe('from', () => {
@@ -672,13 +713,19 @@ suite("DB", () => {
 
 	describe('getInheritance', () => {
 		it('should get inheritance data for path', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('_', { global: 'value' })
-			dbInstance.data.set('dir1/_', { a: 1 })
-			dbInstance.data.set('dir1/dir2/_', { b: 2 })
+			const db = new DB({
+				console: new NoConsole({ silent: false }),
+				predefined: [
+					['_.json', { global: 'value' }],
+					['dir1/_.json', { a: 1 }],
+					['dir1/dir2/_', { b: 2 }],
+				]
+			})
+			await db.connect()
 
-			const result = await dbInstance.getInheritance('dir1/dir2/file')
+			const result = await db.getInheritance('dir1/dir2/file')
 			assert.deepEqual(result, { global: 'value', a: 1, b: 2 })
+			// assert.deepEqual(db.console.output(), [])
 		})
 
 		it('should handle missing inheritance files', async () => {
