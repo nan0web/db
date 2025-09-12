@@ -348,6 +348,7 @@ export default class DB {
      * @param {'asc'|'desc'} [options.order] - Sort order
      * @param {boolean} [options.skipStat] - Skip statistics
      * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
+     * @param {boolean} [options.load=false] - Load data files into memory
      * @yields {StreamEntry} Progress state
      * @returns {AsyncGenerator<StreamEntry, void, unknown>}
      */
@@ -358,7 +359,9 @@ export default class DB {
         order?: "asc" | "desc" | undefined;
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
+        load?: boolean | undefined;
     }): AsyncGenerator<StreamEntry, void, unknown>;
+    isData(uri: any): boolean;
     /**
      * Gets inheritance data for a given path
      * @param {string} path - Document path

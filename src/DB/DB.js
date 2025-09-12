@@ -798,6 +798,7 @@ export default class DB {
 	 * @param {'asc'|'desc'} [options.order] - Sort order
 	 * @param {boolean} [options.skipStat] - Skip statistics
 	 * @param {boolean} [options.skipSymbolicLink] - Skip symbolic links
+	 * @param {boolean} [options.load=false] - Load data files into memory
 	 * @yields {StreamEntry} Progress state
 	 * @returns {AsyncGenerator<StreamEntry, void, unknown>}
 	 */
@@ -809,6 +810,7 @@ export default class DB {
 			order = "asc",
 			skipStat = false,
 			skipSymbolicLink = false,
+			load = false,
 		} = options
 		this.#console.debug("Finding stream", { uri, options })
 		/** @type {Map<string, DocumentEntry>} */
@@ -864,8 +866,18 @@ export default class DB {
 				totalSize,
 			})
 			yield entry
+			if (!skipStat) this.meta.set(file.path, file.stat)
+			if (load && this.isData(file.path)) {
+				const data = await this.loadDocument(file.path)
+				this.data.set(file.path, data)
+			}
 			if (limit > 0 && files.length >= limit) break
 		}
+	}
+
+	isData(uri) {
+		const ext = this.extname(uri)
+		return ext && this.Directory.DATA_EXTNAMES.includes(ext) || !ext
 	}
 
 	/**
