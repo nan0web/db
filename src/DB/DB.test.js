@@ -802,6 +802,27 @@ suite("DB", () => {
 			const result = await dbInstance.getGlobals('any/file/path')
 			assert.deepEqual(result, {})
 		})
+
+		it("should properly load t.json", async () => {
+			const db = new DB({
+				predefined: [
+					["uk/_/t.json", {
+						"Translation": "Pereklad",
+					}],
+					["uk/index.json", {
+						"title": "Holovna"
+					}]
+				]
+			})
+			await db.connect()
+			const data = await db.fetch("uk/index")
+			assert.deepEqual(data, {
+				title: "Holovna",
+				t: {
+					"Translation": "Pereklad"
+				}
+			})
+		})
 	})
 
 	describe.skip('fetch', () => {
@@ -1321,6 +1342,15 @@ suite("DB", () => {
 		it("should calculate directory", () => {
 			assert.equal(db.basename("some/url/with/"), "with/")
 			assert.equal(db.basename("/"), "/")
+		})
+		it("should calculate file with removed suffix", () => {
+			assert.equal(db.basename("some/url/with/a-file.txt", true), "a-file")
+			assert.equal(db.basename("some/url/with/a-file.txt", ".txt"), "a-file")
+			assert.equal(db.basename("some/url/with/a-file.txt", ".md"), "a-file.txt")
+			assert.equal(db.basename("some/url/with/a-file", true), "a-file")
+			assert.equal(db.basename("some/url/with/a-file", ".txt"), "a-file")
+			assert.equal(db.basename("some/url/with/.gitignore", true), "")
+			assert.equal(db.basename("some/url/with/.gitignore", ".gitignore"), "")
 		})
 	})
 

@@ -9,6 +9,8 @@ import StreamEntry from "../StreamEntry.js"
 import GetOptions from "./GetOptions.js"
 import FetchOptions from "./FetchOptions.js"
 
+import { basename } from "node:path"
+
 /**
  * Base database class for document storage and retrieval
  * @class
@@ -580,12 +582,26 @@ export default class DB {
 		return "/"
 	}
 
-	basename(uri) {
-		const parts = uri.split("/")
-		if (uri.endsWith("/")) {
-			return parts.length > 1 ? (parts[parts.length - 2] + "/") : ""
+	/**
+	 * Returns base name of URI with the removedSuffix (if provided).
+	 * If removeSuffix is true the extension will be removed.
+	 * @param {string} uri
+	 * @param {string | true} [removeSuffix]
+	 * @returns {string}
+	 */
+	basename(uri, removeSuffix = "") {
+		if (true === removeSuffix) {
+			removeSuffix = this.extname(uri)
 		}
-		return parts.pop() || ""
+		const parts = uri.split("/")
+		let base = ""
+		if (uri.endsWith("/")) {
+			base = parts.length > 1 ? (parts[parts.length - 2] + "/") : ""
+		}
+		else if (parts.length) {
+			base = parts.pop() || ""
+		}
+		return removeSuffix && base.endsWith(removeSuffix) ? base.slice(0, -removeSuffix.length) : base
 	}
 
 	/**
@@ -961,7 +977,7 @@ export default class DB {
 						const key = this.resolveSync(uri, entry.name)
 						const value = await this.loadDocument(key)
 						if (undefined !== value) {
-							globals[entry.name] = value
+							globals[this.basename(entry.name, true)] = value
 						}
 					}
 				}
