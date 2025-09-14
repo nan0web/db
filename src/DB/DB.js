@@ -9,8 +9,6 @@ import StreamEntry from "../StreamEntry.js"
 import GetOptions from "./GetOptions.js"
 import FetchOptions from "./FetchOptions.js"
 
-import { basename } from "node:path"
-
 /**
  * Base database class for document storage and retrieval
  * @class
@@ -249,7 +247,7 @@ export default class DB {
 	 * Relative path resolver for file systems.
 	 * Must be implemented by platform specific code
 	 * @param {string} from Base directory path
-	 * @param {string} to Target directory path
+	 * @param {string} [to=this.root] Target directory path
 	 * @returns {string} Relative path
 	 */
 	relative(from, to = this.root) {
@@ -352,7 +350,7 @@ export default class DB {
 			// Yield directories first if depth > 0
 			if (Math.abs(depth) > 0) {
 				for (const dir of dirs) {
-					const subdir = dir.path
+					const subdir = this.resolveSync(dirUri, dir.name)
 					yield* this.readDir(subdir, { ...options, depth: depth - 1 })
 				}
 			}
@@ -806,18 +804,19 @@ export default class DB {
 		const keys = Array.from(this.meta.keys())
 		const filtered = keys.filter(key => {
 			if (!key.startsWith(prefix)) return false
+			const isDir = key.endsWith("/")
+			if (isDir) return true
 			const tail = key.slice(prefix.length)
 			if (["./", ".", ""].includes(tail)) return false
 			const arr = tail.split("/")
-			const isDir = tail.endsWith("/")
-			if (isDir) {
-				if (arr.length === 2) return true
-			} else {
-				if (arr.length === 1) return true
-			}
-			return false
+			return arr.length === 1
 		})
 		return filtered.map(path => {
+			const isDir = path.endsWith("/")
+			if (isDir) {
+				const stat = new DocumentStat({ isDirectory: true, mtimeMs: Date.now() })
+				return new DocumentEntry({ path: path.slice(0, -1), stat })
+			}
 			const stat = this.meta.get(path) || new DocumentStat({ isFile: true, mtimeMs: Date.now() })
 			return new DocumentEntry({ path, stat })
 		})
@@ -1008,7 +1007,7 @@ export default class DB {
 		if (!ext) {
 			mightBeDirectory = true
 			// Check if this is a directory
-			if (opts.allowDirs) {
+			if (opts.allowDirs && uri.endsWith("/")) {
 				try {
 					const arr = this.Directory.DATA_EXTNAMES.slice()
 					let extname
@@ -1101,22 +1100,24 @@ export default class DB {
 		let data = await this.loadDocument(uri)
 
 		if (opts.inherit && data && typeof data === 'object') {
-			let parentUri = await this.resolve(uri, "..", this.Directory.FILE)
-			if (parentUri.startsWith("/")) parentUri = parentUri.slice(1)
-
+			let dir = uri
+			let parentData = {}
+			const dirs = []
 			try {
-				const parentData = await this.loadDocument(parentUri)
-				if (parentData && typeof parentData === 'object') {
-					// Recursively fetch parent with same opts and updated visited
-					const processedParentData = await this.fetchMerged(
-						parentUri,
-						opts,
-						nextVisited
-					)
-					data = this.Data.merge(processedParentData, data)
-				}
+				do {
+					dir = this.dirname(dir)
+					let currentDir = await this.resolve(dir, this.Directory.FILE)
+					if (currentDir.startsWith("/")) currentDir = currentDir.slice(1)
+					const stat = await this.statDocument(currentDir)
+					if (stat && stat.exists) {
+						const data = await this.loadDocument(currentDir)
+						parentData = this.Data.merge(parentData, data)
+						dirs.push({ dir: currentDir, data })
+					}
+				} while (!["/", ".", "./", ""].includes(dir))
+				data = this.Data.merge(parentData, data)
 			} catch (/** @type {any} */ err) {
-				this.#console.warn("Error processing inheritance", { parentUri, error: err.message })
+				this.#console.warn("Error processing inheritance", { dir, dirs, parentData, error: err.message })
 			}
 		}
 

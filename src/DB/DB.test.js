@@ -360,6 +360,109 @@ suite("DB", () => {
 			assert.ok(entries.find(e => e.path === 'file1.txt'))
 		})
 
+		describe('readDir with depth logic', () => {
+			it('should load index.jsonl when depth=0', async () => {
+				const db = new DB({
+					predefined: [
+						["index.jsonl",
+							[
+								{ type: "F", path: "file.json", mtimeMs: 1717459200000, size: 100, content: { this: "is something" } },
+								{ type: "F", path: "dir/sub.json", mtimeMs: 1717459200000, size: 200, content: ["Here is a content"] },
+							]
+						]
+					]
+				})
+				await db.connect()
+
+				const entries = []
+				for await (const entry of db.readDir(".")) {
+					entries.push(entry)
+				}
+
+				assert.equal(entries.length, 2)
+				assert.equal(entries[0].path, "file.json")
+				assert.equal(entries[1].path, "dir/sub.json")
+			})
+
+			it('should load index.txt and go deeper when depth=1-3', async () => {
+				const db = new DB({
+					predefined: [
+						["index.txt", "F file.json mecxlwg9 8x\nD subdir/ mecvlwg9 0"],
+						["subdir/index.txt", "F nested.json mecxlwg9 8x"]
+					]
+				})
+				await db.connect()
+
+				const entries = []
+				for await (const entry of db.readDir(".", { depth: 2 })) {
+					entries.push(entry)
+				}
+
+				assert.ok(entries.find(e => e.path === "file.json" && e.isFile))
+				assert.ok(entries.find(e => e.path === "subdir" && e.isDirectory))
+				assert.ok(entries.find(e => e.path === "subdir/nested.json"))
+			})
+
+			it('should read directory contents recursively without index files', async () => {
+				const db = new DB({
+					predefined: [
+						['dir1/file1.txt', 'content1'],
+						['dir1/dir2/file2.txt', 'content2'],
+						['dir1/dir2/dir3/file3.txt', 'content3'],
+						['other.txt', 'other']
+					]
+				})
+				await db.connect()
+
+				const entries = []
+				for await (const entry of db.readDir('dir1', { depth: 3 })) {
+					entries.push(entry)
+				}
+
+				assert.strictEqual(entries.length, 3)
+				assert.ok(entries.find(e => e.path === 'dir1/file1.txt'))
+				assert.ok(entries.find(e => e.path === 'dir1/dir2/file2.txt'))
+				assert.ok(entries.find(e => e.path === 'dir1/dir2/dir3/file3.txt'))
+			})
+
+			it('should read directory contents flat (depth=0) without index files', async () => {
+				const db = new DB({
+					predefined: [
+						['flat/file1.txt', 'content1'],
+						['flat/dir/file2.txt', 'content2'],
+						['flat/dir/subdir/file3.txt', 'content3']
+					]
+				})
+				await db.connect()
+
+				const entries = []
+				for await (const entry of db.readDir('flat', { depth: 0 })) entries.push(entry)
+
+				assert.strictEqual(entries.length, 1)
+				assert.ok(entries.find(e => e.path === 'flat/file1.txt'))
+			})
+
+			it('should read directory contents limited by depth without index files', async () => {
+				const db = new DB({
+					predefined: [
+						['limited/file1.txt', 'content1'],
+						['limited/dir/file2.txt', 'content2'],
+						['limited/dir/subdir/file3.txt', 'content3']
+					]
+				})
+				await db.connect()
+
+				const entries = []
+				for await (const entry of db.readDir('limited', { depth: 1 })) {
+					entries.push(entry)
+				}
+
+				assert.strictEqual(entries.length, 2)
+				assert.ok(entries.find(e => e.path === 'limited/file1.txt'))
+				assert.ok(entries.find(e => e.path === 'limited/dir/file2.txt'))
+			})
+		})
+
 	})
 
 	describe('readBranch', () => {
@@ -492,15 +595,15 @@ suite("DB", () => {
 			assert.equal(path, "users")
 		})
 
-		it.skip("should not resolve .. beyond root", async () => {
+		it("should not resolve .. beyond root", async () => {
 			// Test cases for ../ resolution behavior at root level
 			const testCases = [
 				{ args: ["/", "..", "_"], expected: "_" },
-				{ args: ["/path", "..", "_"], expected: "path/_" },
-				{ args: ["/deeply/nested/path", "..", "_"], expected: "deeply/nested/path/_" },
-				{ args: ["_", "..", "_"], expected: "_/_" },
-				{ args: ["playground/_", "..", "_"], expected: "playground/_/_" },
-				{ args: ["/playground/_", "..", "_"], expected: "playground/_/_" },
+				{ args: ["/path", "..", "_"], expected: "_" },
+				{ args: ["/deeply/nested/path", "..", "_"], expected: "deeply/_" },
+				{ args: ["_", "..", "_"], expected: "_" },
+				{ args: ["playground/_", "..", "_"], expected: "_" },
+				{ args: ["/playground/_", "..", "_"], expected: "_" },
 			]
 
 			for (const { args, expected } of testCases) {
@@ -509,11 +612,11 @@ suite("DB", () => {
 			}
 		})
 
-		it.skip("should prevent same path resolution for parent", async () => {
+		it("should prevent same path resolution for parent", async () => {
 			const testCases = [
 				{ from: "playground/_", to: "..", expected: "_" },
 				{ from: "/playground/_", to: "..", expected: "_" },
-				{ from: "_", to: "..", expected: "." },
+				{ from: "_", to: "..", expected: "_" },
 			]
 
 			for (const { from, to, expected } of testCases) {
@@ -825,36 +928,45 @@ suite("DB", () => {
 		})
 	})
 
-	describe.skip('fetch', () => {
+	describe('fetch', () => {
 		it('should fetch merged data with all options enabled', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('_', { global: 'value' })
-			dbInstance.data.set('test.json', { value: 'test' })
-
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['test.json', { value: 'test' }],
+				]
+			})
+			await db.connect()
 			const opts = new FetchOptions()
-			const result = await dbInstance.fetch('test.json', opts)
+			const result = await db.fetch('test.json', opts)
 			assert.deepEqual(result, { global: 'value', value: 'test' })
 		})
 
 		it('should fetch with extension processing', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('_', { global: 'value' })
-			dbInstance.data.set('parent.json', { parent: 'value' })
-			dbInstance.data.set('child.json', { $ref: 'parent.json', child: 'value' })
-
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['parent.json', { parent: 'value' }],
+					['child.json', { $ref: 'parent.json', child: 'value' }],
+				]
+			})
+			await db.connect()
 			const opts = new FetchOptions()
-			const result = await dbInstance.fetch('child.json', opts)
+			const result = await db.fetch('child.json', opts)
 			assert.deepEqual(result, { global: 'value', parent: 'value', child: 'value' })
 		})
 
 		it('should fetch with reference resolution', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('_', { global: 'value' })
-			dbInstance.data.set('ref.json', { prop: { subprop: 'resolved' } })
-			dbInstance.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
-
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['ref.json', { prop: { subprop: 'resolved' } }],
+					['data.json', { key: '$ref:ref.json#prop/subprop' }],
+				]
+			})
+			await db.connect()
 			const opts = new FetchOptions()
-			const result = await dbInstance.fetch('data.json', opts)
+			const result = await db.fetch('data.json', opts)
 			assert.deepEqual(result, { global: 'value', key: 'resolved' })
 		})
 
@@ -872,7 +984,7 @@ suite("DB", () => {
 				]
 			})
 			await db.connect()
-			const result = await db.fetch('dir')
+			const result = await db.fetch('dir/')
 			assert.deepEqual(result, { title: 'Directory Index' })
 		})
 
@@ -904,7 +1016,7 @@ suite("DB", () => {
 			})
 		})
 
-		it.skip("should handle circular references without infinite loop", async () => {
+		it("should handle circular references without infinite loop", async () => {
 			const db = new DB({
 				predefined: [
 					["_", {
@@ -933,11 +1045,11 @@ suite("DB", () => {
 			const result = await db.fetch("playground/index.json")
 			assert.ok(result.nav)
 			assert.ok(result.$content)
-			assert.equal(result.nav.length, 4)
 			assert.equal(result.$content.length, 2)
+			assert.equal(result.nav.length, 4)
 		})
 
-		it.skip("should not resolve to same path for inheritance", async () => {
+		it("should not resolve to same path for inheritance", async () => {
 			const db = new DB({
 				predefined: [
 					["playground/_", { theme: "light" }],
@@ -954,38 +1066,54 @@ suite("DB", () => {
 		})
 	})
 
-	describe.skip('fetchMerged', () => {
+	describe('fetchMerged', () => {
 		it('should fetch and merge data with all options', async () => {
-			const db = new DB()
-			db.data.set('_', { global: 'value' })
-			db.data.set('test.json', { value: 'test' })
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['test.json', { value: 'test' }],
+				]
+			})
+			await db.connect()
 			const result = await db.fetch('test.json')
 			assert.deepEqual(result, { global: 'value', value: 'test' })
 		})
 
 		it('should handle extension processing with inherit option', async () => {
-			const db = new DB()
-			db.data.set('_', { global: 'value' })
-			db.data.set('parent.json', { parent: 'value' })
-			db.data.set('child.json', { $ref: 'parent.json', child: 'value' })
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['parent.json', { parent: 'value' }],
+					['child.json', { $ref: 'parent.json', child: 'value' }],
+				]
+			})
+			await db.connect()
 			const result = await db.fetch('child.json', { inherit: true })
 			assert.deepEqual(result, { global: 'value', parent: 'value', child: 'value' })
 		})
 
 		it('should handle reference resolution with refs option', async () => {
-			const db = new DB()
-			db.data.set('_', { global: 'value' })
-			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
-			db.data.set('data.json', { key: '$ref:ref.json#prop/subprop' })
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					['ref.json', { prop: { subprop: 'resolved' } }],
+					['data.json', { key: '$ref:ref.json#prop/subprop' }],
+				]
+			})
+			await db.connect()
 			const result = await db.fetch('data.json', { refs: true })
 			assert.deepEqual(result, { global: 'value', key: 'resolved' })
 		})
 
 		it('should skip globals when option is false', async () => {
-			const db = new DB()
-			db.data.set('_', { global: 'value' })
-			db.data.set("_/langs", ["en", "uk"])
-			db.data.set('test.json', { value: 'test' })
+			const db = new DB({
+				predefined: [
+					['_', { global: 'value' }],
+					["_/langs", ["en", "uk"]],
+					['test.json', { value: 'test' }],
+				]
+			})
+			await db.connect()
 			const result = await db.fetch('test.json', { globals: false })
 			assert.deepEqual(result, { global: 'value', value: 'test' })
 		})
@@ -1033,7 +1161,7 @@ suite("DB", () => {
 			})
 			await db.connect()
 			// Mock the fetchMerged implementation to test circular inheritance handling
-			const result = await db.fetch("playground/index.json")
+			const result = await db.fetch("playground/index")
 			assert.ok(result)
 			assert.equal(result.title, "Playground")
 			assert.equal(result.theme, "light")
@@ -1125,6 +1253,11 @@ suite("DB", () => {
 			assert.equal(db.normalize("/root", "/dir", "..", "file.txt"), "file.txt")
 			assert.equal(db.normalize("playground/_/", "..", "_"), "playground/_")
 			assert.equal(db.normalize("playground/_", "..", "_"), "_")
+		})
+
+		it("should normalize after root only", () => {
+			const db = new DB({ root: "data" })
+			assert.equal(db.normalize("_", "langs.yaml"), "_/langs.yaml")
 		})
 	})
 
@@ -1225,112 +1358,10 @@ suite("DB", () => {
 			await db.connect()
 
 			const entries = await db.listDir('dir')
-			assert.strictEqual(entries.length, 2)
+			assert.strictEqual(entries.length, 3)
 			assert.ok(entries.find(e => e.name === 'file1.txt'))
 			assert.ok(entries.find(e => e.name === 'file2.txt'))
-		})
-	})
-
-	describe('readDir with depth logic', () => {
-		it('should load index.jsonl when depth=0', async () => {
-			const db = new DB({
-				predefined: [
-					["index.jsonl",
-						[
-							{ type: "F", path: "file.json", mtimeMs: 1717459200000, size: 100, content: { this: "is something" } },
-							{ type: "F", path: "dir/sub.json", mtimeMs: 1717459200000, size: 200, content: ["Here is a content"] },
-						]
-					]
-				]
-			})
-			await db.connect()
-
-			const entries = []
-			for await (const entry of db.readDir(".")) {
-				entries.push(entry)
-			}
-
-			assert.equal(entries.length, 2)
-			assert.equal(entries[0].path, "file.json")
-			assert.equal(entries[1].path, "dir/sub.json")
-		})
-
-		it('should load index.txt and go deeper when depth=1-3', async () => {
-			const db = new DB({
-				predefined: [
-					["index.txt", "F file.json mecxlwg9 8x\nD subdir/ mecvlwg9 0"],
-					["subdir/index.txt", "F nested.json mecxlwg9 8x"]
-				]
-			})
-			await db.connect()
-
-			const entries = []
-			for await (const entry of db.readDir(".", { depth: 2 })) {
-				entries.push(entry)
-			}
-
-			assert.ok(entries.find(e => e.path === "file.json" && e.isFile))
-			assert.ok(entries.find(e => e.path === "subdir" && e.isDirectory))
-			assert.ok(entries.find(e => e.path === "subdir/nested.json"))
-		})
-
-		it('should read directory contents recursively without index files', async () => {
-			const db = new DB({
-				predefined: [
-					['dir1/file1.txt', 'content1'],
-					['dir1/dir2/file2.txt', 'content2'],
-					['dir1/dir2/dir3/file3.txt', 'content3'],
-					['other.txt', 'other']
-				]
-			})
-			await db.connect()
-
-			const entries = []
-			for await (const entry of db.readDir('dir1', { depth: 3 })) {
-				entries.push(entry)
-			}
-
-			assert.strictEqual(entries.length, 3)
-			assert.ok(entries.find(e => e.path === 'dir1/file1.txt'))
-			assert.ok(entries.find(e => e.path === 'dir1/dir2/file2.txt'))
-			assert.ok(entries.find(e => e.path === 'dir1/dir2/dir3/file3.txt'))
-		})
-
-		it('should read directory contents flat (depth=0) without index files', async () => {
-			const db = new DB({
-				predefined: [
-					['flat/file1.txt', 'content1'],
-					['flat/dir/file2.txt', 'content2'],
-					['flat/dir/subdir/file3.txt', 'content3']
-				]
-			})
-			await db.connect()
-
-			const entries = []
-			for await (const entry of db.readDir('flat', { depth: 0 })) entries.push(entry)
-
-			assert.strictEqual(entries.length, 1)
-			assert.ok(entries.find(e => e.path === 'flat/file1.txt'))
-		})
-
-		it('should read directory contents limited by depth without index files', async () => {
-			const db = new DB({
-				predefined: [
-					['limited/file1.txt', 'content1'],
-					['limited/dir/file2.txt', 'content2'],
-					['limited/dir/subdir/file3.txt', 'content3']
-				]
-			})
-			await db.connect()
-
-			const entries = []
-			for await (const entry of db.readDir('limited', { depth: 1 })) {
-				entries.push(entry)
-			}
-
-			assert.strictEqual(entries.length, 2)
-			assert.ok(entries.find(e => e.path === 'limited/file1.txt'))
-			assert.ok(entries.find(e => e.path === 'limited/dir/file2.txt'))
+			assert.ok(entries.find(e => e.name === 'dir' && e.isDirectory))
 		})
 	})
 

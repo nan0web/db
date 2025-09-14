@@ -151,10 +151,10 @@ export default class DB {
      * Relative path resolver for file systems.
      * Must be implemented by platform specific code
      * @param {string} from Base directory path
-     * @param {string} to Target directory path
+     * @param {string} [to=this.root] Target directory path
      * @returns {string} Relative path
      */
-    relative(from: string, to?: string): string;
+    relative(from: string, to?: string | undefined): string;
     /**
      * Get string representation of the database
      * @returns {string}
@@ -248,7 +248,14 @@ export default class DB {
      */
     resolveSync(...args: string[]): string;
     dirname(uri: any): string;
-    basename(uri: any): any;
+    /**
+     * Returns base name of URI with the removedSuffix (if provided).
+     * If removeSuffix is true the extension will be removed.
+     * @param {string} uri
+     * @param {string | true} [removeSuffix]
+     * @returns {string}
+     */
+    basename(uri: string, removeSuffix?: string | true | undefined): string;
     /**
      * Gets absolute path
      * @note Must be overwritten by platform-specific implementation
