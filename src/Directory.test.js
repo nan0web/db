@@ -29,4 +29,18 @@ suite('Directory', () => {
 			assert.strictEqual(Directory.isGlobal('_global/'), false)
 		})
 	})
+
+	describe("getGlobalName", () => {
+		assert.equal(Directory.getGlobalName("_/langs"), "langs")
+		assert.equal(Directory.getGlobalName("_/langs.yaml"), "langs")
+		assert.equal(Directory.getGlobalName("_/langs.json"), "langs")
+		assert.equal(Directory.getGlobalName("_/sub/folder.json"), "folder")
+		assert.equal(Directory.getGlobalName("langs"), "")
+		assert.equal(Directory.getGlobalName("langs.yaml"), "")
+		assert.equal(Directory.getGlobalName("langs.json"), "")
+		assert.equal(Directory.getGlobalName("sub/folder.json"), "")
+		assert.equal(Directory.getGlobalName("sub/_/langs"), "langs")
+		assert.equal(Directory.getGlobalName("sub/_/langs.yaml"), "langs")
+		assert.equal(Directory.getGlobalName("sub/_/langs.json"), "langs")
+	})
 })

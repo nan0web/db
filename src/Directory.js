@@ -53,6 +53,26 @@ class Directory {
 	}
 
 	/**
+	 * Returns Global variable name or empty string if incorrect global path.
+	 * @param {string} path
+	 * @returns {string}
+	 */
+	static getGlobalName(path) {
+		if (!this.isGlobal(path)) return ""
+		const base = String(path).split("/").pop()
+		if (!base) return ""
+		const arr = base.split(".")
+		if (arr.length > 1) {
+			const ext = "." + arr.pop()
+			if (this.DATA_EXTNAMES.includes(ext)) return arr.join(".")
+		}
+		else if (1 === arr.length) {
+			return arr[0]
+		}
+		return ""
+	}
+
+	/**
 	 * Checks if a given path represents a directory.
 	 * Directory paths end with a forward slash (/).
 	 *

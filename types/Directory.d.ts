@@ -39,6 +39,12 @@ declare class Directory {
      */
     static isGlobal(path: string): boolean;
     /**
+     * Returns Global variable name or empty string if incorrect global path.
+     * @param {string} path
+     * @returns {string}
+     */
+    static getGlobalName(path: string): string;
+    /**
      * Checks if a given path represents a directory.
      * Directory paths end with a forward slash (/).
      *
