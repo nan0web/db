@@ -219,6 +219,16 @@ class DirectoryIndex {
 		if (input instanceof DirectoryIndex) return input
 		return new DirectoryIndex(input)
 	}
+
+	/**
+	 * Checks if a given path represents an index.
+	 *
+	 * @param {string} path
+	 * @returns {boolean} True if the path is an index
+	 */
+	static isIndex(path) {
+		return path.endsWith(`/${this.INDEX}`) || path === this.INDEX
+	}
 }
 
 export default DirectoryIndex

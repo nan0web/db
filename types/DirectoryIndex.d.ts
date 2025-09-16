@@ -14,6 +14,13 @@ declare class DirectoryIndex {
      */
     static from(input: object | DirectoryIndex): DirectoryIndex;
     /**
+     * Checks if a given path represents an index.
+     *
+     * @param {string} path
+     * @returns {boolean} True if the path is an index
+     */
+    static isIndex(path: string): boolean;
+    /**
      * When entriesColumns fulfilled — indexes are stored as string[][] in data files
      * instead of Record<string, object>
      * @param {object} input

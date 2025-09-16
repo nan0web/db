@@ -174,6 +174,14 @@ class DocumentStat {
 	}
 
 	/**
+	 * Returns the short file type: D, F, ?
+	 * @returns {string}
+	 */
+	get type() {
+		return this.isDirectory ? "D" : this.isFile ? "F" : "?"
+	}
+
+	/**
 	 * Creates DocumentStat instance from input
 	 * @param {object|DocumentStat} input - Properties or existing instance
 	 * @returns {DocumentStat}

@@ -127,4 +127,9 @@ declare class DocumentStat {
      * @returns {boolean}
      */
     get exists(): boolean;
+    /**
+     * Returns the short file type: D, F, ?
+     * @returns {string}
+     */
+    get type(): string;
 }

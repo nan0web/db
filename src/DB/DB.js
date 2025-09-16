@@ -297,6 +297,8 @@ export default class DB {
 			depth = -1,
 		} = options
 
+		this.#console.debug("Reading directory", { uri, options })
+
 		const dirUri = await this.resolve(uri)
 
 		const indexPath = this.resolveSync(dirUri, 'index.jsonl')
@@ -448,7 +450,7 @@ export default class DB {
 		for (const key of this.meta.keys()) {
 			let dir
 			if (key.endsWith("/")) {
-				dir = (this.resolveSync(key, "..") || ".") + "/"
+				dir = ((this.dirname(key) || ".") + "/").replace(/\/+/g, "/")
 			} else {
 				const arr = key.split("/")
 				arr.pop()
@@ -466,6 +468,7 @@ export default class DB {
 					size = Math.max(stat.size, size)
 					mtimeMs = Math.max(stat.mtimeMs, mtimeMs)
 				})
+				if (["./", ".", "", "/"].includes(dir)) dir = "."
 				this.meta.set(dir, new DocumentStat({ size, mtimeMs, isDirectory: true }))
 			}
 		}
@@ -807,6 +810,7 @@ export default class DB {
 	 * @throws {Error} If directory does not exist
 	 */
 	async listDir(uri) {
+		this.#console.debug("Listing directory", { uri })
 		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
 		const keys = Array.from(this.meta.keys())
 		const filtered = keys.filter(key => {
@@ -814,7 +818,7 @@ export default class DB {
 			const isDir = key.endsWith("/")
 			if (isDir) return true
 			const tail = key.slice(prefix.length)
-			if (["./", ".", ""].includes(tail)) return false
+			if (["./", "/", ".", ""].includes(tail)) return false
 			const arr = tail.split("/")
 			return arr.length === 1
 		})
@@ -1065,7 +1069,7 @@ export default class DB {
 			// If it's a potential directory and directories are allowed, try as directory
 			if (mightBeDirectory && opts.allowDirs) {
 				try {
-					const indexPath = await this.resolve(uri, this.Directory.INDEX + ext)
+					const indexPath = await this.resolve(uri, this.Index.INDEX)
 					if (indexPath === uri) {
 						throw new Error("Impossible to have the same directory path as a request uri")
 					}
@@ -1190,7 +1194,14 @@ export default class DB {
 
 				const absPath = refString.startsWith('/')
 					? this.normalize(refString)
-					: this.normalize(this.resolveSync(basePath, '..', refString))
+					: this.resolveSync(basePath, '..', refString)
+
+				// Avoid reading the same file we're currently processing
+				// This prevents infinite loops when a file references itself
+				if (absPath === basePath) {
+					this.#console.warn("Self-reference skipped", { ref: absPath })
+					continue
+				}
 
 				if (visited.has(absPath)) {
 					this.#console.warn("Circular reference skipped", { ref: absPath })
@@ -1269,6 +1280,7 @@ export default class DB {
 		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
 			return
 		}
+
 		const dirPath = this.dirname(uri)
 		const indexPathJSONL = this.resolveSync(dirPath, this.Index.FULL_INDEX)
 		const indexPathTXT = this.resolveSync(dirPath, this.Index.INDEX)
@@ -1279,9 +1291,8 @@ export default class DB {
 		 */
 		const entries = []
 		for (const [key, meta] of this.meta.entries()) {
-			const isChild = !key.startsWith(dirPath) ? false : key !== indexPathJSONL && key !== indexPathTXT
-			const isFile = meta.isFile || key === uri
-			if (isChild && isFile && !key.endsWith("/")) {
+			const isChild = `/${key}`.startsWith(dirPath) && ![indexPathJSONL, indexPathTXT].includes(key)
+			if (isChild && meta.isFile && !key.endsWith("/")) {
 				const name = this.basename(key)
 				entries.push([name, meta])
 			}
@@ -1293,7 +1304,6 @@ export default class DB {
 		// Use DirectoryIndex for encoding
 		const Index = this.Index || DirectoryIndex
 		const index = new Index({
-			entriesColumns: ['name', 'mtimeMs.36', 'size.36'],
 			entriesAs: Index.ENTRIES_AS_TEXT,
 		})
 
