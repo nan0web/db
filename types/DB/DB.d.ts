@@ -165,17 +165,18 @@ export default class DB {
      */
     toString(): string;
     /**
-     * Reading the current directory or branch as async generator to follow progress.
-     * For FetchDB it is loading of "index.txt" or "manifest.json".
-     * For NodeFsDB it is loading readdirSync in a conditional recursion.
+     * Reads the content of a directory at the specified URI.
+     * For FetchDB it loads index.txt or manifest.json.
+     * For NodeFsDB it uses readdirSync recursively.
+     *
      * @async
      * @generator
-     * @param {string} uri
-     * @param {object} options
-     * @param {number} [options.depth=-1] Depth to read recursively
-     * @param {boolean} [options.skipStat=false] Skip collecting statistics
-     * @param {boolean} [options.skipSymbolicLink=false] Skip symbolic links
-     * @param {Function} [options.filter] Filter by pattern or callback
+     * @param {string} uri - The URI of the directory to read
+     * @param {object} options - Read directory options
+     * @param {number} [options.depth=-1] - The depth to which subdirectories should be read (-1 means unlimited)
+     * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
+     * @param {boolean} [options.skipSymbolicLink=false] - Whether to skip symbolic links
+     * @param {Function} [options.filter] - A filter function to apply to directory entries
      * @yields {DocumentEntry}
      * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
      */
@@ -206,10 +207,9 @@ export default class DB {
      */
     find(uri: string | ((key: string, value: any) => boolean), depth?: number | undefined): AsyncGenerator<string, void, unknown>;
     /**
-     * Connect to database
+     * Connects to the database. This method should be overridden by subclasses.
      * @abstract
      * @returns {Promise<void>}
-     * Platform specific implementation of connecting to the database
      */
     connect(): Promise<void>;
     /**
@@ -294,7 +294,7 @@ export default class DB {
      */
     saveDocument(uri: string, document: any): Promise<boolean>;
     /**
-     * Reads a statisitics into DocumentStat for a specific document.
+     * Reads statistics for a specific document.
      * Must be overwritten to has the proper file or database document stat operation.
      * In a basic class it just returns a document stat from the db.meta map if exists.
      * @note Must be overwritten by platform-specific implementation
@@ -415,11 +415,24 @@ export default class DB {
     resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
     /**
  * @private
- * Auto-updates index.jsonl and index.txt after save
- * @param {string} uri - Saved document URI
+ * Auto-updates index.jsonl and index.txt after document save
+ * @param {string} uri - URI of saved document
  * @returns {Promise<void>}
  */
     private _updateIndex;
+    /**
+     * Saves index data to both index.jsonl and index.txt files
+     * @param {string} dirUri Directory URI where indexes should be saved
+     * @param {Array<DocumentEntry>} entries Document entries to index
+     * @returns {Promise<void>}
+     */
+    saveIndex(dirUri: string, entries: Array<DocumentEntry>): Promise<void>;
+    /**
+     * Loads index data from either index.jsonl or index.txt file
+     * @param {string} dirUri Directory URI where index file is located
+     * @returns {Promise<Array<DocumentEntry>>} Array of document entries or null if no index found
+     */
+    loadIndex(dirUri: string): Promise<Array<DocumentEntry>>;
     #private;
 }
 import DocumentStat from "../DocumentStat.js";

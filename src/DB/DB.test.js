@@ -934,7 +934,7 @@ suite("DB", () => {
 						"Translation": "Pereklad",
 					}],
 					["uk/index.json", {
-						"title": "Holovna"
+						title: "Holovna"
 					}]
 				]
 			})
@@ -1416,8 +1416,9 @@ suite("DB", () => {
 			assert.equal(db.basename("some/url/with/a-file.txt", ".md"), "a-file.txt")
 			assert.equal(db.basename("some/url/with/a-file", true), "a-file")
 			assert.equal(db.basename("some/url/with/a-file", ".txt"), "a-file")
-			assert.equal(db.basename("some/url/with/.gitignore", true), "")
-			assert.equal(db.basename("some/url/with/.gitignore", ".gitignore"), "")
+			assert.equal(db.basename("some/url/with/a.gitignore", true), "a")
+			assert.equal(db.basename("some/url/with/.gitignore", true), ".gitignore")
+			assert.equal(db.basename("some/url/with/.gitignore", ".gitignore"), ".gitignore")
 		})
 	})
 
@@ -1432,100 +1433,97 @@ suite("DB", () => {
 		})
 	})
 
-	describe('_updateIndex', () => {
-		it('should update index.txt and index.jsonl when a document is saved', async () => {
-			const db = new DB({
-				console: new NoConsole(),
-				predefined: [
-					['file1.json', { content: 'data1' }],
-					['file2.json', { content: 'data2' }],
-				]
-			})
-			await db.connect()
+	describe('saveIndex', () => {
+		it('should save index files correctly', async () => {
+			const dirUri = "."
+			const entries = [
+				new DocumentEntry({ name: "file1.txt", stat: new DocumentStat({ size: 100, mtimeMs: 1000, isFile: true }), path: "file1.txt" }),
+				new DocumentEntry({ name: "file2.json", stat: new DocumentStat({ size: 200, mtimeMs: 2000, isFile: true }), path: "file2.json" }),
+			]
 
-			// Manually trigger index update
-			await db._updateIndex('file1.json')
+			await db.saveIndex(dirUri, entries)
 
-			// Check that index files exist
-			assert.ok(db.data.has('index.txt'))
-			assert.ok(db.data.has('index.jsonl'))
+			// Check that both index files were created
+			assert.ok(db.data.has("index.jsonl"))
+			assert.ok(db.data.has("index.txt"))
 
-			// Check index.txt content
-			const indexTxtContent = db.data.get('index.txt')
-			const textLines = indexTxtContent.split('\n')
-			assert.equal(textLines.length, 2)
+			// Check JSONL content
+			const jsonlContent = db.data.get("index.jsonl")
+			const expectedJSONL = [
+				'{"name":"file1.txt","mtimeMs":1000,"size":100,"type":"F"}',
+				'{"name":"file2.json","mtimeMs":2000,"size":200,"type":"F"}',
+			].join("\n")
+			assert.strictEqual(jsonlContent, expectedJSONL)
 
-			const jsonLines = db.data.get('index.jsonl').split('\n')
-			assert.equal(jsonLines.length, 2)
-
-			const file1Entry = JSON.parse(jsonLines[0])
-			const file2Entry = JSON.parse(jsonLines[1])
-
-			assert.equal(file1Entry.name, 'file1.json')
-			assert.equal(file1Entry.type, 'F')
-			assert.ok(file1Entry.mtimeMs > 0)
-			assert.ok(file1Entry.size > 0)
-
-			assert.equal(file2Entry.name, 'file2.json')
-			assert.equal(file2Entry.type, 'F')
-			assert.ok(file2Entry.mtimeMs > 0)
-			assert.ok(file2Entry.size > 0)
-		})
-
-		it('should not include index files in the index', async () => {
-			const db = new DB()
-			await db.connect()
-
-			// Create some mock data including index files
-			db.data.set('file1.json', { content: 'data1' })
-			db.data.set('index.txt', 'existing index')
-			db.data.set('index.jsonl', [{ name: 'old', type: 'F' }])
-			db.meta.set('file1.json', new DocumentStat({ size: Buffer.byteLength(JSON.stringify({ content: 'data1' })), mtimeMs: 1_000_000_000_000, isFile: true }))
-			db.meta.set('index.txt', new DocumentStat({ size: 50, mtimeMs: 1_000_000_000_000, isFile: true }))
-			db.meta.set('index.jsonl', new DocumentStat({ size: 60, mtimeMs: 1_000_000_000_000, isFile: true }))
-
-			// Manually trigger index update
-			await db._updateIndex('file1.json')
-
-			// Check that index files exist
-			assert.ok(db.data.has('index.txt'))
-			assert.ok(db.data.has('index.jsonl'))
-
-			// Check index.txt content - should not include index files
-			const indexTxtContent = db.data.get('index.txt')
-			assert.match(indexTxtContent, /F file1\.json [a-z0-9]+ [a-z0-9]+/)
-			assert.doesNotMatch(indexTxtContent, /F index\.txt/)
-			assert.doesNotMatch(indexTxtContent, /F index\.jsonl/)
-
-			// Check index.jsonl content - should not include index files
-			const indexJsonlContent = db.data.get('index.jsonl')
-			const lines = indexJsonlContent.split('\n')
-			assert.equal(lines.length, 1)
-
-			const file1Entry = JSON.parse(lines[0])
-			assert.equal(file1Entry.name, 'file1.json')
-		})
-
-		it('should handle directory entries correctly', async () => {
-			const db = new DB({
-				predefined: [
-					['file1.json', { content: 'data1' }],
-					['subdir/', null],
-				]
-			})
-			await db.connect()
-
-			// Manually trigger index update
-			await db._updateIndex('file1.json')
-
-			// Check index.jsonl content
-			const indexJsonlContent = db.data.get('index.jsonl')
-			const lines = indexJsonlContent.split('\n')
-			assert.equal(lines.length, 1)
-			const file1Entry = JSON.parse(lines[0])
-			assert.equal(file1Entry.name, 'file1.json')
-			assert.equal(file1Entry.type, 'F')
+			// Check TXT content
+			const txtContent = db.data.get("index.txt")
+			const expectedTXT = [
+				'F file1.txt rs 2s',
+				'F file2.json 1jk 5k'
+			].join("\n")
+			assert.strictEqual(txtContent, expectedTXT)
 		})
 	})
 
+	describe('loadIndex', () => {
+		it('should load index from JSONL file', async () => {
+			const dirUri = "."
+			db.data.set("index.jsonl", [
+				{ "name": "file1.txt", "mtimeMs": 1000, "size": 100, "type": "F" },
+				{ "name": "file2.json", "mtimeMs": 2000, "size": 200, "type": "F" },
+				{ "name": "dir1/", "mtimeMs": 3000, "size": 0, "type": "D" },
+			])
+
+			const entries = await db.loadIndex(dirUri)
+
+			assert.ok(Array.isArray(entries))
+			assert.strictEqual(entries.length, 3)
+
+			const file1 = entries.find(e => e.name === "file1.txt")
+			assert.ok(file1)
+			assert.strictEqual(file1.stat.mtimeMs, 1000)
+			assert.strictEqual(file1.stat.size, 100)
+			assert.strictEqual(file1.stat.isFile, true)
+
+			const file2 = entries.find(e => e.name === "file2.json")
+			assert.ok(file2)
+			assert.strictEqual(file2.stat.mtimeMs, 2000)
+			assert.strictEqual(file2.stat.size, 200)
+			assert.strictEqual(file2.stat.isFile, true)
+
+			const dir1 = entries.find(e => e.name === "dir1/")
+			assert.ok(dir1)
+			assert.strictEqual(dir1.stat.mtimeMs, 3000)
+			assert.strictEqual(dir1.stat.isDirectory, true)
+		})
+
+		it('should load index from TXT file when JSONL is not available', async () => {
+			const dirUri = "."
+			const txtContent = "F file1.txt mecxlwg9 8x\nF file2.json mecvlwg9 8c\nD dir1/ mecvlwg9 0"
+			db.data.set("index.txt", txtContent)
+
+			const entries = await db.loadIndex(dirUri)
+
+			assert.ok(Array.isArray(entries))
+			assert.strictEqual(entries.length, 3)
+
+			const file1 = entries.find(e => e.name === "file1.txt")
+			assert.ok(file1)
+			assert.strictEqual(file1.name, "file1.txt")
+
+			const file2 = entries.find(e => e.name === "file2.json")
+			assert.ok(file2)
+			assert.strictEqual(file2.name, "file2.json")
+
+			const dir1 = entries.find(e => e.name === "dir1/")
+			assert.ok(dir1)
+			assert.strictEqual(dir1.name, "dir1/")
+		})
+
+		it('should return null when no index files exist', async () => {
+			const dirUri = "."
+			const entries = await db.loadIndex(dirUri)
+			assert.deepEqual(entries, [])
+		})
+	})
 })

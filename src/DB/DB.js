@@ -275,17 +275,18 @@ export default class DB {
 	}
 
 	/**
-	 * Reading the current directory or branch as async generator to follow progress.
-	 * For FetchDB it is loading of "index.txt" or "manifest.json".
-	 * For NodeFsDB it is loading readdirSync in a conditional recursion.
+	 * Reads the content of a directory at the specified URI.
+	 * For FetchDB it loads index.txt or manifest.json.
+	 * For NodeFsDB it uses readdirSync recursively.
+	 *
 	 * @async
 	 * @generator
-	 * @param {string} uri
-	 * @param {object} options
-	 * @param {number} [options.depth=-1] Depth to read recursively
-	 * @param {boolean} [options.skipStat=false] Skip collecting statistics
-	 * @param {boolean} [options.skipSymbolicLink=false] Skip symbolic links
-	 * @param {Function} [options.filter] Filter by pattern or callback
+	 * @param {string} uri - The URI of the directory to read
+	 * @param {object} options - Read directory options
+	 * @param {number} [options.depth=-1] - The depth to which subdirectories should be read (-1 means unlimited)
+	 * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
+	 * @param {boolean} [options.skipSymbolicLink=false] - Whether to skip symbolic links
+	 * @param {Function} [options.filter] - A filter function to apply to directory entries
 	 * @yields {DocumentEntry}
 	 * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
 	 */
@@ -430,10 +431,9 @@ export default class DB {
 	}
 
 	/**
-	 * Connect to database
+	 * Connects to the database. This method should be overridden by subclasses.
 	 * @abstract
 	 * @returns {Promise<void>}
-	 * Platform specific implementation of connecting to the database
 	 */
 	async connect() {
 		this.#console.info("Connecting to database")
@@ -608,6 +608,7 @@ export default class DB {
 		else if (parts.length) {
 			base = parts.pop() || ""
 		}
+		if (base === removeSuffix) return base
 		return removeSuffix && base.endsWith(removeSuffix) ? base.slice(0, -removeSuffix.length) : base
 	}
 
@@ -689,7 +690,7 @@ export default class DB {
 	}
 
 	/**
-	 * Reads a statisitics into DocumentStat for a specific document.
+	 * Reads statistics for a specific document.
 	 * Must be overwritten to has the proper file or database document stat operation.
 	 * In a basic class it just returns a document stat from the db.meta map if exists.
 	 * @note Must be overwritten by platform-specific implementation
@@ -1271,8 +1272,8 @@ export default class DB {
 
 	/**
  * @private
- * Auto-updates index.jsonl and index.txt after save
- * @param {string} uri - Saved document URI
+ * Auto-updates index.jsonl and index.txt after document save
+ * @param {string} uri - URI of saved document
  * @returns {Promise<void>}
  */
 	async _updateIndex(uri) {
@@ -1320,6 +1321,94 @@ export default class DB {
 		await this.saveDocument(indexPathJSONL, jsonl)
 
 		this.#console.debug("Index updated", { dir: dirPath, files: entries.length })
+	}
+
+	/**
+	 * Saves index data to both index.jsonl and index.txt files
+	 * @param {string} dirUri Directory URI where indexes should be saved
+	 * @param {Array<DocumentEntry>} entries Document entries to index
+	 * @returns {Promise<void>}
+	 */
+	async saveIndex(dirUri, entries) {
+		const indexPathJSONL = this.resolveSync(dirUri, this.Index.FULL_INDEX)
+		const indexPathTXT = this.resolveSync(dirUri, this.Index.INDEX)
+
+		// Prepare data for JSONL format
+		const jsonlContent = entries.map(entry => JSON.stringify({
+			name: entry.name,
+			mtimeMs: entry.stat.mtimeMs,
+			size: entry.stat.size,
+			type: entry.stat.isFile ? 'F' : entry.stat.isDirectory ? 'D' : '?',
+		})).join('\n')
+
+		// Save JSONL index
+		await this.saveDocument(indexPathJSONL, jsonlContent)
+
+		// Use DirectoryIndex for encoding TXT format
+		const index = new this.Index({
+			entriesAs: DirectoryIndex.ENTRIES_AS_TEXT,
+		})
+
+		const txtContent = index.encode(entries.map(e => [e.name, e.stat]), DirectoryIndex.ENTRIES_AS_TEXT)
+
+		// Save TXT index
+		await this.saveDocument(indexPathTXT, txtContent)
+	}
+
+	/**
+	 * Loads index data from either index.jsonl or index.txt file
+	 * @param {string} dirUri Directory URI where index file is located
+	 * @returns {Promise<Array<DocumentEntry>>} Array of document entries or null if no index found
+	 */
+	async loadIndex(dirUri) {
+		const indexPathJSONL = this.resolveSync(dirUri, this.Index.FULL_INDEX)
+		const indexPathTXT = this.resolveSync(dirUri, this.Index.INDEX)
+
+		// Try loading JSONL index first
+		try {
+			const lines = await this.loadDocument(indexPathJSONL, [])
+			if (!lines.length) {
+				throw new Error("Empty jsonl index")
+			}
+			return lines.map(data => {
+				const stat = new DocumentStat({
+					mtimeMs: data.mtimeMs,
+					size: data.size,
+					isFile: 'F' === data.type,
+					isDirectory: 'D' === data.type,
+				})
+				return new DocumentEntry({
+					name: data.name,
+					stat,
+					path: this.resolveSync(dirUri, data.name),
+				})
+			})
+		} catch (err) {
+			// JSONL not found or invalid, try TXT
+		}
+
+		// Try loading TXT index
+		try {
+			const txtContent = await this.loadDocument(indexPathTXT, null)
+			if (txtContent) {
+				const index = new this.Index({
+					entriesAs: DirectoryIndex.ENTRIES_AS_TEXT,
+				})
+				const stats = index.decode(txtContent, DirectoryIndex.ENTRIES_AS_TEXT)
+				return stats.map(([name, stat]) => {
+					return new DocumentEntry({
+						name,
+						stat: DocumentStat.from(stat),
+						path: this.resolveSync(dirUri, name),
+					})
+				})
+			}
+		} catch (err) {
+			// TXT not found or invalid
+		}
+
+		// No index found
+		return []
 	}
 
 	/**
