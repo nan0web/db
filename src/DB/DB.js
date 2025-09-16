@@ -159,6 +159,12 @@ export default class DB {
 		return /** @type {typeof DB} */ (this.constructor).Directory
 	}
 	/**
+	 * @returns {typeof DirectoryIndex}
+	 */
+	get Index() {
+		return /** @type {typeof DB} */ (this.constructor).Index
+	}
+	/**
 	 * Returns static.GetOptions that is assign to DB or its extension.
 	 * Define your own static.GetOptions, no need to extend getter.
 	 * ```js
@@ -675,7 +681,8 @@ export default class DB {
 		stat.mtimeMs = Date.now()
 		stat.size = Buffer.byteLength(JSON.stringify(document))
 		this.meta.set(abs, stat)
-		return false
+		this._updateIndex(abs)
+		return true
 	}
 
 	/**
@@ -1106,7 +1113,7 @@ export default class DB {
 			try {
 				do {
 					dir = this.dirname(dir)
-					let currentDir = await this.resolve(dir, this.Directory.FILE)
+					let currentDir = this.resolveSync(dir, this.Directory.FILE)
 					if (currentDir.startsWith("/")) currentDir = currentDir.slice(1)
 					const stat = await this.statDocument(currentDir)
 					if (stat && stat.exists) {
@@ -1183,7 +1190,7 @@ export default class DB {
 
 				const absPath = refString.startsWith('/')
 					? this.normalize(refString)
-					: this.normalize(await this.resolve(basePath, '..', refString))
+					: this.normalize(this.resolveSync(basePath, '..', refString))
 
 				if (visited.has(absPath)) {
 					this.#console.warn("Circular reference skipped", { ref: absPath })
@@ -1249,6 +1256,60 @@ export default class DB {
 		}
 
 		return this.Data.unflatten(newFlat)
+	}
+
+	/**
+ * @private
+ * Auto-updates index.jsonl and index.txt after save
+ * @param {string} uri - Saved document URI
+ * @returns {Promise<void>}
+ */
+	async _updateIndex(uri) {
+		const base = this.basename(uri)
+		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
+			return
+		}
+		const dirPath = this.dirname(uri)
+		const indexPathJSONL = this.resolveSync(dirPath, this.Index.FULL_INDEX)
+		const indexPathTXT = this.resolveSync(dirPath, this.Index.INDEX)
+
+		// Get all direct files in directory
+		/**
+		 * @type {Array<[string, DocumentStat]>}
+		 */
+		const entries = []
+		for (const [key, meta] of this.meta.entries()) {
+			const isChild = !key.startsWith(dirPath) ? false : key !== indexPathJSONL && key !== indexPathTXT
+			const isFile = meta.isFile || key === uri
+			if (isChild && isFile && !key.endsWith("/")) {
+				const name = this.basename(key)
+				entries.push([name, meta])
+			}
+		}
+
+		// Sort entries by name
+		entries.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+
+		// Use DirectoryIndex for encoding
+		const Index = this.Index || DirectoryIndex
+		const index = new Index({
+			entriesColumns: ['name', 'mtimeMs.36', 'size.36'],
+			entriesAs: Index.ENTRIES_AS_TEXT,
+		})
+
+		const text = index.encode(entries, Index.ENTRIES_AS_TEXT)
+		await this.saveDocument(indexPathTXT, text)
+
+		// Generate JSONL: one object per line
+		const jsonl = entries.map(([name, meta]) => JSON.stringify({
+			name,
+			mtimeMs: meta.mtimeMs,
+			size: meta.size,
+			type: meta.isFile ? 'F' : meta.isDirectory ? 'D' : '?',
+		}, null, 0)).join('\n')
+		await this.saveDocument(indexPathJSONL, jsonl)
+
+		this.#console.debug("Index updated", { dir: dirPath, files: entries.length })
 	}
 
 	/**

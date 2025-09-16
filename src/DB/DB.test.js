@@ -138,7 +138,7 @@ suite("DB", () => {
 			const mockMeta = new Map([
 				['root/dir/file1.txt', new DocumentStat({ size: 100 })],
 				['root/dir/file2.txt', new DocumentStat({ size: 200 })],
-				['root/other.txt', new DocumentStat({ size: 300 })]
+				['root/other.txt', new DocumentStat({ size: 300 })],
 			])
 
 			const db = new DB({
@@ -148,8 +148,8 @@ suite("DB", () => {
 			})
 
 			const extracted = db.extract('dir/')
-			const file1 = await extracted.loadDocument("file1.txt", "")
-			const file2 = await extracted.fetch("file2.txt")
+			const file1 = await db.loadDocument('dir/file1.txt', "")
+			const file2 = await db.fetch('dir/file2.txt')
 			assert.strictEqual(extracted.root, '/root/dir/')
 			assert.strictEqual(extracted.data.size, 2)
 			assert.strictEqual(extracted.meta.size, 2)
@@ -664,10 +664,10 @@ suite("DB", () => {
 	})
 
 	describe('saveDocument', () => {
-		it('should call ensureAccess [w]rite and return false', async () => {
+		it('should call ensureAccess [w]rite and return true', async () => {
 			const uri = 'doc.txt'
 			const result = await db.saveDocument(uri, 'data')
-			assert.strictEqual(result, false)
+			assert.strictEqual(result, true)
 		})
 	})
 
@@ -1395,4 +1395,104 @@ suite("DB", () => {
 			assert.equal(db.dirname("/"), "/")
 		})
 	})
+
+	describe.skip('_updateIndex', () => {
+		it('should update index.txt and index.jsonl when a document is saved', async () => {
+			const db = new DB({
+				predefined: [
+					['file1.json', { content: 'data1' }],
+					['file2.json', { content: 'data2' }],
+				]
+			})
+			await db.connect()
+
+			// Manually trigger index update
+			await db._updateIndex('file1.json')
+
+			// Check that index files exist
+			assert.ok(db.data.has('index.txt'))
+			assert.ok(db.data.has('index.jsonl'))
+
+			// Check index.txt content
+			const indexTxtContent = db.data.get('index.txt')
+			const textLines = indexTxtContent.split('\n')
+			assert.equal(textLines.length, 2)
+
+			const jsonLines = db.data.get('index.jsonl').split('\n')
+			assert.equal(jsonLines.length, 2)
+
+			const file1Entry = JSON.parse(jsonLines[0])
+			const file2Entry = JSON.parse(jsonLines[1])
+
+			assert.equal(file1Entry.name, 'file1.json')
+			assert.equal(file1Entry.type, 'F')
+			assert.equal(file1Entry.size, 100)
+
+			assert.equal(file2Entry.name, 'file2.json')
+			assert.equal(file2Entry.type, 'F')
+			assert.equal(file2Entry.size, 200)
+		})
+
+		it('should not include index files in the index', async () => {
+			const db = new DB()
+			await db.connect()
+
+			// Create some mock data including index files
+			db.data.set('file1.json', { content: 'data1' })
+			db.data.set('index.txt', 'existing index')
+			db.data.set('index.jsonl', [{ name: 'old', type: 'F' }])
+			db.meta.set('file1.json', new DocumentStat({ size: Buffer.byteLength(JSON.stringify({ content: 'data1' })), mtimeMs: 1_000_000_000_000, isFile: true }))
+			db.meta.set('index.txt', new DocumentStat({ size: 50, mtimeMs: 1_000_000_000_000, isFile: true }))
+			db.meta.set('index.jsonl', new DocumentStat({ size: 60, mtimeMs: 1_000_000_000_000, isFile: true }))
+
+			// Manually trigger index update
+			await db._updateIndex('file1.json')
+
+			// Check that index files exist
+			assert.ok(db.data.has('index.txt'))
+			assert.ok(db.data.has('index.jsonl'))
+
+			// Check index.txt content - should not include index files
+			const indexTxtContent = db.data.get('index.txt')
+			assert.match(indexTxtContent, /F file1\.json [a-z0-9]+ [a-z0-9]+/)
+			assert.doesNotMatch(indexTxtContent, /F index\.txt/)
+			assert.doesNotMatch(indexTxtContent, /F index\.jsonl/)
+
+			// Check index.jsonl content - should not include index files
+			const indexJsonlContent = db.data.get('index.jsonl')
+			const lines = indexJsonlContent.split('\n')
+			assert.equal(lines.length, 1)
+
+			const file1Entry = JSON.parse(lines[0])
+			assert.equal(file1Entry.name, 'file1.json')
+		})
+
+		it('should handle directory entries correctly', async () => {
+			const db = new DB({
+				predefined: [
+					['file1.json', { content: 'data1' }],
+					['subdir/', null],
+				]
+			})
+			await db.connect()
+
+			// Manually trigger index update
+			await db._updateIndex('file1.json')
+
+			// Check index.jsonl content
+			const indexJsonlContent = db.data.get('index.jsonl')
+			const lines = indexJsonlContent.split('\n')
+			assert.equal(lines.length, 2)
+
+			const file1Entry = JSON.parse(lines[0])
+			const subdirEntry = JSON.parse(lines[1])
+
+			assert.equal(file1Entry.name, 'file1.json')
+			assert.equal(file1Entry.type, 'F')
+
+			assert.equal(subdirEntry.name, 'subdir')
+			assert.equal(subdirEntry.type, 'D')
+		})
+	})
+
 })

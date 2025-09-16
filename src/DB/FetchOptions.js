@@ -27,4 +27,3 @@ export default class FetchOptions {
 		return new FetchOptions(input)
 	}
 }
-

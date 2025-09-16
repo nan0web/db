@@ -5,6 +5,8 @@ declare class DirectoryIndex {
     static ENTRIES_AS_ROWS: string;
     static ENTRIES_AS_TEXT: string;
     static COLUMNS: string[];
+    static FULL_INDEX: string;
+    static INDEX: string;
     /**
      * Creates DirectoryIndex instance from input
      * @param {object|DirectoryIndex} input - Properties or existing instance
@@ -48,6 +50,8 @@ declare class DirectoryIndex {
     get ENTRIES_AS_TEXT(): string;
     /** @returns {string[]} */
     get ENTRIES_AS_ALL(): string[];
+    get FULL_INDEX(): string;
+    get INDEX(): string;
     /**
      * Encodes a component string for safe storage
      * @param {string} str - String to encode

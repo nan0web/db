@@ -23,6 +23,8 @@ class DirectoryIndex {
 	static ENTRIES_AS_ROWS = "rows"
 	static ENTRIES_AS_TEXT = "text"
 	static COLUMNS = ["type", "name", "mtimeMs.36", "size.36"]
+	static FULL_INDEX = "index.jsonl"
+	static INDEX = "index.txt"
 	/** @type {string[]} */
 	entriesColumns = DirectoryIndex.COLUMNS
 	/** @type {string} */
@@ -76,6 +78,8 @@ class DirectoryIndex {
 			this.ENTRIES_AS_TEXT,
 		]
 	}
+	get FULL_INDEX() { return /** @type {typeof DirectoryIndex} */ (this.constructor).FULL_INDEX }
+	get INDEX() { return /** @type {typeof DirectoryIndex} */ (this.constructor).INDEX }
 
 	/**
 	 * Encodes a component string for safe storage

@@ -109,6 +109,10 @@ export default class DB {
      */
     get Directory(): typeof Directory;
     /**
+     * @returns {typeof DirectoryIndex}
+     */
+    get Index(): typeof DirectoryIndex;
+    /**
      * Returns static.GetOptions that is assign to DB or its extension.
      * Define your own static.GetOptions, no need to extend getter.
      * ```js
@@ -409,14 +413,21 @@ export default class DB {
      * @returns {Promise<object>} Data with resolved references
      */
     resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
+    /**
+ * @private
+ * Auto-updates index.jsonl and index.txt after save
+ * @param {string} uri - Saved document URI
+ * @returns {Promise<void>}
+ */
+    private _updateIndex;
     #private;
 }
 import DocumentStat from "../DocumentStat.js";
 import { NoConsole } from "@nan0web/log";
 import Data from "../Data.js";
 import Directory from "../Directory.js";
+import DirectoryIndex from "../DirectoryIndex.js";
 import GetOptions from "./GetOptions.js";
 import DocumentEntry from "../DocumentEntry.js";
 import StreamEntry from "../StreamEntry.js";
 import FetchOptions from "./FetchOptions.js";
-import DirectoryIndex from "../DirectoryIndex.js";
