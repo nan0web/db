@@ -219,8 +219,7 @@ export default class DB {
 		this.#console.debug("Extracting database at URI", { uri })
 		const root = String("." === this.root ? "" : this.root + "/").replace(/\/{2,}/g, "/")
 		const Class = /** @type {typeof DB} */ (this.constructor)
-		const norm = this.resolveSync(this.root, this.normalize(uri))
-		let prefix = String(norm).replace(/\/+$/, '') + "/"
+		let prefix = String(root + uri + "/").replace(/\/{2,}$/, '')
 		if (prefix.startsWith("/")) prefix = prefix.slice(1)
 		const extractor = entries => new Map(entries.map(([key, value]) => {
 			if (key.startsWith(prefix)) {
@@ -272,6 +271,12 @@ export default class DB {
 		const dbString = this.constructor.name + " " + this.root + " [" + this.encoding + "]"
 		this.#console.debug("DB string representation generated", { string: dbString })
 		return dbString
+	}
+
+	async dump() {
+		for (const [uri, data] of this.data) {
+			await this.saveDocument(uri, data)
+		}
 	}
 
 	/**
@@ -703,6 +708,17 @@ export default class DB {
 		await this.ensureAccess(uri)
 		const isDir = uri.endsWith("/")
 		const abs = (this.normalize(await this.resolve(uri)) || ".") + (isDir ? "/" : "")
+
+		const extname = this.extname(abs)
+		if (!extname) {
+			for (const ext of this.Directory.DATA_EXTNAMES) {
+				const stat = await this.statDocument(uri + ext)
+				if (stat.exists) {
+					return stat
+				}
+			}
+		}
+
 		return DocumentStat.from(this.meta.get(abs) ?? {})
 	}
 

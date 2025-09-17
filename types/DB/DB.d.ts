@@ -164,6 +164,7 @@ export default class DB {
      * @returns {string}
      */
     toString(): string;
+    dump(): Promise<void>;
     /**
      * Reads the content of a directory at the specified URI.
      * For FetchDB it loads index.txt or manifest.json.
