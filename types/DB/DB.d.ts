@@ -247,12 +247,23 @@ export default class DB {
      */
     normalize(...args: string[]): string;
     /**
+     * Checks if current uri has shceme in it, such as http://, https://, ftp://, file://, etc.
+     * @param {string} uri
+     * @returns {boolean}
+     */
+    isRemote(uri: string): boolean;
+    /**
+     * Checks if current uri is absolute (started from /) or remote.
+     * @param {string} uri
+     * @returns {boolean}
+     */
+    isAbsolute(uri: string): boolean;
+    /**
      * Resolves path segments to absolute path synchronously
      * @param  {...string} args - Path segments
      * @returns {string} Resolved absolute path
      */
     resolveSync(...args: string[]): string;
-    dirname(uri: any): string;
     /**
      * Returns base name of URI with the removedSuffix (if provided).
      * If removeSuffix is true the extension will be removed.
@@ -261,6 +272,7 @@ export default class DB {
      * @returns {string}
      */
     basename(uri: string, removeSuffix?: string | true | undefined): string;
+    dirname(uri: any): string;
     /**
      * Gets absolute path
      * @note Must be overwritten by platform-specific implementation

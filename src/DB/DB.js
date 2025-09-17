@@ -246,11 +246,11 @@ export default class DB {
 		return db
 	}
 	/**
- * Extracts file extension with leading dot from URI
- * For example 'file.txt' -> '.txt'
- * @param {string} uri
- * @returns {string}
- */
+	 * Extracts file extension with leading dot from URI
+	 * For example 'file.txt' -> '.txt'
+	 * @param {string} uri
+	 * @returns {string}
+	 */
 	extname(uri) {
 		this.#console.debug("Extracting extension from URI", { uri })
 		const arr = uri.split(".")
@@ -592,9 +592,19 @@ export default class DB {
 
 		return result || (startsWithSlash ? "/" : "")
 	}
+	/**
+	 * Checks if current uri has shceme in it, such as http://, https://, ftp://, file://, etc.
+	 * @param {string} uri
+	 * @returns {boolean}
+	 */
 	isRemote(uri) {
 		return /^[a-z]+:\/\//i.test(uri)
 	}
+	/**
+	 * Checks if current uri is absolute (started from /) or remote.
+	 * @param {string} uri
+	 * @returns {boolean}
+	 */
 	isAbsolute(uri) {
 		return uri.startsWith("/") || this.isRemote(uri)
 	}
