@@ -146,9 +146,10 @@ export default class DB {
     extract(uri: string): DB;
     /**
      * Extracts file extension with leading dot from URI
-     * For example 'file.txt' -> '.txt'
      * @param {string} uri
      * @returns {string}
+     * @example
+     * db.extname("file.TXT") // => .txt
      */
     extname(uri: string): string;
     /**

@@ -27,11 +27,6 @@ suite("DB URI Core", () => {
 			const db = new DB({ root: "/base", cwd: "/cwd" })
 			assert.strictEqual(db.resolveSync(".."), "")
 		})
-
-		it("should handle absolute arguments", () => {
-			const db = new DB()
-			assert.equal(db.resolveSync("/root", "/dir", "file.txt"), "dir/file.txt")
-		})
 	})
 
 	describe("normalize", () => {
@@ -426,7 +421,9 @@ suite("DB URI Core", () => {
 		})
 
 		it("extracts file extension", () => {
+			assert.strictEqual(db.extname("file.Txt"), ".txt")
 			assert.strictEqual(db.extname("file.txt"), ".txt")
+			assert.strictEqual(db.extname("file.TXT"), ".txt")
 		})
 
 		it("handles multiple dots correctly", () => {
@@ -483,7 +480,6 @@ suite("DB URI Core", () => {
 			const path = await db.resolve("api/v1", "..", "users")
 			assert.equal(path, "api/users")
 		})
-
 		it("should not resolve .. beyond root", async () => {
 			// Test cases for ../ resolution behavior at root level
 			const testCases = [
@@ -500,5 +496,21 @@ suite("DB URI Core", () => {
 				assert.equal(result, expected, `Failed for args: ${JSON.stringify(args)}`)
 			}
 		})
+		const expected = [
+			[["private/test.txt"], "private/test.txt"],
+			[["private", "test.txt"], "private/test.txt"],
+			[["a", "b", "c.txt"], "a/b/c.txt"],
+			[["../../", "var", "www"], "var/www"],
+			[["."], "."],
+			[["/", "404.json"], "404.json"],
+			[["/root", "/dir", "file.txt"], "dir/file.txt"],
+		]
+		for (const [args, exp] of expected) {
+			const db = new DB()
+			it(`should resolve [${args}] => ${exp}`, async () => {
+				const resolved = await db.resolve(...args)
+				assert.equal(resolved, exp)
+			})
+		}
 	})
 })

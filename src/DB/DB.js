@@ -247,14 +247,15 @@ export default class DB {
 	}
 	/**
 	 * Extracts file extension with leading dot from URI
-	 * For example 'file.txt' -> '.txt'
 	 * @param {string} uri
 	 * @returns {string}
+	 * @example
+	 * db.extname("file.TXT") // => .txt
 	 */
 	extname(uri) {
 		this.#console.debug("Extracting extension from URI", { uri })
 		const arr = uri.split(".")
-		return arr.length > 1 ? `.${arr.pop()}` : ""
+		return arr.length > 1 ? `.${arr.pop()}`.toLowerCase() : ""
 	}
 
 	/**
@@ -626,7 +627,7 @@ export default class DB {
 		const base = this.normalize(this.root)
 
 		if (path.startsWith(base)) {
-			return path.slice(base.length).replace(/^\/+/, '')
+			return path.slice(base.length).replace(/^\/+/, '') || "."
 		}
 
 		return path
