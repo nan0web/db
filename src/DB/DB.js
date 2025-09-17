@@ -217,31 +217,40 @@ export default class DB {
 	 */
 	extract(uri) {
 		this.#console.debug("Extracting database at URI", { uri })
-		const root = String("." === this.root ? "" : this.root + "/").replace(/\/{2,}/g, "/")
+
+		const prefix = (this.normalize(uri) + "/").replace(/\/{2,}$/, "/")
+
 		const Class = /** @type {typeof DB} */ (this.constructor)
-		let prefix = String(root + uri + "/").replace(/\/{2,}$/, '')
-		if (prefix.startsWith("/")) prefix = prefix.slice(1)
-		const extractor = entries => new Map(entries.map(([key, value]) => {
-			if (key.startsWith(prefix)) {
-				return [key, value]
-			}
-			return false
-		}).filter(Boolean))
 
-		return new Class({
-			root: root + uri,
+		const extractor = entries => new Map(
+			Array.from(entries)
+				.filter(([key]) => key.startsWith(prefix))
+				.map(([key, value]) => [String(key.substring(prefix.length) || "."), value])
+		)
+
+		let newRoot = this.normalize(this.root, uri)
+		if (!newRoot.endsWith("/")) newRoot += "/"
+
+		const data = extractor(this.data.entries())
+		const meta = extractor(this.meta.entries())
+
+		const db = new Class({
+			root: newRoot,
 			cwd: this.cwd,
-			data: extractor(this.data.entries()),
-			meta: extractor(this.meta.entries()),
+			data,
+			meta,
+			console: this.console,
 		})
-	}
 
+		this.#console.debug("New database created with extracted data", { db })
+		return db
+	}
 	/**
-	 * Extracts file extension with leading dot from URI
-	 * For example 'file.txt' -> '.txt'
-	 * @param {string} uri
-	 * @returns {string}
-	 */
+ * Extracts file extension with leading dot from URI
+ * For example 'file.txt' -> '.txt'
+ * @param {string} uri
+ * @returns {string}
+ */
 	extname(uri) {
 		this.#console.debug("Extracting extension from URI", { uri })
 		const arr = uri.split(".")
@@ -550,48 +559,67 @@ export default class DB {
 	 * @returns {string} Normalized path
 	 */
 	normalize(...args) {
-		this.#console.debug("Normalizing path", { args })
-		let segments = []
+		let startsWithSlash = false
+		const segments = []
+
 		for (const arg of args) {
-			if (arg.startsWith("/")) segments = []
-			segments.push(arg)
-		}
-		segments = segments.filter(Boolean).join("/").split("/")
-		const norms = []
-
-		let prev
-		for (const segment of segments) {
-			if (segment === "..") {
-				norms.pop()
-				if ("" !== prev) norms.pop()
-			} else if (![".", ""].includes(segment)) {
-				norms.push(segment)
+			if (arg) {
+				if (arg.startsWith("/")) {
+					startsWithSlash = true
+				}
+				const parts = arg.split("/").filter(seg => seg !== "" && seg !== ".")
+				for (const part of parts) {
+					if (part === "..") {
+						if (segments.length > 0) {
+							segments.pop()
+						} else if (startsWithSlash) {
+							startsWithSlash = false
+						}
+					} else {
+						segments.push(part)
+					}
+				}
 			}
-			prev = segment
 		}
 
-		return norms.join("/")
-	}
+		let result = segments.join("/")
+		if (args.length > 0 && args[args.length - 1].endsWith("/") && result !== "") {
+			result += "/"
+		}
+		if (startsWithSlash) {
+			result = "/" + result
+		}
 
+		return result || (startsWithSlash ? "/" : "")
+	}
+	isRemote(uri) {
+		return /^[a-z]+:\/\//i.test(uri)
+	}
+	isAbsolute(uri) {
+		return uri.startsWith("/") || this.isRemote(uri)
+	}
 	/**
 	 * Resolves path segments to absolute path synchronously
 	 * @param  {...string} args - Path segments
 	 * @returns {string} Resolved absolute path
 	 */
 	resolveSync(...args) {
-		this.#console.debug("Resolving path synchronously", { args })
-		return this.normalize(this.cwd, this.root, ...args)
-	}
+		this.#console.debug("Resolving path synchronously", { cwd: this.cwd, root: this.root, args })
 
-	dirname(uri) {
-		const parts = uri.split("/")
-		if (uri.endsWith("/")) {
-			return parts.length > 1 ? (parts.slice(0, parts.length - 2).join("/") + "/") : ""
+		let rels = []
+		args.forEach(arg => {
+			if (this.isAbsolute(arg)) rels = []
+			rels.push(arg)
+		})
+
+		const path = this.normalize(...rels)
+		const base = this.normalize(this.root)
+
+		if (path.startsWith(base)) {
+			return path.slice(base.length).replace(/^\/+/, '')
 		}
-		if (parts.length > 1) {
-			return parts.slice(0, -1).join("/") + "/"
-		}
-		return "/"
+
+		return path
 	}
 
 	/**
@@ -602,21 +630,31 @@ export default class DB {
 	 * @returns {string}
 	 */
 	basename(uri, removeSuffix = "") {
-		if (true === removeSuffix) {
-			removeSuffix = this.extname(uri)
-		}
 		const parts = uri.split("/")
 		let base = ""
 		if (uri.endsWith("/")) {
-			base = parts.length > 1 ? (parts[parts.length - 2] + "/") : ""
-		}
-		else if (parts.length) {
+			base = parts.length > 1 ? parts[parts.length - 2] + "/" : ""
+		} else if (parts.length) {
 			base = parts.pop() || ""
 		}
 		if (base === removeSuffix) return base
-		return removeSuffix && base.endsWith(removeSuffix) ? base.slice(0, -removeSuffix.length) : base
+		const suffix = true === removeSuffix ? this.extname(uri) : String(removeSuffix)
+		if (suffix && base.endsWith(suffix) && suffix !== base) {
+			return base.slice(0, -suffix.length)
+		}
+		return base
 	}
 
+	dirname(uri) {
+		const parts = uri.split("/")
+		if (uri.endsWith("/")) {
+			return parts.length > 1 ? parts.slice(0, parts.length - 2).join("/") + "/" : "/"
+		}
+		if (parts.length > 1) {
+			return parts.slice(0, -1).join("/") + "/"
+		}
+		return "/"
+	}
 	/**
 	 * Gets absolute path
 	 * @note Must be overwritten by platform-specific implementation
@@ -624,11 +662,22 @@ export default class DB {
 	 * @returns {string} Absolute path
 	 */
 	absolute(...args) {
-		this.#console.debug("Getting absolute path", { args })
-		let path = this.resolveSync(this.cwd, this.root, ...args)
-		return path.startsWith("/") ? path : "/" + path
-	}
+		this.#console.debug("Getting absolute path", { args });
 
+		// If cwd contains URL scheme (http://, https://, file://, etc.)
+		if (this.isRemote(this.cwd)) {
+			try {
+				let url = new URL(this.cwd)
+				let path = this.normalize(this.root, ...args)
+				url.pathname = this.normalize(url.pathname || '/', path)
+				return String(url)
+			} catch (e) {
+				this.#console.warn("Incorrect scheme", { cwd: this.cwd })
+			}
+		}
+		let path = this.normalize(this.cwd, this.root, ...args)
+		return path.startsWith('/') ? path : '/' + path
+	}
 	/**
 	 * Loads a document.
 	 * Must be overwritten to has the proper file or database document read operation.
@@ -641,14 +690,12 @@ export default class DB {
 		// uri = await this.resolve(uri)
 		this.#console.debug("Loading document", { uri })
 		uri = this.normalize(uri)
-		// const abs = this.absolute(uri)
-		let abs = this.absolute(uri)
-		if (abs.startsWith("/")) abs = abs.slice(1)
-		await this.ensureAccess(abs, "r")
-		if (this.data.has(abs)) {
-			return this.data.get(abs)
+		// if (abs.startsWith("/")) abs = abs.slice(1)
+		await this.ensureAccess(uri, "r")
+		if (this.data.has(uri)) {
+			return this.data.get(uri)
 		}
-		const extname = this.extname(abs)
+		const extname = this.extname(uri)
 		if (!extname) {
 			for (const ext of this.Directory.DATA_EXTNAMES) {
 				const data = await this.loadDocument(uri + ext, null)

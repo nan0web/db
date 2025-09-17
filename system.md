@@ -4,26 +4,26 @@ lang:
 	jsdoc: en
 	chat: *
 ---
-# NaN•Web DB systen instructions
+# NaN•Web DB системні інструкції
 
-Every data is a database.
+Кожні дані можуть стати твоєю базою знань.
 
-## DB class and document structure
+## Клас DB та структура документів
 
-Just connect available data to manage it as it is own.
+Просто під'єднайте доступні дані, щоб керувати ними як своїми власними.
 
 ```js
-import DB from "@nan0web/db-fetch"; // extension of abstract "@nan0web/db"
+import DB from "@nan0web/db-fetch"; // розширення абстрактного "@nan0web/db"
 const db = new DB({ host: "https://en.wikipedia.org" });
 const page = await db.get("/wiki/Main_Page");
 ```
 
-Structured data is much easier to become an information.
+Структуровані дані набагато легше перетворюються на інформацію.
 
-Root directory global content `_.yaml`
+Зміст головного каталогу `_.yaml`
 
 ```yaml
-title: My Website
+title: Мій Вебсайт
 $content:
   - Header
   - Content
@@ -33,21 +33,21 @@ $langs:
   - title: English
     locale: en-US
     href: /en/
-  - title: Ukrainian
+  - title: Українська
     locale: uk-UA
     href: /uk/
 ```
 
-Contacts page container `contacts.yaml`:
+Контейнер сторінки контактів `contacts.yaml`:
 
 ```yaml
 main:
   company:
-    address: 1st avenue 17
+    address: вул. Перша, 17
     tel: +1234567890
 ```
 
-English version global content `en/_.yaml`
+Англомовний глобальний зміст `en/_.yaml`
 
 ```yaml
 $baseHref: /en/
@@ -60,10 +60,10 @@ $content:
 tags:
   - database
   - @nan0web/db
-desc: Welcome on my website where I share my data that is convertable into information
+desc: Welcome to my nan•web/db website
 ```
 
-Contacts page `en/laconic.yaml`
+Сторінка контактів `en/laconic.yaml`
 
 ```yaml
 $content:
@@ -71,12 +71,12 @@ $content:
   - Footer
 ```
 
-Contacts page `en/contacts.yaml`
+Сторінка контактів `en/contacts.yaml`
 
 ```yaml
 $ref: laconic
-title: My contacts
-desc: Contact me when you have questions or propositions
+title: Мої контакти
+desc: Зв'яжіться зі мною, коли у вас є питання або пропозиції
 contact:
   $ref: /contacts#main/company
 tags:
@@ -85,9 +85,9 @@ tags:
   - information
 ```
 
-For such simple structure we already have some features:
+Для такої простої структури ми вже маємо наступні функції:
 
-The result for `await db.get("en/contacts")` is combined from hierarcy + globals, + every parent global content
+Результат для `await db.fetch("en/contacts")` поєднується з ієрархії + глобальних змінних + змісту кожного батьківського каталогу
 
 ```yaml
 $baseHref: /en/
@@ -98,13 +98,13 @@ $langs:
   - title: English
     locale: en-US
     href: /en/
-  - title: Ukrainian
+  - title: Українська
     locale: uk-UA
     href: /uk/
-title: My contacts
-desc: Contact me when you have questions or propositions
+title: Мої контакти
+desc: Зв'яжіться зі мною, коли у вас є питання або пропозиції
 contact:
-  address: 1st avenue 17
+  address: вул. Перша, 17
   tel: +1234567890
 tags:
   - database
@@ -113,24 +113,423 @@ tags:
   - information
 ```
 
-If you need only a specific file use `await db.loadDocument("en/contacts")` or `await db.loadDocument("en/_")`
+Якщо вам потрібен тільки конкретний файл, використовуйте `await db.loadDocument("en/contacts")` або `await db.loadDocument("en/_")`
 
-Core relations and functions available for basic database:
+Основні відносини та функції, доступні для базової бази даних:
 
-1. `Inheritance` — of parent and current directories global content that is saved by uri `/.*\/?_$/`, in file system it could be `_.nano` (`@nan0web/db-fs`) or `_.json` (`@nan0web/db-browser`) or how they are set up, for `@nan0web/db-redis` or `@nan0web/db-mongo` extensions make no sense, but only for data documents, binary documents must loaded, saved as normal CRUD operations.
-1. `Scoping` — of variables on directory and all subdirectories levels by storing the documents in `/.*\/?_\/.*/`
-1. `Extention` - of other document by defining `$ref: [uri]` property in top level of document.
-1. `Referencing` - to other elements by defining `$ref: [uri]` property in any part of document or as value `someKey: "$ref:location.json#memorized/value"` (`uri = "location.json#memorized/value"`), besides top level, otherwise it is called `extension`.
+1. `Наслідування` — батьківських і поточних глобальних змінних каталогів, що зберігаються за URI `/.*\/?_$/`, у файловій системі це можуть бути файли `_.nano` (`@nan0web/db-fs`) або `_.json` (`@nan0web/db-browser`) тощо. Для розширень `@nan0web/db-redis` або `@nan0web/db-mongo` розширення не мають змісту, але лише для документів даних. Двоїчні документи повинні завантажуватись і зберігатись як звичайні CRUD операції.
+1. `Область видимості` — змінних на рівні каталогу і всіх підкаталогів, що зберігаються в `/.*\/?_\/.*/`.
+1. `Розширення` — іншого документу через визначення властивості `$ref: [uri]` на верхньому рівні документу.
+1. `Посилання` — на інші елементи через визначення властивості `$ref: [uri]` в будь-якій частині документу або як значення `someKey: "$ref:location.json#memorized/value"` (`uri = "location.json#memorized/value"`), окрім верхнього рівня, інакше це називається `розширенням`.
 
-All `[uri]` are relative to current document, so will be resolved from current directory when requesting data.
+Всі `[uri]` є відносними до поточного документу, тому будуть розшифровані з поточного каталогу під час запиту даних.
 
-## Directory class
+## Ключові компоненти системи URI
 
-Directories are not mandatory for databases, but they are present by default.
+### 1. `cwd` (Current Working Directory)
+- **Що це**: Зовнішній контекст бази даних (хост або фізичний шлях)
+- **Приклади**: `https://example.com`, `/var/www`, `redis://localhost:6379`
+- **Призначення**: Визначає середовище, в якому працює база
 
-Every directory can have it's own document that is shared withing all the children data documents with `Inheritance` function. By default it is underscore `_` and with possible extensions, so for the file system database it might be `_.json`, `_.yaml`, `_.yml`, `_.nano`, `_.csv`. In case of redis or mongodb or similar database storages there might be no extensions, so directory data will be stored like `_` or `en/_`. Also for such databases it is possible to have `Directory.File = "/"` but it is not tested yet.
+### 2. `root` (Root Path)
+- **Що це**: Внутрішній корінь/точка монтування бази
+- **Приклади**: `content`, `api/v1`, `private`
+- **Призначення**: Визначає початок шляху до ваших даних
 
-The data can be stored by different loaders and savers that defines by overwritten `loadDocument()` and `saveDocument()`.
+### 3. `pathname` (Request Path)
+- **Що це**: Відносний шлях запиту від кореня
+- **Приклади**: `en/contacts.yaml`, `blog/post.md`
+- **Призначення**: Вказує на конкретний ресурс у базі
+
+Ідентифікація директорії - закінчується на слеш /.
+Ідентифікація файла - не закінчується на слеш /.
+
+### ✔️ **Правильна формула URI: `cwd + root + pathname`**
+Ця формула є **основою системи** і не повинна бути змінена.
+
+## Клас DB та структура документів
+
+```js
+import DB from "@nan0web/db-browser"
+const db = new DB({ 
+  cwd: "https://en.wikipedia.org", 
+  root: "wiki",
+  cache: true // Включаємо кешування в IndexedDB (відсутнє у базовому класі)
+})
+await db.connect()
+const page = await db.get("Main_Page") // Використовує кеш, якщо налаштовано => https://en.wikipedia.org/wiki/Main_Page
+```
+
+## BrowserDB - реалізація для веб-браузера
+
+BrowserDB повністю інтегрується з IndexedDB для локального зберігання даних. Це дозволяє:
+
+1. Працювати без мережі (offline режим)
+2. Прискорити доступ до часто використовуваних ресурсів
+3. Зберігати стан даних між сеансами
+4. Імплементувати редактор з можливістю бачити різницю між зміненою версією і серверною (як `git diff`)
+
+### Конфігурація BrowserDB
+
+```js
+import DB from "@nan0web/db-browser"
+const db = new DB({
+  cwd: "https://api.example.com",
+  root: "data",
+  cache: true,        // Включити IndexedDB кеш
+  dbName: "myapp-cache", // Назва бази даних в IndexedDB
+  storeName: "documents", // Назва сховища
+  ttl: 86400000,     // Час життя кешу (1 день в мс)
+})
+```
+
+### BrowserDB API: Операції зберігання
+
+```js
+/**
+ * Перевіряє наявність документа в кеші IndexedDB
+ * @param {string} uri - URI документа
+ * @returns {Promise<DocumentStat>}
+ */
+async statDocument(uri) {
+  const db = await openDB(this.dbName, 1);
+  const stat = await db.get(this.storeName, this.resolveSync(uri));
+  return stat ? new DocumentStat(stat) : new DocumentStat();
+}
+
+/**
+ * Зберігає документ у IndexedDB
+ * @param {string} uri - URI документа
+ * @param {any} document - Дані документа
+ * @returns {Promise<boolean>}
+ */
+async saveDocument(uri, document) {
+  const db = await openDB(this.dbName, 1);
+  const key = this.resolveSync(uri);
+  await db.put(this.storeName, {
+    key,
+    value: document,
+    mtimeMs: Date.now(),
+    size: JSON.stringify(document).length
+  });
+  return true;
+}
+
+/**
+ * Видаляє документ з IndexedDB
+ * @param {string} uri - URI документа
+ * @returns {Promise<boolean>}
+ */
+async dropDocument(uri) {
+  const db = await openDB(this.dbName, 1);
+  await db.delete(this.storeName, this.resolveSync(uri));
+  return true;
+}
+
+/**
+ * Записує частину документа (стриймово)
+ * @param {string} uri - URI документа
+ * @param {string} chunk - Частина даних
+ * @returns {Promise<boolean>}
+ */
+async writeDocument(uri, chunk) {
+  const db = await openDB(this.dbName, 1);
+  const key = this.resolveSync(uri);
+  
+  // Якщо документ вже існує, додаємо до існуючих даних
+  const existing = await db.get(this.storeName, key);
+  const newData = existing ? existing.value + chunk : chunk;
+  
+  await db.put(this.storeName, {
+    key,
+    value: newData,
+    mtimeMs: Date.now(),
+    size: newData.length
+  });
+  return true;
+}
+
+/**
+ * Переміщує документ у кеші
+ * @param {string} from - Вихідний URI
+ * @param {string} to - Цільовий URI
+ * @returns {Promise<boolean>}
+ */
+async moveDocument(from, to) {
+  const db = await openDB(this.dbName, 1);
+  const fromKey = this.resolveSync(from);
+  const toKey = this.resolveSync(to);
+  
+  const data = await db.get(this.storeName, fromKey);
+  if (data) {
+    await db.put(this.storeName, {
+      ...data,
+      key: toKey
+    });
+    await db.delete(this.storeName, fromKey);
+  }
+  return true;
+}
+```
+
+### Кешування в BrowserDB
+
+Коли активовано кешування (`cache: true`), методи `get()` та `fetch()` працюють за наступною логікою:
+
+```
+Початок
+  │
+  ├── Запит → Чи є кеш для цього URI?
+  │     │
+  │     ├── Так → Отримати з IndexedDB
+  │     │      │
+  │     │      ├── Чи дійсний TTL кешу?
+  │     │             │
+  │     │             ├── Так → Повернути кешовані дані
+  │     │             │
+  │     │             └── Ні → Оновити з мережі
+  │     │
+  │     └── Ні → Отримати з мережі
+  │
+  └── Мережевий запит
+        │
+        └── Оновити кеш при успіху
+```
+
+## Архітектурні діаграми
+
+### 1. DBBrowser з IndexedDB кешуванням
+
+```mermaid
+graph TD
+    A[DB Core] -->|Віртуальний простір URI| B[[cwd + root + pathname]]
+    
+    C[BrowserDB] -->|Послідовність доступу| D["Потік кешування"]
+    D -->|Перевірка| E["IndexedDB (кеш)"]
+    D -->|Мережевий запит| F["fetch(cwd + root + pathname)"]
+    D -->|Кешування| G["saveDocument()"]
+    
+    E -->|Кеш дійсний| H{Використання кешу?}
+    E -->|Кеш застарів| F
+    H -->|Так| I[Повернення даних]
+    
+    F -->|Останній стан| G
+    G -->|Зберігає| E
+    
+    C -->|CRUD операції| J[saveDocument]
+    C -->|CRUD операції| K[writeDocument]
+    C -->|CRUD операції| L[moveDocument]
+    C -->|CRUD операції| N[dropDocument]
+    
+    J -->|Запис до| M[IndexedDB]
+    K -->|Запис до| M
+    L -->|Видалення і запис| M
+    N -->|Видалення з| M
+    
+    classDef core fill:#4CAF50,stroke:#388E3C,color:white;
+    classDef browser fill:#9C27B0,stroke:#7B1FA2,color:white;
+    classDef cache fill:#FFD54F,stroke:#FFC107,color:black;
+    
+    class A,B core;
+    class C,D,E,F,G,H,I,J,K,L,N browser;
+    class M cache;
+```
+
+### 2. DBMongo з повною CRUD інтеграцією
+
+```mermaid
+graph TD
+    A[DB Core] -->|Віртуальний простір URI| B[[cwd + root + pathname]]
+    
+    C[DBMongo] -->|З'єднання| D[mongodb://localhost:27017]
+    C -->|Документація| E[get/fetch]
+    C -->|CRUD операції| F[statDocument/saveDocument]
+    C -->|CRUD операції| G[dropDocument/writeDocument]
+    C -->|CRUD операції| H[moveDocument/listDir]
+    
+    F -->|Додає| I["collection.insertOne()"]
+    F -->|Читає| J["collection.findOne()"]
+    
+    G -->|Видаляє| K["collection.deleteOne()"]
+    H -->|Перейменовує| L["collection.updateOne()"]
+    H -->|Список| M["collection.find()"]
+    
+    I -->|Дані| N[(MongoDB)]
+    J -->|Дані| N
+    K -->|Дані| N
+    L -->|Дані| N
+    M -->|Дані| N
+    
+    classDef core fill:#4CAF50,stroke:#388E3C,color:white;
+    classDef mongo fill:#4DB6AC,stroke:#00796B,color:black;
+    
+    class A,B core;
+    class C,D,E,F,G,H,I,J,K,L,M,N mongo;
+```
+
+### 3. DBNeo4j з графовою модельлю даних
+
+```mermaid
+graph TD
+    A[DB Core] -->|Віртуальний простір URI| B[[cwd + root + pathname]]
+    
+    C[DBNeo4j] -->|З'єднання| D[bolt://localhost:7687]
+    C -->|Документація| E[get/fetch]
+    C -->|CRUD операції| F[statDocument/saveDocument]
+    C -->|CRUD операції| G[dropDocument/writeDocument]
+    C -->|CRUD операції| H[moveDocument/listDir]
+    
+    F -->|Створення| I["CREATE (n:Document)"]
+    F -->|Читання| J["MATCH (n) WHERE n.uri = $uri"]
+    
+    G -->|Видалення| K["MATCH (n) WHERE n.uri = $uri DETACH DELETE n"]
+    H -->|Оновлення| L["MATCH (n) WHERE n.uri = $oldUri SET n.uri = $newUri"]
+    H -->|Список| M["MATCH (p)-[:CHILD]->(c) WHERE p.uri = $uri"]
+    
+    I -->|Дані| N[(Neo4j)]
+    J -->|Дані| N
+    K -->|Дані| N
+    L -->|Дані| N
+    M -->|Дані| N
+    
+    classDef core fill:#4CAF50,stroke:#388E3C,color:white;
+    classDef neo4j fill:#7B1FA2,stroke:#4A148C,color:white;
+    
+    class A,B core;
+    class C,D,E,F,G,H,I,J,K,L,M,N neo4j;
+```
+
+Графові бази (як Neo4j) ідеально підходять для ієрархічних даних, подібних до файлової системи:
+
+- **Відносини**: `:PARENT` і `:CHILD` відносини між вузлами (документами)
+- **Ефективний пошук**: Запити з `STARTS WITH` для швидкого отримання ієрархії
+- **Гнучкі зв'язки**: Природня підтримка механізму `$ref` через графові зв'язки
+
+```js
+// Реалізація listDir для Neo4j
+async function listDir(uri) {
+  const result = await this.session.run(
+    `MATCH (p {path: $basePath})-[:CHILD]->(c)
+     RETURN c.name AS name, c.mtimeMs AS mtimeMs, c.size AS size`,
+    { basePath: `${this.root}/${uri}` }
+  );
+  // Формуємо DirectoryIndex з результату запиту...
+}
+```
+
+Головна перевага графової бази — робота зі зв'язками між документами, що ідеально підходить для механізму посилань (`$ref`).
+
+
+### 4. DBRedis з оптимізованими операціями
+
+```mermaid
+graph TD
+    A[DB Core] -->|Віртуальний простір URI| B[[cwd + root + pathname]]
+    
+    C[DBRedis] -->|З'єднання| D[redis://localhost:6379]
+    C -->|Документація| E[get/fetch]
+    C -->|CRUD операції| F[statDocument/saveDocument]
+    C -->|CRUD операції| G[dropDocument/writeDocument]
+    C -->|CRUD операції| H[moveDocument/listDir]
+    
+    F -->|Запис| I["SET db:{uri} {data}"]
+    F -->|Читання| J["GET db:{uri}"]
+    F -->|Метадані| K["HMSET meta:{uri} mtime {time} size {size}"]
+    
+    G -->|Видалення| L["DEL db:{uri} meta:{uri}"]
+    H -->|Перейменування| M["RENAME db:{from} db:{to}"]
+    H -->|Список| N["KEYS db:{path}*"]
+    
+    I -->|Дані| O[(Redis)]
+    J -->|Дані| O
+    K -->|Дані| O
+    L -->|Дані| O
+    M -->|Дані| O
+    N -->|Дані| O
+    
+    classDef core fill:#4CAF50,stroke:#388E3C,color:white;
+    classDef redis fill:#F44336,stroke:#D32F2F,color:white;
+    
+    class A,B core;
+    class C,D,E,F,G,H,I,J,K,L,M,N,O redis;
+```
+
+## Практичний приклад: BrowserDB з кешуванням
+
+```js
+import { DB } from "@nan0web/db-browser"
+
+// Створюємо базу з кешуванням
+const apiDB = new DB({
+  cwd: "https://api.example.com",
+  root: "v1",
+  cache: true,
+  dbName: "my-app",
+  storeName: "api-cache"
+})
+
+await apiDB.connect()
+
+// Завантажуємо дані - спочатку з кешу (якщо є), потім з мережі
+const userProfile = await apiDB.get("users/profile")
+
+// Здійснюємо локальну зміну
+await apiDB.set("users/profile#preferences", { theme: "dark" })
+
+// Зберігаємо оновлені дані (всі зміни)
+await apiDB.push()
+
+// Тепер приступаємо без мережі
+navigator.onLine = false
+const cachedProfile = await apiDB.get("users/profile") // Отримуємо з кешу
+
+// Можемо витягнути частину бази
+const userDB = apiDB.extract("users")
+const usersData = await userDB.listDir() // Список користувачів з кешу
+```
+
+
+### Порівняння Стратегій Індексації
+
+| База Даних | Механізм listDir | Переваги | Недоліки |
+|------------|------------------|----------|----------|
+| **FS (DBFS)** | `index.txt`/`index.jsonl` файли | - Мінімальна затримка<br>- Проста імплементація | - Потрібно оновлювати індекси при змінах |
+| **Browser (DBBrowser)** | Завантаження `index.txt` з сервера | - Немає локального сканування<br>- Кешування через IndexedDB | - Залежність від мережі |
+| **Redis (DBRedis)** | `KEYS {path}*` запит | - Висока швидкість<br>- Немає окремих файлів | - `KEYS` не рекомендовано в продуктиві |
+| **MongoDB (DBMongo)** | `$regex` запит | - Природня інтеграція<br>- Можливість індексації | - Потребує налаштування індексів |
+| **Neo4j (DBGraph)** | `STARTS WITH` запит | - Природня робота з ієрархією<br>- Ефективні зв'язки | - Вища складність моделювання |
+
+
+## Чому комбінація `cwd + root + pathname` залишається критично важливою
+
+1. **Чітке розділення контекстів**:
+   - При зміні `cwd` (наприклад, зміна хосту API)
+   - `root` залишається незмінним (структура API)
+   - `pathname` адаптується до нового контексту
+
+2. **Уніфікований інтерфейс для різних реалізацій**:
+   ```js
+   // Усі реалізації використовують одну логіку:
+   const resolved = db.normalize(db.cwd, db.root, pathname);
+   ```
+
+3. **Коректна робота з `extract()`**:
+   ```js
+   const mainDB = new DB({ cwd: "https://example.com", root: "api/v1" });
+   const usersDB = mainDB.extract("users");
+   ```
+   - `usersDB.root` = `api/v1/users/`
+   - `usersDB.data` = дані тільки для `api/v1/users/**`
+
+4. **Повна підтримка всіх CRUD операцій** через єдиний інтерфейс, що спирається на цю формулу
+
+## Клас Directory
+
+Каталоги не є обов'язковими для баз даних, але вони присутні за замовчуванням.
+
+Кожен каталог може мати свій власний документ, який спільно використовується всіма дочірніми документами через функцію `Наслідування`. За замовчуванням це символ підкреслення `_` з можливими розширеннями, тому для бази даних файлової системи це може бути `_.json`, `_.yaml`, `_.yml`, `_.nano`, `_.csv`. У разі сховищ Redis, MongoDB або подібних, розширення можуть бути відсутні, тому дані каталогу будуть зберігатися як `_` або `en/_`. Також для таких баз даних можливе встановлення `Directory.File = "/"`, але це не тестовано.
+
+Дані можуть зберігатися за допомогою різних завантажувачів та зберігачів, які визначаються шляхом перевизначення `loadDocument()` та `saveDocument()`.
 
 ```js
 class Directory {
@@ -140,9 +539,9 @@ class Directory {
 }
 ```
 
-## DirectoryIndex class
+## Клас DirectoryIndex
 
-Instance of the directory index is automatically amending `entries: string[]` That is just names of available nodes (documents and directories), for instance:
+Екземпляр індексу каталогу автоматично доповнює `entries: string[]`, що являє собою просто імена доступних вузлів (документів і каталогів), наприклад:
 
 ```json
 {
@@ -158,7 +557,7 @@ Instance of the directory index is automatically amending `entries: string[]` Th
 }
 ```
 
-Possible to store indexes in different formats (rows, text, object, array):
+Можливо зберігати індекси в різних форматах (рядки, текст, об'єкт, масив):
 
 ```json
 {
@@ -175,7 +574,7 @@ Possible to store indexes in different formats (rows, text, object, array):
 }
 ```
 
-Possible to store by reference:
+Можливо зберігати за посиланням:
 
 ```json
 {

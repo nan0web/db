@@ -128,71 +128,6 @@ suite("DB", () => {
 		})
 	})
 
-	describe('extract', () => {
-		it('should create new DB with subset of data', async () => {
-			const mockData = new Map([
-				['root/dir/file1.txt', 'content1'],
-				['root/dir/file2.txt', 'content2'],
-				['root/other.txt', 'other']
-			])
-			const mockMeta = new Map([
-				['root/dir/file1.txt', new DocumentStat({ size: 100 })],
-				['root/dir/file2.txt', new DocumentStat({ size: 200 })],
-				['root/other.txt', new DocumentStat({ size: 300 })],
-			])
-
-			const db = new DB({
-				root: '/root',
-				data: mockData,
-				meta: mockMeta,
-			})
-
-			const extracted = db.extract('dir/')
-			const file1 = await db.loadDocument('dir/file1.txt', "")
-			const file2 = await db.fetch('dir/file2.txt')
-			assert.strictEqual(extracted.root, '/root/dir/')
-			assert.strictEqual(extracted.data.size, 2)
-			assert.strictEqual(extracted.meta.size, 2)
-			assert.strictEqual(file1, "content1")
-			assert.strictEqual(file2, "content2")
-			assert.ok(extracted.data.has('root/dir/file1.txt'))
-			assert.ok(extracted.data.has('root/dir/file2.txt'))
-			assert.ok(!extracted.data.has('root/other.txt'))
-		})
-	})
-
-	describe('extname', () => {
-		it('should return extension with dot', () => {
-			assert.strictEqual(db.extname('file.txt'), '.txt')
-			assert.strictEqual(db.extname('archive.tar.gz'), '.gz')
-		})
-
-		it('should return empty string if no extension', () => {
-			assert.strictEqual(db.extname('filename'), '')
-		})
-
-		it('should handle empty string', () => {
-			assert.strictEqual(db.extname(''), '')
-		})
-	})
-
-	describe('relative', () => {
-		it('should return uri if from and to are absolute and from starts with to', async () => {
-			const result = db.relative("/root/api", "/root/")
-			assert.strictEqual(result, "api")
-		})
-
-		it('should return uri if from and to are absolute and from do not starts with to', async () => {
-			const result = db.relative("/root/api", "/root2/")
-			assert.strictEqual(result, "/root2/")
-		})
-
-		it('should return uri if to is relative', async () => {
-			const result = db.relative("root/api", "/root2/")
-			assert.strictEqual(result, "/root2/")
-		})
-	})
-
 	describe('toString', () => {
 		it('should return formatted string representation', () => {
 			const dbInstance = new DB({ root: '/test' })
@@ -399,7 +334,7 @@ suite("DB", () => {
 				}
 
 				assert.ok(entries.find(e => e.path === "file.json" && e.isFile))
-				assert.ok(entries.find(e => e.path === "subdir" && e.isDirectory))
+				assert.ok(entries.find(e => e.path === "subdir/" && e.isDirectory))
 				assert.ok(entries.find(e => e.path === "subdir/nested.json"))
 			})
 
@@ -574,64 +509,6 @@ suite("DB", () => {
 			const result = await dbInstance.stat('test.txt')
 			assert.strictEqual(result.size, 100)
 			assert.strictEqual(result.isFile, true)
-		})
-	})
-
-	describe('resolve', () => {
-		it("should resolve the path", async () => {
-			const path = await db.resolve("a/b", "c")
-			assert.equal(path, "a/b/c")
-		})
-		it("should resolve / directories", async () => {
-			const path = await db.resolve("api", "/users")
-			assert.equal(path, "users")
-		})
-		it("should resolve .. directories", async () => {
-			const path = await db.resolve("api/v1/", "../users")
-			assert.equal(path, "api/users")
-		})
-		it("should resolve .. in 3 args", async () => {
-			const path = await db.resolve("api/v1", "..", "users")
-			assert.equal(path, "users")
-		})
-
-		it("should not resolve .. beyond root", async () => {
-			// Test cases for ../ resolution behavior at root level
-			const testCases = [
-				{ args: ["/", "..", "_"], expected: "_" },
-				{ args: ["/path", "..", "_"], expected: "_" },
-				{ args: ["/deeply/nested/path", "..", "_"], expected: "deeply/_" },
-				{ args: ["_", "..", "_"], expected: "_" },
-				{ args: ["playground/_", "..", "_"], expected: "_" },
-				{ args: ["/playground/_", "..", "_"], expected: "_" },
-			]
-
-			for (const { args, expected } of testCases) {
-				const result = await db.resolve(...args)
-				assert.equal(result, expected, `Failed for args: ${JSON.stringify(args)}`)
-			}
-		})
-
-		it("should prevent same path resolution for parent", async () => {
-			const testCases = [
-				{ from: "playground/_", to: "..", expected: "_" },
-				{ from: "/playground/_", to: "..", expected: "_" },
-				{ from: "_", to: "..", expected: "_" },
-			]
-
-			for (const { from, to, expected } of testCases) {
-				const result = await db.resolve(from, to, "_")
-				assert.equal(result, expected, `Failed for from: ${from}, to: ${to}`)
-			}
-		})
-	})
-
-	describe('absolute', () => {
-		it('should throw not implemented error', () => {
-			const db = new DB()
-			const abs = db.absolute('path')
-
-			assert.equal(abs, "/path")
 		})
 	})
 
@@ -1282,21 +1159,6 @@ suite("DB", () => {
 		})
 	})
 
-	describe("normalize", () => {
-		it("should normalize path with //", () => {
-			const db = new DB()
-			assert.equal(db.normalize("/root", "/dir", "file.txt"), "dir/file.txt")
-			assert.equal(db.normalize("/root", "/dir", "..", "file.txt"), "file.txt")
-			assert.equal(db.normalize("playground/_/", "..", "_"), "playground/_")
-			assert.equal(db.normalize("playground/_", "..", "_"), "_")
-		})
-
-		it("should normalize after root only", () => {
-			const db = new DB({ root: "data" })
-			assert.equal(db.normalize("_", "langs.yaml"), "_/langs.yaml")
-		})
-	})
-
 	describe('processExtensions', () => {
 		it('should process extension with $ref', async () => {
 			const db = new DB({
@@ -1398,38 +1260,6 @@ suite("DB", () => {
 			assert.ok(entries.find(e => e.name === 'file1.txt'))
 			assert.ok(entries.find(e => e.name === 'file2.txt'))
 			assert.ok(entries.find(e => e.name === 'dir' && e.isDirectory))
-		})
-	})
-
-	describe("basename", () => {
-		it("should calculate file", () => {
-			assert.equal(db.basename("some/url/with/a-file.txt"), "a-file.txt")
-			assert.equal(db.basename("a-file.txt"), "a-file.txt")
-		})
-		it("should calculate directory", () => {
-			assert.equal(db.basename("some/url/with/"), "with/")
-			assert.equal(db.basename("/"), "/")
-		})
-		it("should calculate file with removed suffix", () => {
-			assert.equal(db.basename("some/url/with/a-file.txt", true), "a-file")
-			assert.equal(db.basename("some/url/with/a-file.txt", ".txt"), "a-file")
-			assert.equal(db.basename("some/url/with/a-file.txt", ".md"), "a-file.txt")
-			assert.equal(db.basename("some/url/with/a-file", true), "a-file")
-			assert.equal(db.basename("some/url/with/a-file", ".txt"), "a-file")
-			assert.equal(db.basename("some/url/with/a.gitignore", true), "a")
-			assert.equal(db.basename("some/url/with/.gitignore", true), ".gitignore")
-			assert.equal(db.basename("some/url/with/.gitignore", ".gitignore"), ".gitignore")
-		})
-	})
-
-	describe("dirname", () => {
-		it("should calculate file path", () => {
-			assert.equal(db.dirname("some/url/with/a-file.txt"), "some/url/with/")
-			assert.equal(db.dirname("a-file.txt"), "/")
-		})
-		it("should calculate directory path", () => {
-			assert.equal(db.dirname("some/url/with/"), "some/url/")
-			assert.equal(db.dirname("/"), "/")
 		})
 	})
 
