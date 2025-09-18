@@ -59,7 +59,7 @@ class DirectoryIndex {
 		this.entriesAs = Enum(...this.ENTRIES_AS_ALL)(entriesAs)
 		this.maxEntriesOnLoad = Number(maxEntriesOnLoad)
 		this.filter = DirectoryIndexFilter.from(filter)
-		this.entries = this.decode(entries)
+		this.entries = this.decode({ source: entries })
 	}
 
 	/** @returns {string} */
@@ -163,11 +163,12 @@ class DirectoryIndex {
 
 	/**
 	 * Decodes entries from stored format back to [name, DocumentStat] pairs
-	 * @param {any} source - Source data to decode
-	 * @param {string} target - Target decoding format
+	 * @param {Object} [input]
+	 * @param {any} [input.source=this.entries] - Source data to decode
+	 * @param {string} [input.target] - Target encoding format, or current entriesAs
 	 * @returns {Array<[string, DocumentStat]>} Decoded entries
 	 */
-	decode(source, target = this.entriesAs) {
+	decode({ source = this.entries, target = this.entriesAs } = {}) {
 		if (target === this.ENTRIES_AS_TEXT) {
 			if (typeof source !== 'string') {
 				throw new TypeError([
@@ -190,6 +191,9 @@ class DirectoryIndex {
 
 			return source.map(row => {
 				const values = Array.isArray(row) ? row : [row]
+				if ("string" === typeof values[0] && values[1] && values[1] instanceof DocumentStat) {
+					return [String(values[0]), DocumentStat.from(values[1])]
+				}
 				const stat = {}
 				let name = ""
 
@@ -261,11 +265,8 @@ class DirectoryIndex {
 		const indexes = []
 		let currentDir = db.dirname(uri)
 
-		// Add index files for the directory containing the changed document
-		indexes.push(
-			db.resolveSync(currentDir, this.FULL_INDEX),
-			db.resolveSync(currentDir, this.INDEX)
-		)
+		// Add index file for the directory containing the changed document
+		indexes.push(db.resolveSync(currentDir, this.INDEX))
 
 		// Traverse up the directory tree and add index files for each parent
 		while (true) {
@@ -274,17 +275,12 @@ class DirectoryIndex {
 				break
 			}
 			currentDir = parentDir
-			indexes.push(
-				db.resolveSync(currentDir, this.FULL_INDEX),
-				db.resolveSync(currentDir, this.INDEX)
-			)
+			indexes.push(db.resolveSync(currentDir, this.INDEX))
 		}
 
-		// Always add root indexes
-		indexes.push(
-			db.resolveSync('.', this.FULL_INDEX),
-			db.resolveSync('.', this.INDEX)
-		)
+		// Always add root indexes - full index first, then regular index
+		indexes.push(db.resolveSync('.', this.FULL_INDEX))
+		indexes.push(db.resolveSync('.', this.INDEX))
 
 		// Remove duplicates and filter out empty strings
 		return [...new Set(indexes)].filter(Boolean)
@@ -324,6 +320,70 @@ class DirectoryIndex {
 		entries.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
 
 		return entries
+	}
+
+	/**
+	 * Get all entries recursively from a directory and its subdirectories
+	 * @param {import("./DB/DB.js").default} db - Database instance
+	 * @param {string} dirPath - Path of directory to get all entries for
+	 * @returns {Promise<Array<[string, DocumentStat]>>} Array of all directory entries
+	 */
+	static async getAllEntries(db, dirPath = '.') {
+		/** @type {Array<[string, DocumentStat]>} */
+		const allEntries = []
+
+		const readDirStream = db.readDir(dirPath, { depth: Infinity })
+		for await (const entry of readDirStream) {
+			if (this.isFullIndex(entry.name) || this.isIndex(entry.name)) continue
+
+			// Normalize the entry name - add trailing slash for directories
+			const entryName = entry.stat.isDirectory ? entry.name + '/' : entry.name
+			allEntries.push([entryName, entry.stat])
+		}
+
+		// Sort entries alphabetically
+		allEntries.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+
+		return allEntries
+	}
+
+	/**
+	 * Generate indexes for a directory and its subdirectories recursively
+	 * @param {import("./DB/DB.js").default} db - Database instance
+	 * @param {string} dirPath - Path of directory to index
+	 * @returns {AsyncGenerator<[string, DirectoryIndex], void, unknown>} Generator of [indexUri, directoryIndex] pairs
+	 */
+	static async* generateAllIndexes(db, dirPath = '.') {
+		// Generate regular indexes for each directory
+		const directories = new Set()
+		const readDirStream = db.readDir(dirPath, { depth: Infinity })
+
+		for await (const entry of readDirStream) {
+			if (entry.stat.isDirectory) {
+				directories.add(entry.path)
+			}
+		}
+
+		// Add the starting directory itself
+		directories.add(dirPath)
+
+		// For each directory, generate its index (immediate children only)
+		for (const directory of directories) {
+			const entries = await this.getDirectoryEntries(db, directory)
+			const directoryIndex = new DirectoryIndex({ entries })
+
+			// Yield simple index for the directory
+			const indexUri = db.resolveSync(directory, this.INDEX)
+			yield [indexUri, directoryIndex]
+		}
+
+		// Generate one full index at the root level containing all entries
+		const allEntries = await this.getAllEntries(db, dirPath)
+		const fullIndex = new DirectoryIndex({ entries: allEntries })
+
+		// Yield full index at the root level
+		const fullIndexUri = db.resolveSync(dirPath, this.FULL_INDEX)
+		yield [fullIndexUri, fullIndex]
 	}
 }
 

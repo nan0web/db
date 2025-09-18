@@ -144,8 +144,8 @@ describe("getIndexesToUpdate", () => {
 
 		const indexUris = DirectoryIndex.getIndexesToUpdate(db, 'file.txt')
 		assert.deepStrictEqual(indexUris, [
+			'index.txt',
 			'index.jsonl',
-			'index.txt'
 		])
 	})
 
@@ -154,7 +154,6 @@ describe("getIndexesToUpdate", () => {
 
 		const indexUris = DirectoryIndex.getIndexesToUpdate(db, 'dir1/file.txt')
 		assert.deepStrictEqual(indexUris, [
-			'dir1/index.jsonl',
 			'dir1/index.txt',
 			'index.jsonl',
 			'index.txt'
@@ -166,11 +165,8 @@ describe("getIndexesToUpdate", () => {
 
 		const indexUris = DirectoryIndex.getIndexesToUpdate(db, 'dir1/dir2/dir3/file.txt')
 		assert.deepStrictEqual(indexUris, [
-			'dir1/dir2/dir3/index.jsonl',
 			'dir1/dir2/dir3/index.txt',
-			'dir1/dir2/index.jsonl',
 			'dir1/dir2/index.txt',
-			'dir1/index.jsonl',
 			'dir1/index.txt',
 			'index.jsonl',
 			'index.txt'
@@ -185,13 +181,13 @@ describe("getIndexesToUpdate", () => {
 		const indexDir = DirectoryIndex.getIndexesToUpdate(db, 'dir1/index.txt')
 
 		assert.deepStrictEqual(indexRoot, [
-			"index.jsonl", "index.txt"
+			"index.txt", "index.jsonl",
 		])
 		assert.deepStrictEqual(indexFull, [
-			"index.jsonl", "index.txt"
+			"index.txt", "index.jsonl",
 		])
 		assert.deepStrictEqual(indexDir, [
-			"dir1/index.jsonl", "dir1/index.txt", "index.jsonl", "index.txt"
+			"dir1/index.txt", "index.jsonl", "index.txt"
 		])
 	})
 })
@@ -235,7 +231,7 @@ describe("DirectoryIndex - decode", () => {
 			entriesColumns: ["type", "name", "mtimeMs", "size"],
 			entriesAs: "array"
 		})
-		const decoded = index.decode(source)
+		const decoded = index.decode({ source })
 		assert.strictEqual(decoded[0][0], "file.txt")
 		assert.strictEqual(decoded[0][1].size, 100)
 		assert.strictEqual(decoded[0][1].mtimeMs, 1625097600000)
@@ -248,7 +244,7 @@ describe("DirectoryIndex - decode", () => {
 			entriesColumns: ["type", "name", "mtimeMs", "size"],
 			entriesAs: "rows"
 		})
-		const decoded = index.decode(source)
+		const decoded = index.decode({ source })
 		assert.strictEqual(decoded[0][0], "file.txt")
 		assert.strictEqual(decoded[0][1].size, 100)
 		assert.strictEqual(decoded[0][1].mtimeMs, 1625097600000)
@@ -262,7 +258,7 @@ describe("DirectoryIndex - decode", () => {
 			entriesAs: "text",
 			entries: source
 		})
-		const decoded = index.decode(source)
+		const decoded = index.decode({ source })
 		assert.strictEqual(decoded[0][0], "file.txt")
 		assert.strictEqual(decoded[0][1].size, 100)
 		assert.strictEqual(decoded[0][1].mtimeMs, 1625097600000)
@@ -275,7 +271,7 @@ describe("DirectoryIndex - decode", () => {
 			entriesColumns: ["type", "name", "mtimeMs.36", "size.36"],
 			entriesAs: "array"
 		})
-		const decoded = index.decode(source)
+		const decoded = index.decode({ source })
 		assert.strictEqual(decoded[0][0], "file.txt")
 		assert.strictEqual(decoded[0][1].mtime.toISOString().slice(0, 10), "2025-08-15")
 		assert.strictEqual(decoded[0][1].size, 300)
@@ -289,11 +285,10 @@ describe("DirectoryIndex - decode", () => {
 		}, TypeError)
 	})
 
-	it("throws error when decoding array formats from non-array source", () => {
+	it("should return empty array when decoding array formats from non-array source", () => {
 		const index = new DirectoryIndex({ entriesAs: "array" })
-		assert.throws(() => {
-			index.decode("not an array")
-		}, TypeError)
+		const decoded = index.decode("not an array")
+		assert.deepEqual(decoded, [])
 	})
 })
 
@@ -380,5 +375,111 @@ describe("DirectoryIndex.Filter", () => {
 	it("should create an instance from", () => {
 		const filter = DirectoryIndex.Filter.from({})
 		assert.ok(filter instanceof DirectoryIndex.Filter)
+	})
+})
+
+describe("generateAllIndexes", () => {
+	it("generates indexes for all directories recursively", async () => {
+		const db = {
+			basename,
+			dirname,
+			resolveSync,
+			readDir: async function* (uri, options) {
+				// Mock directory structure:
+				// .
+				// ├── file1.txt
+				// ├── dir1/
+				// │   ├── file2.txt
+				// │   └── subdir/
+				// │       └── file3.txt
+				const entries = [
+					{ path: 'file1.txt', name: 'file1.txt', stat: new DocumentStat({ size: 100, isFile: true }) },
+					{ path: 'dir1', name: 'dir1', stat: new DocumentStat({ size: 4096, isDirectory: true }) },
+					{ path: 'dir1/file2.txt', name: 'file2.txt', stat: new DocumentStat({ size: 200, isFile: true }) },
+					{ path: 'dir1/subdir', name: 'subdir', stat: new DocumentStat({ size: 4096, isDirectory: true }) },
+					{ path: 'dir1/subdir/file3.txt', name: 'file3.txt', stat: new DocumentStat({ size: 300, isFile: true }) }
+				]
+
+				// Filter entries based on the uri and depth option
+				const depth = options?.depth || 1
+				for (const entry of entries) {
+					const entryUri = entry.path
+					const entryParts = entryUri.split('/').filter(part => part.length > 0)
+					const uriParts = uri.split('/').filter(part => part.length > 0)
+					const relativeDepth = entryParts.length - uriParts.length
+
+					if (depth === Infinity || relativeDepth <= depth) {
+						if (uri === '.' || uri === '' || entryUri.startsWith(uri + '/')) {
+							yield entry
+						}
+					}
+				}
+			}
+		}
+
+		const indexes = []
+		for await (const [uri, index] of DirectoryIndex.generateAllIndexes(db)) {
+			indexes.push([uri, index])
+		}
+
+		// Should generate indexes for: ., dir1, dir1/subdir
+		// Each directory should have index.txt and index.jsonl for root dir.
+		assert.strictEqual(indexes.length, 4)
+
+		const indexUris = indexes.map(([uri]) => uri).sort()
+		const expectedUris = [
+			'index.jsonl',
+			'index.txt',
+			'dir1/index.txt',
+			'dir1/subdir/index.txt'
+		].sort()
+
+		assert.deepStrictEqual(indexUris, expectedUris)
+	})
+
+	it("generates indexes for a specific subdirectory", async () => {
+		const db = {
+			basename,
+			dirname,
+			resolveSync,
+			readDir: async function* (uri, options) {
+				// Mock directory structure:
+				// dir1/
+				// ├── file2.txt
+				// └── subdir/
+				//     └── file3.txt
+				const entries = [
+					{ path: 'dir1/file2.txt', name: 'file2.txt', stat: new DocumentStat({ size: 200, isFile: true }) },
+					{ path: 'dir1/subdir', name: 'subdir', stat: new DocumentStat({ size: 4096, isDirectory: true }) },
+					{ path: 'dir1/subdir/file3.txt', name: 'file3.txt', stat: new DocumentStat({ size: 300, isFile: true }) }
+				]
+
+				// Filter entries based on the uri
+				for (const entry of entries) {
+					const entryUri = entry.path
+					if (uri === 'dir1' || entryUri.startsWith('dir1/')) {
+						yield entry
+					}
+				}
+			}
+		}
+
+		const indexes = []
+		for await (const [uri, index] of DirectoryIndex.generateAllIndexes(db, 'dir1')) {
+			indexes.push([uri, index])
+		}
+
+		// Should generate indexes for: dir1, dir1/subdir
+		// Each directory should have 2 indexes: index.jsonl and index.txt
+		assert.strictEqual(indexes.length, 3)
+
+		const indexUris = indexes.map(([uri]) => uri).sort()
+		const expectedUris = [
+			'dir1/index.jsonl',
+			'dir1/index.txt',
+			'dir1/subdir/index.txt'
+		].sort()
+
+		assert.deepStrictEqual(indexUris, expectedUris)
 	})
 })

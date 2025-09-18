@@ -329,9 +329,9 @@ export default class DB {
 
 		const indexTxtPath = this.resolveSync(dirUri, 'index.txt')
 		if (this.data.has(indexTxtPath)) {
-			const content = this.data.get(indexTxtPath)
+			const source = this.data.get(indexTxtPath)
 			const index = new DirectoryIndex()
-			const list = index.decode(content, DirectoryIndex.ENTRIES_AS_TEXT)
+			const list = index.decode({ source, target: DirectoryIndex.ENTRIES_AS_TEXT })
 			for (const [name, stat] of list) {
 				const path = this.resolveSync(dirUri, name)
 				const entry = new DocumentEntry({ path, name: name, stat: stat })

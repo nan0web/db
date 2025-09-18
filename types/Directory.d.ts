@@ -62,13 +62,4 @@ declare class Directory {
      * @returns {Function} A function that returns an empty array.
      */
     get entriesFn(): Function;
-    /**
-     * Gets the filter instance used for directory entries.
-     * @returns {Filter} A new Filter instance.
-     */
-    get filter(): typeof Filter;
 }
-/**
- * Filter class used for filtering directory entries.
- */
-declare function Filter(): void;

@@ -435,18 +435,62 @@ export default class DB {
  */
     private _updateIndex;
     /**
-     * Saves index data to both index.jsonl and index.txt files
-     * @param {string} dirUri Directory URI where indexes should be saved
-     * @param {Array<DocumentEntry>} entries Document entries to index
+     * @private
+     * Auto-updates index.jsonl and index.txt after document save for all parent directories
+     * @param {string} uri - URI of saved document
      * @returns {Promise<void>}
      */
-    saveIndex(dirUri: string, entries: Array<DocumentEntry>): Promise<void>;
+    private _updateIndex2;
+    /**
+     * @private
+     * Auto-updates both types of indexes after document save:
+     * - index.txt: contains only immediate children with basic stats
+     * - index.jsonl: contains full recursive directory structure
+     *
+     * This allows for:
+     * 1. Quick loading of immediate directory content via index.txt
+     * 2. Deep traversal without multiple requests via index.jsonl
+     *
+     * @param {string} uri - URI of saved document
+     * @param {boolean} [recursive] - Force recursive index update
+     * @returns {Promise<void>}
+     */
+    private _updateIndexes;
+    /**
+     * @private
+     * Updates index.txt with just immediate directory entries
+     * @param {string} uri - URI of changed document
+     * @returns {Promise<void>}
+     */
+    private _updateImmediateIndex;
+    /**
+     * @private
+     * Updates the full recursive index (index.jsonl)
+     * @returns {Promise<void>}
+     */
+    private _updateRecursiveIndex;
+    /**
+     * @private
+     * Recursively builds directory tree
+     * @param {string} dirPath - Current directory path
+     * @param {Array<[string, DocumentStat]>} entries - Accumulator for entries
+     * @param {number} depth - Current depth level
+     * @returns {Promise<void>}
+     */
+    private _buildDirectoryTree;
+    /**
+     * Saves index data to both index.jsonl and index.txt files
+     * @param {string} dirUri Directory URI where indexes should be saved
+     * @param {Array<[string, DocumentStat]>} [entries] Document entries with their paths, if not provided this.meta is used.
+     * @returns {Promise<void>}
+     */
+    saveIndex(dirUri: string, entries?: [string, DocumentStat][] | undefined): Promise<void>;
     /**
      * Loads index data from either index.jsonl or index.txt file
-     * @param {string} dirUri Directory URI where index file is located
-     * @returns {Promise<Array<DocumentEntry>>} Array of document entries or null if no index found
+     * @param {string} [dirUri] Directory URI where index file is located
+     * @returns {Promise<DirectoryIndex>} Index data.
      */
-    loadIndex(dirUri: string): Promise<Array<DocumentEntry>>;
+    loadIndex(dirUri?: string | undefined): Promise<DirectoryIndex>;
     #private;
 }
 import DocumentStat from "../DocumentStat.js";
