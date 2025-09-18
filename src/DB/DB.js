@@ -1409,7 +1409,7 @@ export default class DB {
 		const indexUris = DirectoryIndex.getIndexesToUpdate(this, uri)
 		for (const indexPath of indexUris) {
 			const dirPath = this.dirname(indexPath)
-			const entries = DirectoryIndex.getDirectoryEntries(this, dirPath)
+			const entries = await DirectoryIndex.getDirectoryEntries(this, dirPath)
 			await this.saveIndex(dirPath, entries)
 		}
 		this.#console.debug("All parent indexes updated", {
@@ -1461,7 +1461,7 @@ export default class DB {
 	 */
 	async _updateImmediateIndex(uri) {
 		const dirPath = this.dirname(uri);
-		const entries = DirectoryIndex.getDirectoryEntries(this, dirPath);
+		const entries = await DirectoryIndex.getDirectoryEntries(this, dirPath);
 
 		// Save as index.txt (rows format)
 		const indexPathTXT = this.resolveSync(dirPath, this.Index.INDEX);
@@ -1506,7 +1506,7 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async _buildDirectoryTree(dirPath, entries, depth = 0) {
-		const immediateEntries = DirectoryIndex.getDirectoryEntries(this, dirPath);
+		const immediateEntries = await DirectoryIndex.getDirectoryEntries(this, dirPath);
 
 		for (const [name, stat] of immediateEntries) {
 			const fullPath = dirPath === '.' ? name : this.resolveSync(dirPath, name);
