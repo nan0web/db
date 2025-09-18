@@ -25,11 +25,12 @@ class DirectoryIndex {
 	static COLUMNS = ["type", "name", "mtimeMs.36", "size.36"]
 	static FULL_INDEX = "index.jsonl"
 	static INDEX = "index.txt"
+	static Filter = DirectoryIndexFilter
 	/** @type {string[]} */
 	entriesColumns = DirectoryIndex.COLUMNS
 	/** @type {string} */
 	entriesAs = DirectoryIndex.ENTRIES_AS_ARRAY
-	/** @type {Array<Array<string, DocumentStat>> | string[][] | string[] | string} */
+	/** @type {Array<[string, DocumentStat]>} */
 	entries = []
 	/** @type {number} */
 	maxEntriesOnLoad = 12
@@ -41,7 +42,7 @@ class DirectoryIndex {
 	 * instead of Record<string, object>
 	 * @param {object} input
 	 * @param {string[]} [input.entriesColumns=[]]
-	 * @param {Array<Array<string, DocumentStat>> | string[][] | string[] | string} [input.entries=[]]
+	 * @param {Array<[string, DocumentStat]> | string[][] | string[] | string} [input.entries=[]]
 	 * @param {string} [input.entriesAs]
 	 * @param {number} [input.maxEntriesOnLoad=12]
 	 * @param {object} [input.filter]
@@ -54,11 +55,11 @@ class DirectoryIndex {
 			maxEntriesOnLoad = 12,
 			filter = new DirectoryIndexFilter(),
 		} = input
-		this.entries = entries
 		this.entriesColumns = entriesColumns
 		this.entriesAs = Enum(...this.ENTRIES_AS_ALL)(entriesAs)
 		this.maxEntriesOnLoad = Number(maxEntriesOnLoad)
 		this.filter = DirectoryIndexFilter.from(filter)
+		this.entries = this.decode(entries)
 	}
 
 	/** @returns {string} */
@@ -107,9 +108,12 @@ class DirectoryIndex {
 			throw new TypeError("To encode index entries as array entriesColumns must include mtimeMs column")
 		}
 
-		return entries.map(([name, stat]) => {
+		return entries.map(	([name, stat]) => {
 			return this.entriesColumns.map(col => {
 				if ("name" === col) return name
+				if ("type" === col) {
+					return stat.isFile ? "F" : stat.isDirectory ? "D" : "?"
+				}
 				if (col.includes(".")) {
 					const [key, num] = col.split(".")
 					const radix = parseInt(num)
@@ -139,11 +143,12 @@ class DirectoryIndex {
 
 	/**
 	 * Encodes entries according to specified format
-	 * @param {Array<[string, DocumentStat]>} entries - Entries to encode
-	 * @param {string} target - Target encoding format
+	 * @param {Object} [input]
+	 * @param {Array<[string, DocumentStat]>} [input.entries] - Entries to encode, or current entries
+	 * @param {string} [input.target] - Target encoding format, or current entriesAs
 	 * @returns {string[][] | string[] | string | Array<[string, DocumentStat]>} Encoded entries
 	 */
-	encode(entries, target = this.entriesAs) {
+	encode({ entries = this.entries, target = this.entriesAs } = {}) {
 		if (target === this.ENTRIES_AS_ARRAY) {
 			return this.encodeIntoArray(entries)
 		}
@@ -165,7 +170,10 @@ class DirectoryIndex {
 	decode(source, target = this.entriesAs) {
 		if (target === this.ENTRIES_AS_TEXT) {
 			if (typeof source !== 'string') {
-				throw new TypeError("Source must be string when decoding as text")
+				throw new TypeError([
+					"Source must be string when decoding as text",
+					["But provided", typeof source].join(": ")
+				].join("\n"))
 			}
 			source = source.split("\n")
 		}
@@ -217,6 +225,9 @@ class DirectoryIndex {
 	 */
 	static from(input) {
 		if (input instanceof DirectoryIndex) return input
+		if (Array.isArray(input)) {
+			return new DirectoryIndex({ entries: input })
+		}
 		return new DirectoryIndex(input)
 	}
 
@@ -228,6 +239,89 @@ class DirectoryIndex {
 	 */
 	static isIndex(path) {
 		return path.endsWith(`/${this.INDEX}`) || path === this.INDEX
+	}
+
+	/**
+	 * Checks if a given path represents a full index.
+	 *
+	 * @param {string} path
+	 * @returns {boolean} True if the path is a full index
+	 */
+	static isFullIndex(path) {
+		return path.endsWith(`/${this.FULL_INDEX}`) || path === this.FULL_INDEX
+	}
+
+	/**
+	 * Get all indexes that need to be updated when a document changes
+	 * @param {import("./DB/DB.js").default} db - Database instance
+	 * @param {string} uri - URI of the changed document
+	 * @returns {string[]} Array of index URIs to update
+	 */
+	static getIndexesToUpdate(db, uri) {
+		const indexes = []
+		let currentDir = db.dirname(uri)
+
+		while (true) {
+			indexes.push(
+				db.resolveSync(currentDir, this.FULL_INDEX),
+				db.resolveSync(currentDir, this.INDEX)
+			)
+			const parentDir = db.dirname(currentDir)
+			if (parentDir === currentDir || parentDir === '.') {
+				break
+			}
+			currentDir = parentDir
+		}
+		indexes.push(
+			db.resolveSync('.', this.FULL_INDEX),
+			db.resolveSync('.', this.INDEX)
+		)
+		return [...new Set(indexes)].filter(Boolean)
+	}
+
+	/**
+	 * Get directory entries (immediate children only)
+	 * @param {import("./DB/DB.js").default} db - Database instance
+	 * @param {string} dirPath - Path of directory to get entries for
+	 * @returns {Array<[string, DocumentStat]>} Array of directory entries
+	 */
+	static getDirectoryEntries(db, dirPath) {
+		const isRoot = dirPath === '.' || dirPath === '/' || dirPath === ''
+		const dirPrefix = isRoot ? '' : (dirPath.endsWith('/') ? dirPath : dirPath + '/')
+
+		/** @type {Array<[string, DocumentStat]>} */
+		const entries = []
+		const files = new Set()
+
+		for (const [key, meta] of db.meta.entries()) {
+			if (this.isFullIndex(key) || this.isIndex(key)) {
+				continue
+			}
+
+			if (isRoot) {
+				const parts = key.split('/').filter(Boolean)
+				if (parts.length > 0 && !files.has(parts[0])) {
+					entries.push([parts[0], meta])
+					files.add(parts[0])
+				}
+				continue
+			}
+
+			if (!key.startsWith(dirPrefix)) continue
+
+			const relativePath = key.substring(dirPrefix.length)
+			const firstSlashIndex = relativePath.indexOf('/')
+
+			const name = firstSlashIndex > 0 ? relativePath.substring(0, firstSlashIndex) : relativePath
+			if (name && !files.has(name)) {
+				entries.push([name, meta])
+				files.add(name)
+			}
+		}
+
+		entries.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+
+		return [...new Set(entries)]
 	}
 }
 

@@ -30,17 +30,68 @@ suite('Directory', () => {
 		})
 	})
 
-	describe("getGlobalName", () => {
-		assert.equal(Directory.getGlobalName("_/langs"), "langs")
-		assert.equal(Directory.getGlobalName("_/langs.yaml"), "langs")
-		assert.equal(Directory.getGlobalName("_/langs.json"), "langs")
-		assert.equal(Directory.getGlobalName("_/sub/folder.json"), "folder")
-		assert.equal(Directory.getGlobalName("langs"), "")
-		assert.equal(Directory.getGlobalName("langs.yaml"), "")
-		assert.equal(Directory.getGlobalName("langs.json"), "")
-		assert.equal(Directory.getGlobalName("sub/folder.json"), "")
-		assert.equal(Directory.getGlobalName("sub/_/langs"), "langs")
-		assert.equal(Directory.getGlobalName("sub/_/langs.yaml"), "langs")
-		assert.equal(Directory.getGlobalName("sub/_/langs.json"), "langs")
+	describe('getGlobalName', () => {
+		it('should extract global variable name correctly', () => {
+			assert.equal(Directory.getGlobalName('_/langs'), 'langs')
+			assert.equal(Directory.getGlobalName('_/langs.yaml'), 'langs')
+			assert.equal(Directory.getGlobalName('_/langs.json'), 'langs')
+			assert.equal(Directory.getGlobalName('_/sub/folder.json'), 'folder')
+		})
+
+		it('should return empty string for non-global paths', () => {
+			assert.equal(Directory.getGlobalName('langs'), '')
+			assert.equal(Directory.getGlobalName('langs.yaml'), '')
+			assert.equal(Directory.getGlobalName('langs.json'), '')
+			assert.equal(Directory.getGlobalName('sub/folder.json'), '')
+		})
+
+		it('should extract global variable name from nested paths', () => {
+			assert.equal(Directory.getGlobalName('sub/_/langs'), 'langs')
+			assert.equal(Directory.getGlobalName('sub/_/langs.yaml'), 'langs')
+			assert.equal(Directory.getGlobalName('sub/_/langs.json'), 'langs')
+		})
+
+		it('should handle edge cases', () => {
+			assert.equal(Directory.getGlobalName('_/'), '')
+			assert.equal(Directory.getGlobalName('_/index.txt'), '')
+			assert.equal(Directory.getGlobalName('sub/_/'), '')
+			assert.equal(Directory.getGlobalName(null), '')
+			assert.equal(Directory.getGlobalName(undefined), '')
+		})
+	})
+
+	describe('isDirectory', () => {
+		it('should return true for directory paths ending with slash', () => {
+			assert.strictEqual(Directory.isDirectory('folder/'), true)
+			assert.strictEqual(Directory.isDirectory('path/to/folder/'), true)
+			assert.strictEqual(Directory.isDirectory('/'), true)
+		})
+
+		it('should return false for file paths not ending with slash', () => {
+			assert.strictEqual(Directory.isDirectory('file.txt'), false)
+			assert.strictEqual(Directory.isDirectory('path/to/file.json'), false)
+			assert.strictEqual(Directory.isDirectory(''), false)
+			assert.strictEqual(Directory.isDirectory('noextension'), false)
+		})
+
+		it('should handle edge cases', () => {
+			assert.strictEqual(Directory.isDirectory(null), false)
+			assert.strictEqual(Directory.isDirectory(undefined), false)
+			assert.strictEqual(Directory.isDirectory(123), false)
+		})
+	})
+
+	describe('entries', () => {
+		it('should return an empty array', () => {
+			const directory = new Directory()
+			assert.deepStrictEqual(directory.entries, [])
+		})
+	})
+
+	describe('entriesFn', () => {
+		it('should return a function that returns an empty array', () => {
+			const directory = new Directory()
+			assert.deepStrictEqual(directory.entriesFn(), [])
+		})
 	})
 })

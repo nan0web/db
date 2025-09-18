@@ -50,8 +50,9 @@ describe('DocumentEntry', () => {
 	})
 
 	it('should create from plain object', () => {
-		const entry = DocumentEntry.from({ name: 'test' })
-		assert.strictEqual(entry.name, 'test')
+		const entry = DocumentEntry.from({ path: 'test/dir/file.txt' })
+		assert.equal(entry.name, 'file.txt')
+		assert.equal(entry.depth, 3)
 		assert.ok(entry instanceof DocumentEntry)
 	})
 })

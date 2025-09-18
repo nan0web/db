@@ -87,9 +87,6 @@ export default class DB {
 		// And DB is base local storage interface
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map(from => DB.from(from))
-		if (!this.dbs.every(d => d instanceof DB)) {
-			throw new Error("Not all items in dbs are DB instances")
-		}
 		this.predefined = new Map(predefined)
 		this.#console.info("DB instance created", { root: this.root, cwd: this.cwd })
 	}
@@ -427,9 +424,7 @@ export default class DB {
 		await this.requireConnected()
 		if (!this.loaded) {
 			this.#console.debug("Loading DB for find operation")
-			for await (const element of this.readDir(this.root, { depth: depth + 1 })) {
-				yield element.path
-			}
+			for await (const element of this.readDir(this.root, { depth: depth + 1 })) {}
 			this.meta.set("?loaded", new DocumentStat())
 		}
 		if ("function" === typeof uri) {
@@ -673,7 +668,7 @@ export default class DB {
 	 * @returns {string} Absolute path
 	 */
 	absolute(...args) {
-		this.#console.debug("Getting absolute path", { args });
+		this.#console.debug("Getting absolute path", { args })
 
 		// If cwd contains URL scheme (http://, https://, file://, etc.)
 		if (this.isRemote(this.cwd)) {
@@ -748,7 +743,7 @@ export default class DB {
 		stat.mtimeMs = Date.now()
 		stat.size = Buffer.byteLength(JSON.stringify(document))
 		this.meta.set(abs, stat)
-		this._updateIndex(abs)
+		await this._updateIndex(abs)
 		return true
 	}
 
@@ -803,6 +798,8 @@ export default class DB {
 	async dropDocument(uri) {
 		this.#console.debug("Dropping document", { uri })
 		await this.ensureAccess(uri, "d")
+		this.data.delete(uri)
+		this.meta.delete(uri)
 		return false
 	}
 
@@ -865,6 +862,9 @@ export default class DB {
 		await this.ensureAccess(from, "r")
 		const data = await this.loadDocument(from)
 		await this.saveDocument(to, data)
+		await this.dropDocument(from)
+		const abs = this.normalize(await this.resolve(from))
+		await this._updateIndex(abs)
 		return true
 	}
 
@@ -1378,11 +1378,9 @@ export default class DB {
 
 		// Use DirectoryIndex for encoding
 		const Index = this.Index || DirectoryIndex
-		const index = new Index({
-			entriesAs: Index.ENTRIES_AS_TEXT,
-		})
+		const index = new Index({ entries, entriesAs: Index.ENTRIES_AS_OBJECT })
 
-		const text = index.encode(entries, Index.ENTRIES_AS_TEXT)
+		const text = index.encode({ target: Index.ENTRIES_AS_TEXT })
 		await this.saveDocument(indexPathTXT, text)
 
 		// Generate JSONL: one object per line
@@ -1398,65 +1396,173 @@ export default class DB {
 	}
 
 	/**
+	 * @private
+	 * Auto-updates index.jsonl and index.txt after document save for all parent directories
+	 * @param {string} uri - URI of saved document
+	 * @returns {Promise<void>}
+	 */
+	async _updateIndex2(uri) {
+		const base = this.basename(uri)
+		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
+			return
+		}
+		const indexUris = DirectoryIndex.getIndexesToUpdate(this, uri)
+		for (const indexPath of indexUris) {
+			const dirPath = this.dirname(indexPath)
+			const entries = DirectoryIndex.getDirectoryEntries(this, dirPath)
+			await this.saveIndex(dirPath, entries)
+		}
+		this.#console.debug("All parent indexes updated", {
+			uri,
+			indexesUpdated: indexUris.length,
+			paths: indexUris
+		})
+	}
+
+	/**
+	 * @private
+	 * Auto-updates both types of indexes after document save:
+	 * - index.txt: contains only immediate children with basic stats
+	 * - index.jsonl: contains full recursive directory structure
+	 *
+	 * This allows for:
+	 * 1. Quick loading of immediate directory content via index.txt
+	 * 2. Deep traversal without multiple requests via index.jsonl
+	 *
+	 * @param {string} uri - URI of saved document
+	 * @param {boolean} [recursive] - Force recursive index update
+	 * @returns {Promise<void>}
+	 */
+	async _updateIndexes(uri, recursive = false) {
+		// Skip if URI is index file itself
+		const base = this.basename(uri);
+		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
+			return;
+		}
+
+		// First update immediate directory's index.txt
+		await this._updateImmediateIndex(uri);
+
+		// Only update index.jsonl if:
+		// 1. Changed file is deep enough to affect higher levels
+		// 2. Recursive flag is set
+		// 3. This is manually requested
+		const dirLevel = this.dirname(uri).split('/').filter(Boolean).length;
+		if (dirLevel === 0 || recursive) {
+			await this._updateRecursiveIndex();
+		}
+	}
+
+	/**
+	 * @private
+	 * Updates index.txt with just immediate directory entries
+	 * @param {string} uri - URI of changed document
+	 * @returns {Promise<void>}
+	 */
+	async _updateImmediateIndex(uri) {
+		const dirPath = this.dirname(uri);
+		const entries = DirectoryIndex.getDirectoryEntries(this, dirPath);
+
+		// Save as index.txt (rows format)
+		const indexPathTXT = this.resolveSync(dirPath, this.Index.INDEX);
+		const indexTXT = new DirectoryIndex({
+			entries,
+			entriesAs: DirectoryIndex.ENTRIES_AS_ROWS,
+			entriesColumns: ['name', 'mtimeMs.36', 'size.36']
+		});
+
+		await this.saveDocument(indexPathTXT, indexTXT.encode());
+	}
+
+	/**
+	 * @private
+	 * Updates the full recursive index (index.jsonl)
+	 * @returns {Promise<void>}
+	 */
+	async _updateRecursiveIndex() {
+		// Get a complete tree structure
+		const fullEntries = [];
+		await this._buildDirectoryTree('.', fullEntries);
+
+		// Save as index.jsonl (full format)
+		const indexPathJSONL = this.resolveSync('.', this.Index.FULL_INDEX);
+		const indexJSONL = new DirectoryIndex({
+			entries: fullEntries,
+			entriesAs: DirectoryIndex.ENTRIES_AS_ARRAY,
+			entriesColumns: ['name', 'mtimeMs.36', 'size.36', 'depth']
+		});
+
+		await this.saveDocument(indexPathJSONL, indexJSONL.encode({
+			target: DirectoryIndex.ENTRIES_AS_TEXT
+		}));
+	}
+
+	/**
+	 * @private
+	 * Recursively builds directory tree
+	 * @param {string} dirPath - Current directory path
+	 * @param {Array<[string, DocumentStat]>} entries - Accumulator for entries
+	 * @param {number} depth - Current depth level
+	 * @returns {Promise<void>}
+	 */
+	async _buildDirectoryTree(dirPath, entries, depth = 0) {
+		const immediateEntries = DirectoryIndex.getDirectoryEntries(this, dirPath);
+
+		for (const [name, stat] of immediateEntries) {
+			const fullPath = dirPath === '.' ? name : this.resolveSync(dirPath, name);
+			const entryStat = {
+				...stat,
+				depth,
+				name: fullPath
+			};
+
+			entries.push([fullPath, new DocumentStat(entryStat)]);
+
+			if (name.endsWith('/') && name !== '.') {
+				await this._buildDirectoryTree(fullPath, entries, depth + 1);
+			}
+		}
+	}
+
+	/**
 	 * Saves index data to both index.jsonl and index.txt files
 	 * @param {string} dirUri Directory URI where indexes should be saved
-	 * @param {Array<DocumentEntry>} entries Document entries to index
+	 * @param {Array<[string, DocumentStat]>} [entries] Document entries with their paths, if not provided this.meta is used.
 	 * @returns {Promise<void>}
 	 */
 	async saveIndex(dirUri, entries) {
+		if (!entries) {
+			const base = this.normalize(dirUri)
+			entries = Array.from(this.meta.entries()).filter(
+				([uri]) => uri.startsWith(base)
+			)
+		}
 		const indexPathJSONL = this.resolveSync(dirUri, this.Index.FULL_INDEX)
 		const indexPathTXT = this.resolveSync(dirUri, this.Index.INDEX)
 
-		// Prepare data for JSONL format
-		const jsonlContent = entries.map(entry => JSON.stringify({
-			name: entry.name,
-			mtimeMs: entry.stat.mtimeMs,
-			size: entry.stat.size,
-			type: entry.stat.isFile ? 'F' : entry.stat.isDirectory ? 'D' : '?',
-		})).join('\n')
+		const index = this.Index.from({ entries, entriesAs: this.Index.ENTRIES_AS_OBJECT })
 
-		// Save JSONL index
-		await this.saveDocument(indexPathJSONL, jsonlContent)
-
-		// Use DirectoryIndex for encoding TXT format
-		const index = new this.Index({
-			entriesAs: DirectoryIndex.ENTRIES_AS_TEXT,
-		})
-
-		const txtContent = index.encode(entries.map(e => [e.name, e.stat]), DirectoryIndex.ENTRIES_AS_TEXT)
-
-		// Save TXT index
-		await this.saveDocument(indexPathTXT, txtContent)
+		await this.saveDocument(indexPathJSONL, index.encode({ target: this.Index.ENTRIES_AS_ARRAY }))
+		await this.saveDocument(indexPathTXT, index.encode({ target: this.Index.ENTRIES_AS_TEXT }))
 	}
 
 	/**
 	 * Loads index data from either index.jsonl or index.txt file
-	 * @param {string} dirUri Directory URI where index file is located
-	 * @returns {Promise<Array<DocumentEntry>>} Array of document entries or null if no index found
+	 * @param {string} [dirUri] Directory URI where index file is located
+	 * @returns {Promise<DirectoryIndex>} Index data.
 	 */
-	async loadIndex(dirUri) {
+	async loadIndex(dirUri = ".") {
 		const indexPathJSONL = this.resolveSync(dirUri, this.Index.FULL_INDEX)
 		const indexPathTXT = this.resolveSync(dirUri, this.Index.INDEX)
 
 		// Try loading JSONL index first
 		try {
-			const lines = await this.loadDocument(indexPathJSONL, [])
-			if (!lines.length) {
+			const entries = await this.loadDocument(indexPathJSONL, [])
+			if (!entries.length) {
 				throw new Error("Empty jsonl index")
 			}
-			return lines.map(data => {
-				const stat = new DocumentStat({
-					mtimeMs: data.mtimeMs,
-					size: data.size,
-					isFile: 'F' === data.type,
-					isDirectory: 'D' === data.type,
-				})
-				return new DocumentEntry({
-					name: data.name,
-					stat,
-					path: this.resolveSync(dirUri, data.name),
-				})
-			})
+			const index = this.Index.from({ entries })
+			return index
 		} catch (err) {
 			// JSONL not found or invalid, try TXT
 		}
@@ -1465,24 +1571,15 @@ export default class DB {
 		try {
 			const txtContent = await this.loadDocument(indexPathTXT, null)
 			if (txtContent) {
-				const index = new this.Index({
-					entriesAs: DirectoryIndex.ENTRIES_AS_TEXT,
-				})
-				const stats = index.decode(txtContent, DirectoryIndex.ENTRIES_AS_TEXT)
-				return stats.map(([name, stat]) => {
-					return new DocumentEntry({
-						name,
-						stat: DocumentStat.from(stat),
-						path: this.resolveSync(dirUri, name),
-					})
-				})
+				const index = new this.Index({ entries: txtContent, entriesAs: DirectoryIndex.ENTRIES_AS_TEXT })
+				return index
 			}
 		} catch (err) {
 			// TXT not found or invalid
 		}
 
 		// No index found
-		return []
+		return new DirectoryIndex()
 	}
 
 	/**

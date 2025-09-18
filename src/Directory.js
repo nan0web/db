@@ -1,11 +1,4 @@
 /**
- * Filter class used for filtering directory entries.
- */
-function Filter() {
-
-}
-
-/**
  * Directory class handles directory-related operations and configurations.
  *
  * @class Directory
@@ -64,12 +57,12 @@ class Directory {
 		const arr = base.split(".")
 		if (arr.length > 1) {
 			const ext = "." + arr.pop()
-			if (this.DATA_EXTNAMES.includes(ext)) return arr.join(".")
+			if (this.DATA_EXTNAMES.includes(ext)) {
+				return arr.join(".")
+			}
+			return ""
 		}
-		else if (1 === arr.length) {
-			return arr[0]
-		}
-		return ""
+		return arr[0]
 	}
 
 	/**
@@ -96,15 +89,7 @@ class Directory {
 	 * @returns {Function} A function that returns an empty array.
 	 */
 	get entriesFn() {
-		return Function()
-	}
-
-	/**
-	 * Gets the filter instance used for directory entries.
-	 * @returns {Filter} A new Filter instance.
-	 */
-	get filter() {
-		return new Filter()
+		return (() => [])
 	}
 }
 

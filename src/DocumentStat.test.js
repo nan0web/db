@@ -39,6 +39,7 @@ describe('DocumentStat', () => {
 		assert.strictEqual(stat.size, 100)
 		assert.strictEqual(stat.isFile, true)
 		assert.strictEqual(stat.mtimeMs, 1000)
+		assert.equal(stat.type, "F")
 		assert.ok(stat.error instanceof Error)
 		assert.strictEqual(stat.error.message, 'test error')
 	})
