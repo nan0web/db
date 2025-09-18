@@ -261,21 +261,32 @@ class DirectoryIndex {
 		const indexes = []
 		let currentDir = db.dirname(uri)
 
+		// Add index files for the directory containing the changed document
+		indexes.push(
+			db.resolveSync(currentDir, this.FULL_INDEX),
+			db.resolveSync(currentDir, this.INDEX)
+		)
+
+		// Traverse up the directory tree and add index files for each parent
 		while (true) {
-			indexes.push(
-				db.resolveSync(currentDir, this.FULL_INDEX),
-				db.resolveSync(currentDir, this.INDEX)
-			)
 			const parentDir = db.dirname(currentDir)
 			if (parentDir === currentDir || parentDir === '.') {
 				break
 			}
 			currentDir = parentDir
+			indexes.push(
+				db.resolveSync(currentDir, this.FULL_INDEX),
+				db.resolveSync(currentDir, this.INDEX)
+			)
 		}
+
+		// Always add root indexes
 		indexes.push(
 			db.resolveSync('.', this.FULL_INDEX),
 			db.resolveSync('.', this.INDEX)
 		)
+
+		// Remove duplicates and filter out empty strings
 		return [...new Set(indexes)].filter(Boolean)
 	}
 
@@ -283,9 +294,9 @@ class DirectoryIndex {
 	 * Get directory entries (immediate children only)
 	 * @param {import("./DB/DB.js").default} db - Database instance
 	 * @param {string} dirPath - Path of directory to get entries for
-	 * @returns {Array<[string, DocumentStat]>} Array of directory entries
+	 * @returns {Promise<Array<[string, DocumentStat]>>} Array of directory entries
 	 */
-	static getDirectoryEntries(db, dirPath) {
+	static async getDirectoryEntries(db, dirPath) {
 		const isRoot = dirPath === '.' || dirPath === '/' || dirPath === ''
 		const dirPrefix = isRoot ? '' : (dirPath.endsWith('/') ? dirPath : dirPath + '/')
 
@@ -293,35 +304,26 @@ class DirectoryIndex {
 		const entries = []
 		const files = new Set()
 
-		for (const [key, meta] of db.meta.entries()) {
-			if (this.isFullIndex(key) || this.isIndex(key)) {
-				continue
-			}
+		// Replace db.meta.entries() with db.readDir() that yields only immediate children
+		// This ensures we're working with the actual directory listing rather than raw metadata
+		const readDirStream = db.readDir(dirPath, { depth: 1 })
+		for await (const entry of readDirStream) {
+			if (this.isFullIndex(entry.name) || this.isIndex(entry.name)) continue
 
-			if (isRoot) {
-				const parts = key.split('/').filter(Boolean)
-				if (parts.length > 0 && !files.has(parts[0])) {
-					entries.push([parts[0], meta])
-					files.add(parts[0])
-				}
-				continue
-			}
+			// const absolutePath = db.resolveSync(dirPath, entry.name)
+			const itemStat = entry.stat
 
-			if (!key.startsWith(dirPrefix)) continue
-
-			const relativePath = key.substring(dirPrefix.length)
-			const firstSlashIndex = relativePath.indexOf('/')
-
-			const name = firstSlashIndex > 0 ? relativePath.substring(0, firstSlashIndex) : relativePath
-			if (name && !files.has(name)) {
-				entries.push([name, meta])
-				files.add(name)
+			if (!files.has(entry.name)) {
+				// For directories, ensure trailing slash in entry name
+				const entryName = entry.stat.isDirectory ? entry.name + '/' : entry.name
+				entries.push([entryName, itemStat.isFile || itemStat.isDirectory ? itemStat : new DocumentStat({ isFile: true })])
+				files.add(entry.name)
 			}
 		}
 
 		entries.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
 
-		return [...new Set(entries)]
+		return entries
 	}
 }
 

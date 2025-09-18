@@ -4,12 +4,6 @@ import DirectoryIndex from './DirectoryIndex.js'
 import DocumentStat from './DocumentStat.js'
 
 const basename = (path) => path.split('/').pop()
-// (path) => {
-// const parts = path.split('/')
-// return path.endsWith('/') && parts.length > 1 ?
-// parts[parts.length - 2] + '/' : parts.pop()
-// }
-
 const dirname = (path) => {
 	const parts = path.split('/').filter(part => part.length > 0)
 	return parts.slice(0, -1).join('/') || '.'
@@ -21,103 +15,125 @@ const resolveSync = (dir, name) => {
 }
 
 describe("getDirectoryEntries", () => {
-	it("returns immediate children for root directory", () => {
+	it("returns immediate children for root directory", async () => {
 		const db = {
 			basename,
-			meta: new Map([
-				['file1.txt', new DocumentStat({ size: 100, isFile: true })],
-				['dir1/', new DocumentStat({ size: 4096, isDirectory: true })],
-				['subdir/file2.txt', new DocumentStat({ size: 200, isFile: true })],
-				['index.txt', new DocumentStat({ size: 50 })],
-				['index.jsonl', new DocumentStat({ size: 75 })]
-			])
+			dirname,
+			resolveSync,
+			readDir: async function* (uri) {
+				const entries = [
+					{ path: 'file1.txt', name: 'file1.txt', stat: new DocumentStat({ size: 100, isFile: true }) },
+					{ path: 'dir1', name: 'dir1', stat: new DocumentStat({ size: 4096, isDirectory: true }) },
+					{ path: 'subdir', name: 'subdir', stat: new DocumentStat({ size: 4096, isDirectory: true }) }
+				]
+				for (const entry of entries) yield entry
+			}
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, '.')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, '.')
 		assert.strictEqual(entries.length, 3, "Should return direct children only")
 		assert.deepStrictEqual(
 			entries.map(([name]) => name).sort(),
-			['dir1', 'file1.txt', 'subdir'].sort()
+			['dir1/', 'file1.txt', 'subdir/'].sort()
 		)
 	})
 
-	it("returns immediate children for subdirectory", () => {
+	it("returns immediate children for subdirectory", async () => {
 		const db = {
-			basename, dirname,
-			meta: new Map([
-				['dir1/file1.txt', new DocumentStat({ size: 100, isFile: true })],
-				['dir1/subdir/', new DocumentStat({ isDirectory: true })],
-				['dir1/subdir/file2.txt', new DocumentStat({ size: 200, isFile: true })],
-				['dir1/index.txt', new DocumentStat({ size: 50 })],
-				['dir1/index.jsonl', new DocumentStat({ size: 75 })]
-			])
+			basename,
+			dirname,
+			resolveSync,
+			readDir: async function* (uri) {
+				const entries = [
+					{ path: 'dir1/file1.txt', name: 'file1.txt', stat: new DocumentStat({ size: 100, isFile: true }) },
+					{ path: 'dir1/subdir', name: 'subdir', stat: new DocumentStat({ isDirectory: true }) }
+				]
+				for (const entry of entries) yield entry
+			}
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, 'dir1/')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, 'dir1/')
 		assert.strictEqual(entries.length, 2, "Should return direct children only")
 		assert.deepStrictEqual(
 			entries.map(([name]) => name).sort(),
-			['file1.txt', "subdir"].sort()
+			['file1.txt', "subdir/"].sort()
 		)
 	})
 
-	it("ignores index files when collecting entries", () => {
+	it("ignores index files when collecting entries", async () => {
 		const db = {
 			basename,
-			meta: new Map([
-				['dir1/file1.txt', new DocumentStat({ size: 100 })],
-				['dir1/index.txt', new DocumentStat({ size: 50 })],
-				['dir1/index.jsonl', new DocumentStat({ size: 75 })]
-			])
+			dirname,
+			resolveSync,
+			readDir: async function* (uri) {
+				const entries = [
+					{ path: 'dir1/file1.txt', name: 'file1.txt', stat: new DocumentStat({ size: 100 }) },
+					{ path: 'dir1/index.txt', name: 'index.txt', stat: new DocumentStat({ size: 50 }) },
+					{ path: 'dir1/index.jsonl', name: 'index.jsonl', stat: new DocumentStat({ size: 75 }) }
+				]
+				for (const entry of entries) yield entry
+			}
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, 'dir1/')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, 'dir1/')
 		assert.strictEqual(entries.length, 1, "Index files should be ignored")
 		assert.strictEqual(entries[0][0], 'file1.txt')
 	})
 
-	it("sorts entries alphabetically with trailing slashes", () => {
+	it("sorts entries alphabetically with trailing slashes", async () => {
 		const db = {
 			basename,
-			meta: new Map([
-				['zfile.txt', new DocumentStat({ size: 100 })],
-				['afile.txt', new DocumentStat({ size: 200 })],
-				['bdir/', new DocumentStat({ size: 4096, isDirectory: true })]
-			])
+			dirname,
+			resolveSync,
+			readDir: async function* (uri) {
+				const entries = [
+					{ path: 'zfile.txt', name: 'zfile.txt', stat: new DocumentStat({ size: 100 }) },
+					{ path: 'afile.txt', name: 'afile.txt', stat: new DocumentStat({ size: 200 }) },
+					{ path: 'bdir', name: 'bdir', stat: new DocumentStat({ size: 4096, isDirectory: true }) }
+				]
+				for (const entry of entries) yield entry
+			}
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, '.')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, '.')
 		assert.deepStrictEqual(
 			entries.map(([name]) => name),
-			['afile.txt', 'bdir', 'zfile.txt']
+			['afile.txt', 'bdir/', 'zfile.txt']
 		)
 	})
 
-	it("handles special characters in filenames correctly", () => {
+	it("handles special characters in filenames correctly", async () => {
 		const db = {
 			basename,
-			meta: new Map([
-				['special file!.txt', new DocumentStat({ size: 512, mtimeMs: 1625097600000 })],
-				['directory with spaces/', new DocumentStat({ isDirectory: true })],
-				['ümlaut_file.txt', new DocumentStat({ size: 1024 })]
-			])
+			dirname,
+			resolveSync,
+			readDir: async function* (uri) {
+				const entries = [
+					{ path: 'special file!.txt', name: 'special file!.txt', stat: new DocumentStat({ size: 512, mtimeMs: 1625097600000 }) },
+					{ path: 'directory with spaces', name: 'directory with spaces', stat: new DocumentStat({ size: 4096, isDirectory: true }) },
+					{ path: 'ümlaut_file.txt', name: 'ümlaut_file.txt', stat: new DocumentStat({ size: 1024 }) }
+				]
+				for (const entry of entries) yield entry
+			}
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, '.')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, '.')
 		assert.strictEqual(entries.length, 3)
 		assert.deepStrictEqual(
 			entries.map(([name]) => name).sort(),
-			['directory with spaces', 'special file!.txt', 'ümlaut_file.txt'].sort()
+			['directory with spaces/', 'special file!.txt', 'ümlaut_file.txt'].sort()
 		)
 	})
 
-	it("returns empty array for non-existing directory", () => {
+	it("returns empty array for non-existing directory", async () => {
 		const db = {
 			basename,
-			meta: new Map()
+			dirname,
+			resolveSync,
+			readDir: async function* () { }
 		}
 
-		const entries = DirectoryIndex.getDirectoryEntries(db, 'nonexistent/')
+		const entries = await DirectoryIndex.getDirectoryEntries(db, 'nonexistent/')
 		assert.deepStrictEqual(entries, [])
 	})
 })
