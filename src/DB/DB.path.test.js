@@ -30,6 +30,11 @@ suite("DB URI Core", () => {
 	})
 
 	describe("normalize", () => {
+		it("normalizes abolute", () => {
+			const db = new DB()
+			assert.strictEqual(db.normalize("/a"), "a")
+		})
+
 		it("normalizes dot segments", () => {
 			const db = new DB()
 			assert.strictEqual(db.normalize("a/./b"), "a/b")
@@ -67,8 +72,8 @@ suite("DB URI Core", () => {
 
 		it("should normalize path with //", () => {
 			const db = new DB()
-			assert.equal(db.normalize("/root", "/dir", "file.txt"), "/root/dir/file.txt")
-			assert.equal(db.normalize("/root", "/dir", "..", "file.txt"), "/root/file.txt")
+			assert.equal(db.normalize("/root", "/dir", "file.txt"), "root/dir/file.txt")
+			assert.equal(db.normalize("/root", "/dir", "..", "file.txt"), "root/file.txt")
 			assert.equal(db.normalize("playground/_/", "..", "_"), "playground/_")
 			assert.equal(db.normalize("playground/_", "..", "_"), "playground/_")
 		})
@@ -245,7 +250,7 @@ suite("DB URI Core", () => {
 			const extracted = db.extract('dir/')
 			const file1 = await extracted.loadDocument('file1.txt', "")
 			const file2 = await extracted.fetch('file2.txt')
-			assert.strictEqual(extracted.root, '/root/dir/')
+			assert.strictEqual(extracted.root, 'root/dir/')
 			assert.strictEqual(extracted.data.size, 2)
 			assert.strictEqual(extracted.meta.size, 3)
 			assert.strictEqual(file1, "content1")
@@ -278,6 +283,14 @@ suite("DB URI Core", () => {
 			const result = db.relative("root/api", "/root2/")
 			assert.strictEqual(result, "/root2/")
 		})
+
+		it.todo('should navigate sibling directories', () => {
+			const db = new DB()
+			const from = '/api/users/list'
+			const to = '/api/posts/recent'
+			assert.strictEqual(db.relative(from, to), '../posts/recent')
+		})
+
 	})
 
 	describe("absolute", () => {

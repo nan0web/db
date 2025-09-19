@@ -1134,11 +1134,11 @@ suite("DB", () => {
 		})
 
 		it('should resolve fragment references', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			const db = new DB()
+			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
 			const data = { key: '$ref:ref.json#prop/subprop' }
 
-			const result = await dbInstance.resolveReferences(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { key: 'resolved' })
 		})
 

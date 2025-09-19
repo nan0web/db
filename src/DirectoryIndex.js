@@ -169,6 +169,12 @@ class DirectoryIndex {
 	 * @returns {Array<[string, DocumentStat]>} Decoded entries
 	 */
 	decode({ source = this.entries, target = this.entriesAs } = {}) {
+		if (Array.isArray(source)) {
+			if (!source.length) return source
+			if (source.every(([uri, stat]) => "string" === typeof uri && stat instanceof DocumentStat)) {
+				return source
+			}
+		}
 		if (target === this.ENTRIES_AS_TEXT) {
 			if (typeof source !== 'string') {
 				throw new TypeError([
@@ -191,9 +197,6 @@ class DirectoryIndex {
 
 			return source.map(row => {
 				const values = Array.isArray(row) ? row : [row]
-				if ("string" === typeof values[0] && values[1] && values[1] instanceof DocumentStat) {
-					return [String(values[0]), DocumentStat.from(values[1])]
-				}
 				const stat = {}
 				let name = ""
 

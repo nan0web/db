@@ -7,7 +7,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc",
-		"test": "node --test",
+		"test": "node --test \"src/**/*.test.js\"",
 		"clean": "rm -rf .cache/ && rm -rf dist/",
 		"clean:modules": "rm -rf node_modules",
 		"test:docs": "node --test src/README.md.js",

@@ -433,14 +433,14 @@ export default class DB {
  * @param {string} uri - URI of saved document
  * @returns {Promise<void>}
  */
-    private _updateIndex;
+    private _updateIndex0;
     /**
      * @private
      * Auto-updates index.jsonl and index.txt after document save for all parent directories
      * @param {string} uri - URI of saved document
      * @returns {Promise<void>}
      */
-    private _updateIndex2;
+    private _updateIndex;
     /**
      * @private
      * Auto-updates both types of indexes after document save:

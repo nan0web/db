@@ -87,7 +87,7 @@ export default class DB {
 		// And DB is base local storage interface
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map(from => DB.from(from))
-		this.predefined = new Map(predefined)
+		this.predefined = predefined instanceof Map ? predefined : new Map(predefined)
 		this.#console.info("DB instance created", { root: this.root, cwd: this.cwd })
 	}
 
@@ -315,23 +315,25 @@ export default class DB {
 		const dirUri = await this.resolve(uri)
 
 		const indexPath = this.resolveSync(dirUri, 'index.jsonl')
-		if (depth < 0 && this.data.has(indexPath)) {
-			const index = this.data.get(indexPath)
-			const list = Array.isArray(index) ? index : []
-			for (const item of list) {
-				const entry = new DocumentEntry(item)
-				if (!filter || filter(entry)) {
-					yield entry
+		if (depth < 0) {
+			const index = await this.loadDocument(indexPath)
+			if (index) {
+				const list = Array.isArray(index) ? index : []
+				for (const item of list) {
+					const entry = new DocumentEntry(item)
+					if (!filter || filter(entry)) {
+						yield entry
+					}
 				}
+				return
 			}
-			return
 		}
 
 		const indexTxtPath = this.resolveSync(dirUri, 'index.txt')
-		if (this.data.has(indexTxtPath)) {
-			const source = this.data.get(indexTxtPath)
-			const index = new DirectoryIndex()
-			const list = index.decode({ source, target: DirectoryIndex.ENTRIES_AS_TEXT })
+		const entries = await this.loadDocument(indexTxtPath, "")
+		if (entries) {
+			const index = new DirectoryIndex({ entries, entriesAs: DirectoryIndex.ENTRIES_AS_TEXT })
+			const list = index.decode()
 			for (const [name, stat] of list) {
 				const path = this.resolveSync(dirUri, name)
 				const entry = new DocumentEntry({ path, name: name, stat: stat })
@@ -582,9 +584,12 @@ export default class DB {
 		if (args.length > 0 && args[args.length - 1].endsWith("/") && result !== "") {
 			result += "/"
 		}
-		if (startsWithSlash) {
-			result = "/" + result
+		if (result.startsWith("/")) {
+			result = result.slice(1)
 		}
+		// if (startsWithSlash) {
+		// 	result = "/" + result
+		// }
 
 		return result || (startsWithSlash ? "/" : "")
 	}
@@ -1350,7 +1355,7 @@ export default class DB {
  * @param {string} uri - URI of saved document
  * @returns {Promise<void>}
  */
-	async _updateIndex(uri) {
+	async _updateIndex0(uri) {
 		const base = this.basename(uri)
 		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
 			return
@@ -1401,7 +1406,7 @@ export default class DB {
 	 * @param {string} uri - URI of saved document
 	 * @returns {Promise<void>}
 	 */
-	async _updateIndex2(uri) {
+	async _updateIndex(uri) {
 		const base = this.basename(uri)
 		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
 			return
