@@ -295,7 +295,8 @@ export default class DB {
 		const total = this.meta.size
 		let current = 0
 		const updatedURIs = []
-		for (const [uri] of this.meta.entries()) {
+		for (const [uri, stat] of this.meta.entries()) {
+			if (!stat.isFile) continue
 			const data = await this.loadDocument(uri)
 			current++
 			try {
