@@ -102,6 +102,7 @@ suite("DB index functions", () => {
 	describe('buildIndexes', () => {
 		it('should build index files for deep structure', async () => {
 			const db = new DB({
+				root: "dist",
 				predefined: [
 					['level1.json', { value: 'level1' }],
 					['dir1/level2.json', { value: 'level2' }],

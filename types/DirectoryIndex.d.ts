@@ -1,10 +1,16 @@
 export default DirectoryIndex;
 declare class DirectoryIndex {
-    static ENTRIES_AS_TXT: string;
-    static ENTRIES_AS_TXTL: string;
     static COLUMNS: string[];
     static FULL_INDEX: string;
     static INDEX: string;
+    /**
+     * Encodes into string rows
+     * @param {Array<[string, DocumentStat]>} entries - Entries to encode
+     * @param {string[]} [columns=this.COLUMNS] - Columns to return
+     * @param {boolean} [inc=false] - Is path incremental or full
+     * @returns {string[]}
+     */
+    static encodeRows(entries: Array<[string, DocumentStat]>, columns?: string[] | undefined, inc?: boolean | undefined): string[];
     /**
      * Checks if a given path represents an index.
      * @param {string} path
@@ -46,89 +52,50 @@ declare class DirectoryIndex {
      */
     static _getAllEntriesFallback(db: import("./DB/DB.js").default, dirPath: string): Promise<Array<[string, DocumentStat]>>;
     /**
+     * Decodes entries from stored format back to [name, DocumentStat] pairs and returns them in the index
+     * @param {string|object} source - Source data to decode
+     * @returns {DirectoryIndex}
+     */
+    static decode(source: string | object): DirectoryIndex;
+    /**
      * Creates DirectoryIndex instance from input
      * @param {object|DirectoryIndex} input
      * @returns {DirectoryIndex}
      */
     static from(input: object | DirectoryIndex): DirectoryIndex;
     /**
-     * @param {object} input
-     * @param {Array<[string, DocumentStat]> | string[][] | string[] | string} [input.entries=[]]
-     * @param {string} [input.entriesAs=DirectoryIndex.ENTRIES_AS_TXT]
-     */
-    constructor(input?: {
-        entries?: string | string[] | string[][] | [string, DocumentStat][] | undefined;
-        entriesAs?: string | undefined;
-    });
-    /** @type {string[]} */
-    entriesColumns: string[];
-    /** @type {string} */
-    entriesAs: string;
-    /** @type {Array<[string, DocumentStat]>} */
-    entries: Array<[string, DocumentStat]>;
-    /** @returns {string} */
-    get ENTRIES_AS_TXT(): string;
-    /** @returns {string} */
-    get ENTRIES_AS_TXTL(): string;
-    /**
-     * Encodes entries as simple space-separated rows (for immediate directory)
-     * @param {Array<[string, DocumentStat]>} entries - Entries to encode
-     * @returns {string[]} Encoded rows
-     */
-    encodeIntoTxt(entries: Array<[string, DocumentStat]>): string[];
-    /**
-     * Encodes entries using contextual hierarchical format (optimized)
-     * @param {Array<[string, DocumentStat]>} entries - Entries to encode
-     * @returns {string[]} Contextual encoded rows
-     */
-    encodeIntoTxtl(entries: Array<[string, DocumentStat]>): string[];
-    /**
-     * Returns the directory context for a path
+     * Returns directory for current path.
      * @param {string} path
      * @returns {string}
      */
-    _getPathContext(path: string): string;
+    static dirname(path: string): string;
     /**
-     * Calculates statistics for a directory context
-     * @param {Array<[string, DocumentStat]>} entries
-     * @param {string} context
-     * @returns {DocumentStat}
+     * @param {object} input
+     * @param {Array<[string, DocumentStat]>} [input.entries=[]]
+     * @param {string[]} [input.columns=DirectoryIndex.COLUMNS]
      */
-    _calculateContextStat(entries: Array<[string, DocumentStat]>, context: string): DocumentStat;
-    /**
-     * Safely encodes a value
-     * @param {DocumentStat} stat
-     * @param {string} field
-     * @param {number} radix
-     * @returns {string}
-     */
-    _encodeValue(stat: DocumentStat, field: string, radix: number): string;
+    constructor(input?: {
+        entries?: [string, DocumentStat][] | undefined;
+        columns?: string[] | undefined;
+    });
+    /** @type {string[]} */
+    columns: string[];
+    /** @type {Array<[string, DocumentStat]>} */
+    entries: Array<[string, DocumentStat]>;
     /**
      * Encodes entries according to specified format
      * @param {Object} [input]
      * @param {Array<[string, DocumentStat]>} [input.entries=this.entries] - Entries to encode
+     * @param {string} [input.dir="."] - Directory to start with.
+     * @param {boolean} [input.long=false] - Generates all the children maps if long is TRUE, otherwise only current directory.
+     * @param {boolean} [input.inc=false] - If TRUE, uses incremental path format (no duplicate dir prefixes)
      * @returns {string} Encoded entries as a string
      */
-    encode({ entries }?: {
+    encode({ entries, dir, long, inc }?: {
         entries?: [string, DocumentStat][] | undefined;
+        dir?: string | undefined;
+        long?: boolean | undefined;
+        inc?: boolean | undefined;
     } | undefined): string;
-    /**
-     * Decodes entries from stored format back to [name, DocumentStat] pairs
-     * @param {any|Array<[string, DocumentStat]>} source - Source data to decode
-     * @returns {Array<[string, DocumentStat]>} Decoded entries
-     */
-    decode(source: any | Array<[string, DocumentStat]>): Array<[string, DocumentStat]>;
-    /**
-     * Decodes flat single-level format (txt)
-     * @param {string} source
-     * @returns {Array<[string, DocumentStat]>}
-     */
-    _decodeTxt(source: string): Array<[string, DocumentStat]>;
-    /**
-     * Decodes contextual hierarchical format (txtl)
-     * @param {string} source
-     * @returns {Array<[string, DocumentStat]>}
-     */
-    _decodeTxtl(source: string): Array<[string, DocumentStat]>;
 }
 import DocumentStat from "./DocumentStat.js";

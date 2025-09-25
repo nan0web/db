@@ -378,6 +378,7 @@ export default class DB {
 	 * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
 	 * @param {boolean} [options.includeDirs=false] - Whether to skip or include directories.
 	 * @param {boolean} [options.skipSymbolicLink=false] - Whether to skip symbolic links
+	 * @param {boolean} [options.skipIndex=false] - Whether to skip saved indexed
 	 * @param {Function} [options.filter] - A filter function to apply to directory entries
 	 * @yields {DocumentEntry}
 	 * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
@@ -386,6 +387,7 @@ export default class DB {
 		const {
 			skipStat = false,
 			skipSymbolicLink = false,
+			skipIndex = false,
 			includeDirs = false,
 			filter,
 			depth = -1,
@@ -395,41 +397,42 @@ export default class DB {
 
 		const dirUri = await this.resolve(uri)
 
-		const indexPath = this.resolveSync(this.Index.FULL_INDEX)
-		if (depth < 0) {
-			const entries = await this.loadDocument(indexPath)
+		if (!skipIndex) {
+			const indexPath = this.resolveSync(this.Index.FULL_INDEX)
+			if (depth < 0) {
+				const entries = await this.loadDocument(indexPath)
+				if (entries) {
+					const index = DirectoryIndex.decode(entries)
+					for (const [path, stat] of index.entries) {
+						const entry = new DocumentEntry({ path, stat })
+						if (!filter || filter(entry)) {
+							yield entry
+						}
+					}
+					return
+				}
+			}
+			const indexTxtPath = this.resolveSync(dirUri, this.Index.INDEX)
+			const entries = await this.loadDocument(indexTxtPath, "")
 			if (entries) {
 				const index = DirectoryIndex.decode(entries)
-				for (const [path, stat] of index.entries) {
-					const entry = new DocumentEntry({ path, stat })
+				for (const [name, stat] of index.entries) {
+					const path = this.resolveSync(dirUri, name)
+					const entry = new DocumentEntry({ path, name: name, stat: stat })
 					if (!filter || filter(entry)) {
 						yield entry
 					}
 				}
-				return
-			}
-		}
-
-		const indexTxtPath = this.resolveSync(dirUri, this.Index.INDEX)
-		const entries = await this.loadDocument(indexTxtPath, "")
-		if (entries) {
-			const index = DirectoryIndex.decode(entries)
-			for (const [name, stat] of index.entries) {
-				const path = this.resolveSync(dirUri, name)
-				const entry = new DocumentEntry({ path, name: name, stat: stat })
-				if (!filter || filter(entry)) {
-					yield entry
-				}
-			}
-			if (Math.abs(depth) > 0) {
-				for (const [name, item] of index.entries) {
-					if (item.isDirectory) {
-						const subdir = this.resolveSync(dirUri, name)
-						yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+				if (Math.abs(depth) > 0) {
+					for (const [name, item] of index.entries) {
+						if (item.isDirectory) {
+							const subdir = this.resolveSync(dirUri, name)
+							yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+						}
 					}
 				}
+				return
 			}
-			return
 		}
 
 		try {
@@ -1468,9 +1471,9 @@ export default class DB {
 
 		// Use DirectoryIndex for encoding
 		const Index = this.Index || DirectoryIndex
-		const index = new Index({ entries, entriesAs: Index.ENTRIES_AS_OBJECT })
+		const index = new Index({ entries })
 
-		const text = index.encode({ target: Index.ENTRIES_AS_TEXT })
+		const text = index.encode()
 		await this.saveDocument(indexPathTXT, text)
 
 		// Generate JSONL: one object per line

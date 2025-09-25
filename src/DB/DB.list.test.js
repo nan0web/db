@@ -22,6 +22,7 @@ suite("DB", () => {
 	describe("listDir", () => {
 		it('should list directory contents correctly', async () => {
 			const db = new DB({
+				root: "dist",
 				predefined: [
 					['dir1/file1.txt', 'content1'],
 					['dir1/file2.txt', 'content2'],
@@ -59,6 +60,7 @@ suite("DB", () => {
 
 		it('should yield directory entries', async () => {
 			const db = new DB({
+				root: "dist",
 				predefined: [
 					['file1.txt', 'content1'],
 					['file2.txt', 'content2']
@@ -99,6 +101,7 @@ suite("DB", () => {
 
 		it('should read index.txtl at depth 0', async () => {
 			const db = new DB({
+				root: "dist",
 				predefined: [
 					['index.txtl', `columns: name, mtimeMs.36, size.36
 long
@@ -139,6 +142,7 @@ dir/sub.json h7v37u 5k`]
 
 		it('should read with depth 1 to include subdirectories', async () => {
 			const db = new DB({
+				root: "data",
 				predefined: [
 					['dir1/index.txt', 'file1.txt mecxlwg9 8x\nfile2.txt mecvlwg9 8c\nsubdir/ mecvlwg9 0'],
 					['dir1/subdir/index.txt', 'nested.json mecxlwg9 8x'],
@@ -162,6 +166,7 @@ dir/sub.json h7v37u 5k`]
 
 		it('should read with skipStat option', async () => {
 			const db = new DB({
+				root: "data",
 				predefined: [
 					['file1.txt', 'content1'],
 					['file2.txt', 'content2']

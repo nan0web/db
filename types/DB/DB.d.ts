@@ -126,6 +126,7 @@ export default class DB {
      * @returns {typeof GetOptions}
      */
     get GetOptions(): typeof GetOptions;
+    isRoot(dir: any): boolean;
     /**
      * Attaches another DB instance
      * @param {DB} db - Database to attach
@@ -212,6 +213,7 @@ export default class DB {
      * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
      * @param {boolean} [options.includeDirs=false] - Whether to skip or include directories.
      * @param {boolean} [options.skipSymbolicLink=false] - Whether to skip symbolic links
+     * @param {boolean} [options.skipIndex=false] - Whether to skip saved indexed
      * @param {Function} [options.filter] - A filter function to apply to directory entries
      * @yields {DocumentEntry}
      * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
@@ -221,6 +223,7 @@ export default class DB {
         skipStat?: boolean | undefined;
         includeDirs?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
+        skipIndex?: boolean | undefined;
         filter?: Function | undefined;
     }): AsyncGenerator<DocumentEntry, void, unknown>;
     /**

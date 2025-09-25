@@ -256,7 +256,7 @@ class DirectoryIndex {
 			const entries = await this.getDirectoryEntries(db, directory)
 
 			// Yield TXT index for the directory
-			const indexUri = directory === '.' ? this.INDEX : `${directory}/${this.INDEX}`
+			const indexUri = directory === '.' ? this.INDEX : `${directory}/${this.INDEX}`.replace(/\/{2,}/, "/")
 			yield [indexUri, new DirectoryIndex({ entries })]
 		}
 
@@ -281,11 +281,12 @@ class DirectoryIndex {
 	static async _getAllEntriesFallback(db, dirPath) {
 		/** @type {Array<[string, DocumentStat]>} */
 		const allEntries = []
-		const readDirStream = db.readDir(dirPath)
+		const readDirStream = db.readDir(dirPath, { skipIndex: true })
 
 		for await (const entry of readDirStream) {
 			if (!this.isFullIndex(entry.name) && !this.isIndex(entry.name)) {
-				const entryName = entry.path + (entry.stat.isDirectory ? '/' : '')
+				let entryName = entry.path
+				if (entry.stat.isDirectory && !entryName.endsWith("/")) entryName += "/"
 				allEntries.push([entryName, entry.stat])
 			}
 		}
