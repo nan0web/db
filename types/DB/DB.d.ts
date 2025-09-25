@@ -165,7 +165,40 @@ export default class DB {
      * @returns {string}
      */
     toString(): string;
-    dump(): Promise<void>;
+    /**
+     * Dumps current database into destination database.
+     * @param {DB} dest
+     * @param {object} [options]
+     * @param {({ uri, url, data, current, total }) => void} [options.onProgress]
+     * @returns {Promise<{ total: number, processed: number, ignored: number, updatedURIs: string[] }>}
+     */
+    dump(dest: DB, options?: {
+        onProgress?: (({ uri, url, data, current, total }: {
+            uri: any;
+            url: any;
+            data: any;
+            current: any;
+            total: any;
+        }) => void) | undefined;
+    } | undefined): Promise<{
+        total: number;
+        processed: number;
+        ignored: number;
+        updatedURIs: string[];
+    }>;
+    /**
+     * Build indexes inside the directory.
+     * @param {string} dir
+     */
+    buildIndexes(dir?: string): Promise<void>;
+    /**
+     *
+     * @param {string} dirPath The directory path.
+     * @param {Array<[string, DocumentStat]>} [entries=[]] Entries to extend with the files found.
+     * @param {number} [depth=0] The depth level.
+     * @returns
+     */
+    _buildRecursiveDirectoryTree(dirPath: string, entries?: [string, DocumentStat][] | undefined, depth?: number | undefined): Promise<[string, DocumentStat][]>;
     /**
      * Reads the content of a directory at the specified URI.
      * For FetchDB it loads index.txt or manifest.json.
@@ -177,6 +210,7 @@ export default class DB {
      * @param {object} options - Read directory options
      * @param {number} [options.depth=-1] - The depth to which subdirectories should be read (-1 means unlimited)
      * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
+     * @param {boolean} [options.includeDirs=false] - Whether to skip or include directories.
      * @param {boolean} [options.skipSymbolicLink=false] - Whether to skip symbolic links
      * @param {Function} [options.filter] - A filter function to apply to directory entries
      * @yields {DocumentEntry}
@@ -185,6 +219,7 @@ export default class DB {
     readDir(uri: string, options?: {
         depth?: number | undefined;
         skipStat?: boolean | undefined;
+        includeDirs?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
         filter?: Function | undefined;
     }): AsyncGenerator<DocumentEntry, void, unknown>;
@@ -388,7 +423,12 @@ export default class DB {
         skipSymbolicLink?: boolean | undefined;
         load?: boolean | undefined;
     }): AsyncGenerator<StreamEntry, void, unknown>;
-    isData(uri: any): boolean;
+    /**
+     * Returns TRUE if uri is a data file.
+     * @param {string} uri
+     * @returns {boolean}
+     */
+    isData(uri: string): boolean;
     /**
      * Gets inheritance data for a given path
      * @param {string} path - Document path
@@ -441,43 +481,6 @@ export default class DB {
      * @returns {Promise<void>}
      */
     private _updateIndex;
-    /**
-     * @private
-     * Auto-updates both types of indexes after document save:
-     * - index.txt: contains only immediate children with basic stats
-     * - index.jsonl: contains full recursive directory structure
-     *
-     * This allows for:
-     * 1. Quick loading of immediate directory content via index.txt
-     * 2. Deep traversal without multiple requests via index.jsonl
-     *
-     * @param {string} uri - URI of saved document
-     * @param {boolean} [recursive] - Force recursive index update
-     * @returns {Promise<void>}
-     */
-    private _updateIndexes;
-    /**
-     * @private
-     * Updates index.txt with just immediate directory entries
-     * @param {string} uri - URI of changed document
-     * @returns {Promise<void>}
-     */
-    private _updateImmediateIndex;
-    /**
-     * @private
-     * Updates the full recursive index (index.jsonl)
-     * @returns {Promise<void>}
-     */
-    private _updateRecursiveIndex;
-    /**
-     * @private
-     * Recursively builds directory tree
-     * @param {string} dirPath - Current directory path
-     * @param {Array<[string, DocumentStat]>} entries - Accumulator for entries
-     * @param {number} depth - Current depth level
-     * @returns {Promise<void>}
-     */
-    private _buildDirectoryTree;
     /**
      * Saves index data to both index.jsonl and index.txt files
      * @param {string} dirUri Directory URI where indexes should be saved
