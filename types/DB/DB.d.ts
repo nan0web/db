@@ -31,7 +31,7 @@ export default class DB {
      * @param {boolean} [input.connected=false]
      * @param {Map<string, any | false>} [input.data=new Map()]
      * @param {Map<string, DocumentStat>} [input.meta=new Map()]
-     * @param {Map<string, any>} [input.predefined=new Map()] - Data for memory operations.
+     * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
      * @param {DB[]} [input.dbs=[]]
      * @param {Console | NoConsole} [input.console=new NoConsole()]
      */
@@ -41,7 +41,7 @@ export default class DB {
         connected?: boolean | undefined;
         data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
-        predefined?: Map<string, any> | undefined;
+        predefined?: Map<string, any> | (readonly [string, any])[] | undefined;
         dbs?: DB[] | undefined;
         console?: Console | NoConsole | undefined;
     });
