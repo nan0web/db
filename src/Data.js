@@ -65,7 +65,7 @@ class Data {
 				if (typeof obj[key] === 'object' && null !== obj[key]) {
 					// Check if it's an empty object or array
 					if ((Array.isArray(obj[key]) && obj[key].length === 0) ||
-							(!Array.isArray(obj[key]) && Object.keys(obj[key]).length === 0)) {
+						(!Array.isArray(obj[key]) && Object.keys(obj[key]).length === 0)) {
 						res[propName] = obj[key]
 					} else {
 						Data.flatten(obj[key], propName, res)
@@ -88,19 +88,24 @@ class Data {
 	static find(path, obj) {
 		const arrPath = Array.isArray(path) ? path : path.split(this.OBJECT_DIVIDER)
 		let acc = obj
+		let i = 0
 		for (let key of arrPath) {
-			if (acc === undefined) return undefined
+			++i
+			if (acc === undefined || acc === null) return undefined
 			if (typeof key?.match === 'function') {
 				const arrayMatch = key.match(new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`))
 				if (arrayMatch) {
 					key = String(parseInt(arrayMatch[1], 10))
 				}
 			}
+			if (typeof acc !== 'object' || !Object.hasOwn(acc, key)) {
+				return undefined
+			}
 			const next = acc[key]
 			if ('object' === typeof next && null !== next) {
 				acc = next
 			} else {
-				return next
+				return i < arrPath.length ? undefined : next
 			}
 		}
 		return acc
@@ -122,8 +127,11 @@ class Data {
 			value = Data.find(parentPath, obj)
 			if (skipScalar && !['object', 'function'].includes(typeof value)) {
 				value = undefined
+				parentPath = []
+				break
 			}
 			if (undefined === value) {
+				// @todo cover with a test.
 				parentPath.pop()
 			}
 		} while (undefined === value && parentPath.length && ++i < Data.MAX_DEEP_UNFLATTEN)
@@ -155,12 +163,13 @@ class Data {
 				if (match) {
 					curr = String(parseInt(match[1], 10))
 				}
-				if (null !== next && next.match(noRegExp)) {
+				if (null !== next && next.match && next.match(noRegExp)) {
 					if (!Array.isArray(parent[curr])) parent[curr] = []
 				}
 				else if ('object' === typeof parent && null !== parent) {
 					if (null === parent[curr] || 'object' !== typeof parent[curr]) parent[curr] = {}
 				}
+				// @todo cover with a test
 				else if (parent !== result) {
 					throw new TypeError(`Element is not an object in ${path.join(Data.OBJECT_DIVIDER)}`)
 				}
@@ -173,26 +182,35 @@ class Data {
 				const match = key.match(noRegExp)
 				if (match) {
 					const curr = parseInt(match[1], 10)
+					// @todo cover with a test
 					value[curr] = data[flatKey]
 				} else {
 					value[key] = data[flatKey]
 				}
 			} else if (null !== value && 'object' === typeof value) {
+				// @todo cover with a test
 				value[key] = data[flatKey]
 			} else {
+				// @todo cover with a test
 				const parentPath = path.slice(0, -1)
 				const { value: v, path: p } = Data.findValue(parentPath, result, true)
 				if ('object' === typeof v) {
-					const path = flatKey.slice(p.join(Data.OBJECT_DIVIDER).length + 1)
+					const pathKey = flatKey.slice(p.join(Data.OBJECT_DIVIDER).length + 1)
 					const parentValue = Data.find(p, result)
 					// Check if parentValue is actually an object before trying to set property
 					if (typeof parentValue === 'object' && parentValue !== null) {
-						parentValue[path] = data[flatKey]
+						parentValue[pathKey] = data[flatKey]
 					} else {
-						throw new TypeError(`Cannot set property '${path}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`)
+						throw new TypeError(`Cannot set property '${pathKey}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`)
 					}
 				} else {
-					result[flatKey] = data[flatKey]
+					const parentValue = Data.find(path, result)
+					// @todo cover with a test
+					if (typeof parentValue === 'object' && parentValue !== null) {
+						parentValue[key] = data[flatKey]
+					} else {
+						result[flatKey] = data[flatKey]
+					}
 				}
 			}
 		}
@@ -247,12 +265,27 @@ class Data {
 		 */
 		const add = (entry, overwrite) => {
 			const [rawKey, rawVal] = entry
+
+			// Handle references $ref – merge object into parent path.
+			if (referenceKey && rawKey.endsWith(Data.OBJECT_DIVIDER + referenceKey)) {
+				const baseKey = rawKey.slice(0, -referenceKey.length - Data.OBJECT_DIVIDER.length)
+				if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal)) {
+					// @ts-ignore
+					for (const prop in rawVal) {
+						if (Object.hasOwn(rawVal, prop)) {
+							const fullKey = `${baseKey}${Data.OBJECT_DIVIDER}${prop}`
+							if (overwrite || !map.has(fullKey)) {
+								map.set(fullKey, rawVal[prop])
+							}
+						}
+					}
+				}
+				// Do not add the $ref entry itself to the map
+				return
+			}
+
 			if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal)) {
 				let baseKey = rawKey
-				// Handle references $ref – merge object into parent path.
-				if (referenceKey && rawKey.endsWith(Data.OBJECT_DIVIDER + referenceKey)) {
-					baseKey = rawKey.slice(0, -referenceKey.length - Data.OBJECT_DIVIDER.length)
-				}
 				// @ts-ignore
 				for (const prop in rawVal) {
 					if (Object.hasOwn(rawVal, prop)) {
@@ -305,9 +338,9 @@ class Data {
 	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
 		if (!Array.isArray(flat)) flat = Object.entries(Data.flatten(flat))
 		const path = "" === parentKey ? "" : parentKey + Data.OBJECT_DIVIDER
-		const keyPath = key + Data.OBJECT_DIVIDER
+		const level = key.split(Data.OBJECT_DIVIDER).length
 		return flat.filter(
-			([k]) => k.startsWith(path) && k !== key && !k.startsWith(keyPath)
+			([k]) => k.startsWith(path) && k !== key && k.split(Data.OBJECT_DIVIDER).length >= level
 		)
 	}
 
@@ -321,6 +354,10 @@ class Data {
 	 */
 	static getPathParents(path, suffix = "", avoidRoot = false) {
 		const segments = path.split('/').filter(Boolean)
+		if (segments.length === 0) {
+			return [suffix]
+		}
+
 		const result = segments.slice(0, -1).map(
 			/**
 			 * @param {*} _
@@ -329,7 +366,12 @@ class Data {
 			 */
 			(_, index) => segments.slice(0, index + 1).join('/') + suffix
 		)
-		return avoidRoot ? result : [suffix, ...result]
+
+		if (avoidRoot) {
+			return result
+		} else {
+			return [suffix, ...result]
+		}
 	}
 }
 

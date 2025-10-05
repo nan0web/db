@@ -45,6 +45,10 @@ class Directory {
 		return str.startsWith(this.GLOBALS) || str.includes(`/${this.GLOBALS}`)
 	}
 
+	static isRoot(path) {
+		return [".", "/", "./", ""].includes(path)
+	}
+
 	/**
 	 * Returns Global variable name or empty string if incorrect global path.
 	 * @param {string} path

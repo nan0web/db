@@ -7,9 +7,9 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc",
-		"test": "node --test \"src/**/*.test.js\"",
 		"clean": "rm -rf .cache/ && rm -rf dist/",
 		"clean:modules": "rm -rf node_modules",
+		"test": "node --test \"src/**/*.test.js\"",
 		"test:docs": "node --test src/README.md.js",
 		"test:release": "node --test \"releases/**/*.test.js\"",
 		"test:coverage": "node --experimental-test-coverage --test-coverage-include=\"src/**/*.js\" --test-coverage-exclude=\"src/**/*.test.js\" --test \"src/**/*.test.js\"",

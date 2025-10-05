@@ -1208,7 +1208,8 @@ export default class DB {
 			const extsToTry = this.Directory.DATA_EXTNAMES
 			for (const extension of extsToTry) {
 				const fullUri = uri + extension
-				if (this.data.has(fullUri)) {
+				const stat = await this.statDocument(fullUri)
+				if (stat.exists) {
 					return await this.fetchMerged(fullUri, opts)
 				}
 			}

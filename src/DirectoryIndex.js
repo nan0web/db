@@ -1,10 +1,12 @@
 import { FilterString } from "@nan0web/types"
 import DocumentStat from "./DocumentStat.js"
+import Directory from "./Directory.js"
 
 class DirectoryIndex {
 	static COLUMNS = ["name", "mtimeMs.36", "size.36"]
 	static FULL_INDEX = "index.txtl"
 	static INDEX = "index.txt"
+	static Directory = Directory
 
 	/** @type {string[]} */
 	columns = DirectoryIndex.COLUMNS
@@ -24,6 +26,10 @@ class DirectoryIndex {
 		} = input
 		this.entries = entries
 		this.columns = columns
+	}
+
+	get Directory() {
+		return /** @type {typeof DirectoryIndex} */ (this.constructor).Directory
 	}
 
 	/**
@@ -130,14 +136,36 @@ class DirectoryIndex {
 			for (const directory of sortedDirs) {
 				const dirEntries = entriesByDir.get(directory)
 
-				// Add context line for directories other than root
+				// In full path mode, directory context lines use full paths
+				// In incremental mode, directory context lines are relative to current context
 				if (directory !== ".") {
-					lines.push(directory + "/")
+					if (inc) {
+						// In incremental mode, only show relative part
+						if (this.Directory.isRoot(currentContext)) {
+							lines.push(directory + "/")
+						}
+						else {
+							if (directory.startsWith(currentContext + "/")) {
+								lines.push(directory.slice(currentContext.length + 1) + "/")
+							}
+							else {
+								lines.push("/" + directory + "/")
+							}
+						}
+					} else {
+						// In full path mode, show full directory path
+						lines.push(directory + "/")
+					}
 				}
 
-				// Encode each entry in this directory, removing directory prefix from entry name
+				// For entries, use incremental names in incremental mode, full names in full mode
 				const rows = DirectoryIndex.encodeRows(dirEntries, this.columns, inc)
 				lines.push(...rows)
+
+				// Update currentContext for incremental mode
+				if (inc) {
+					currentContext = directory
+				}
 			}
 		} else {
 			// Simple flat format - just encode each entry
@@ -217,7 +245,10 @@ class DirectoryIndex {
 				relativePath = relativePath.substring(dirPath.length + 1)
 			}
 			if (relativePath) {
-				entries.push([relativePath, entry.stat])
+				const arr = relativePath.split("/")
+				if (1 === arr.length || 2 === arr.length && "" === arr[1]) {
+					entries.push([relativePath, entry.stat])
+				}
 			}
 			files.add(entry.path)
 		}

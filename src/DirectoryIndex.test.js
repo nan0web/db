@@ -63,9 +63,7 @@ describe('DirectoryIndex - encodeRows function', () => {
 
 		const r1 = DirectoryIndex.encodeRows(entries, DirectoryIndex.COLUMNS, true)
 		assert.deepStrictEqual(r1, [
-			// 'content/',
 			'file1.txt kqk55hc0 2s',
-			// 'content/subdir/',
 			'file2.txt kqk55i3s 5k'
 		])
 		const r2 = DirectoryIndex.encodeRows(entries)
@@ -147,21 +145,20 @@ describe("DirectoryIndex - TXTL format (index.txtl) with full paths", () => {
 
 		const index = new DirectoryIndex({ entries })
 
-		const encoded = String(index.encode({ long: true, inc: true })).split("\n")
-		assert.deepEqual(encoded, [
+		const encoded = String(index.encode({ long: true, inc: false })).split("\n")
+		assert.deepStrictEqual(encoded, [
 			"long",
-			"inc",
 			"---",
 			"about/",
-			"us.html qvjhc3 8c",
+			"about/us.html qvjhc3 8c",
 			"content/",
-			"about.yaml qvjhc0 2s",
-			"contacts.yaml qvjhc0 5k",
+			"content/about.yaml qvjhc0 2s",
+			"content/contacts.yaml qvjhc0 5k",
 			"content/blog/",
-			"post1.yaml qvjhc1 2s",
-			"post2.yaml qvjhc1 5k",
+			"content/blog/post1.yaml qvjhc1 2s",
+			"content/blog/post2.yaml qvjhc1 5k",
 			"content/products/",
-			"item1.yaml qvjhc2 2s",
+			"content/products/item1.yaml qvjhc2 2s"
 		])
 	})
 
@@ -218,26 +215,29 @@ describe("DirectoryIndex - TXTL format (index.txtl) with incremental paths", () 
 			["content/about.yaml", new DocumentStat({ mtimeMs: 1625097600, size: 100, isFile: true })],
 			["content/contacts.yaml", new DocumentStat({ mtimeMs: 1625097600, size: 200, isFile: true })],
 			["content/blog/post1.yaml", new DocumentStat({ mtimeMs: 1625097601, size: 100, isFile: true })],
+			["some/thing.yaml", new DocumentStat({ mtimeMs: 1625097601, size: 100, isFile: true })],
 			["about/us.html", new DocumentStat({ mtimeMs: 1625097603, size: 300, isFile: true })]
 		]
 
 		const index = new DirectoryIndex({ entries })
 
 		const encoded = String(index.encode({ long: true, inc: true })).split("\n")
-		assert.deepEqual(encoded, [
+		assert.deepStrictEqual(encoded, [
 			"long",
 			"inc",
 			"---",
 			"about/",
 			"us.html qvjhc3 8c",
-			"content/",
+			"/content/",
 			"about.yaml qvjhc0 2s",
 			"contacts.yaml qvjhc0 5k",
-			"content/blog/",
+			"blog/",
 			"post1.yaml qvjhc1 2s",
 			"post2.yaml qvjhc1 5k",
-			"content/products/",
+			"/content/products/",
 			"item1.yaml qvjhc2 2s",
+			"/some/",
+			"thing.yaml qvjhc1 2s"
 		])
 	})
 
@@ -310,7 +310,7 @@ describe("DirectoryIndex - getDirectoryEntries", () => {
 		)
 	})
 
-	it.skip('returns immediate children for subdirectory', async () => {
+	it('returns immediate children for subdirectory', async () => {
 		const db = {
 			basename,
 			dirname,
