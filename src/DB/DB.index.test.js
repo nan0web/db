@@ -2,7 +2,6 @@ import { suite, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { NoConsole } from '@nan0web/log'
 import DB from './DB.js'
-import DirectoryIndex from '../DirectoryIndex.js'
 
 suite("DB index functions", () => {
 	describe('saveIndex', () => {
