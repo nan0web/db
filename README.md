@@ -1,8 +1,6 @@
 # @nan0web/db
 
-|[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
-|---|---|---|---|---|
- |🟢 `98.4%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `91.8%` |✅ d.ts 📜 system.md 🕹️ playground |— |
+<!-- %PACKAGE_STATUS% -->
 
 Agnostic document database and data manipulation utilities. Designed to be
 flexible, minimal and powerful — the tool that supports any data format and
@@ -86,7 +84,7 @@ CLI sandbox for safe experiments:
 git clone https://github.com/nan0web/db.git
 cd db
 npm install
-npm run playground
+npm run play
 ```
 
 ## API Reference
@@ -118,7 +116,8 @@ Supports extension lookup, e.g. find `.json` even when omitted.
 How to load extended data?
 ```js
 import DB from "@nan0web/db"
-const db = new DB({ data: new Map([["file.json", { value: "loaded" }]]) })
+const db = new DB({ predefined: [["file.json", { value: "loaded" }]] })
+await db.connect()
 const result = await db.fetch("file")
 console.info(result) // ← { value: "loaded" }
 ```
@@ -133,24 +132,13 @@ const res = await db.set("file.text", "save me!")
 console.info(res) // ← "save me!"
 console.info(db.data.get("file.text")) // ← "save me!"
 ```
-### `db.push(uri?)`
-Syncs memory changes to external files or services.
-
-How to sync to storage?
-```js
-import DB from "@nan0web/db"
-const db = new DB()
-await db.set("./app.json", { version: "1.0" })
-const changed = await db.push()
-console.info(changed) // ← ["./app.json"]
-```
 ### `Data.flatten(data)`
 Flattens nested object into paths as keys.
 
 How to flatten object?
 ```js
 import { Data } from "@nan0web/db"
-const flat = Data.flatten({ x: { a: [1, 2, { b: 3 }] }})
+const flat = Data.flatten({ x: { a: [1, 2, { b: 3 }] } })
 console.info(flat) // ← { 'x/a/[0]': 1, 'x/a/[1]': 2, 'x/a/[2]/b': 3 }
 ```
 ### `Data.unflatten(data)`
@@ -184,8 +172,8 @@ How many d.ts files should cover the source?
 
 ## Contributing
 
-How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
+How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)
 
 ## License
 
-ISC LICENSE – [see full text](https://github.com/nan0web/db/blob/main/LICENSE)
+ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)

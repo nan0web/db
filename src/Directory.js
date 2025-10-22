@@ -31,7 +31,7 @@ class Directory {
 	 * Supported data file extensions for loading documents.
 	 * @type {string[]}
 	 */
-	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".csv"]
+	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".csv", ".md"]
 
 	/**
 	 * Checks if a given path is a global variable path.

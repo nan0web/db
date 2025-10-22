@@ -19,7 +19,7 @@
 		"precommit": "npm test",
 		"prepush": "npm test",
 		"prepare": "husky",
-		"playground": "node playground/main.js"
+		"play": "node play/main.js"
 	},
 	"exports": {
 		".": {
@@ -42,20 +42,19 @@
 	"author": "YaRaSLove (ЯRаСлав) <support@yaro.page>",
 	"license": "ISC",
 	"devDependencies": {
-		"@nan0web/db-fs": "workspace:*",
-		"@nan0web/release": "workspace:*",
-		"@nan0web/types": "workspace:*",
-		"@nan0web/test": "workspace:*",
+		"@nan0web/db-fs": "^1.0.0",
+		"@nan0web/release": "^1.0.0",
+		"@nan0web/test": "^1.0.0",
+		"@nan0web/types": "^1.0.0",
+		"@nan0web/ui-cli": "^1.0.0",
 		"husky": "^9.1.7"
 	},
 	"peerDependencies": {
-		"@nan0web/db-fs": "^1.0.0",
 		"@nan0web/types": "^1.0.0"
 	},
 	"files": [
-		"src/",
-		"types/",
-		"package.json",
-		"README.md"
+		"src/**/*.js",
+		"!src/**/*.test.js",
+		"types/**/*.d.ts"
 	]
 }

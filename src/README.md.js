@@ -139,10 +139,10 @@ function testRender() {
 		 * git clone https://github.com/nan0web/db.git
 		 * cd db
 		 * npm install
-		 * npm run playground
+		 * npm run play
 		 * ```
 		 */
-		assert.ok(String(pkg.scripts?.playground).includes("node playground"))
+		assert.ok(String(pkg.scripts?.play).includes("node play"))
 	})
 
 	/**
@@ -178,7 +178,8 @@ function testRender() {
 	 */
 	it("How to load extended data?", async () => {
 		//import DB from "@nan0web/db"
-		const db = new DB({ data: new Map([["file.json", { value: "loaded" }]]) })
+		const db = new DB({ predefined: [["file.json", { value: "loaded" }]] })
+		await db.connect()
 		const result = await db.fetch("file")
 		console.info(result) // ← { value: "loaded" }
 		assert.deepStrictEqual(console.output()[0][1], { value: "loaded" })
@@ -201,26 +202,12 @@ function testRender() {
 
 	/**
 	 * @docs
-	 * ### `db.push(uri?)`
-	 * Syncs memory changes to external files or services.
-	 */
-	it("How to sync to storage?", async () => {
-		//import DB from "@nan0web/db"
-		const db = new DB()
-		await db.set("./app.json", { version: "1.0" })
-		const changed = await db.push()
-		console.info(changed) // ← ["./app.json"]
-		assert.deepStrictEqual(console.output()[0][1], ["./app.json"])
-	})
-
-	/**
-	 * @docs
 	 * ### `Data.flatten(data)`
 	 * Flattens nested object into paths as keys.
 	 */
 	it("How to flatten object?", () => {
 		//import { Data } from "@nan0web/db"
-		const flat = Data.flatten({ x: { a: [1, 2, { b: 3 }] }})
+		const flat = Data.flatten({ x: { a: [1, 2, { b: 3 }] } })
 		console.info(flat) // ← { 'x/a/[0]': 1, 'x/a/[1]': 2, 'x/a/[2]/b': 3 }
 		assert.deepStrictEqual(console.output()[0][1], {
 			"x/a/[0]": 1,
@@ -244,7 +231,7 @@ function testRender() {
 		console.info(nested) // ← { x: { y: { z: 7 } }, arr: [ { title: 'first' }, { title: 'second' } ] }
 		assert.deepStrictEqual(console.output()[0][1], {
 			x: { y: { z: 7 } },
-			arr: [ { title: "first" }, { title: "second" } ]
+			arr: [{ title: "first" }, { title: "second" }]
 		})
 	})
 

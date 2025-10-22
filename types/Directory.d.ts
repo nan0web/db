@@ -38,6 +38,7 @@ declare class Directory {
      * @returns {boolean} True if the path is a global variable path.
      */
     static isGlobal(path: string): boolean;
+    static isRoot(path: any): boolean;
     /**
      * Returns Global variable name or empty string if incorrect global path.
      * @param {string} path

@@ -19,7 +19,7 @@ export default class DB {
 	static Index = DirectoryIndex
 	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
-	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".html", ".xml"]
+	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".html", ".xml", ".md"]
 	/** @type {string} */
 	encoding = "utf-8"
 	/** @type {Map<string, any | false>} */
@@ -88,7 +88,7 @@ export default class DB {
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map(from => DB.from(from))
 		this.predefined = predefined instanceof Map ? predefined : new Map(predefined)
-		this.#console.info("DB instance created", { root: this.root, cwd: this.cwd })
+		this.#console.info("DB instance created", String(this))
 	}
 
 	/**
@@ -1245,7 +1245,21 @@ export default class DB {
 					const result = await this.fetchMerged(indexPath, opts)
 					return result
 				} catch (/** @type {any} */ indexErr) {
-					// If index file doesn't exist, return default value
+					// If index file doesn't exist, return listing
+					if (opts.allowDirs) {
+						const dirEntries = await this.listDir(uri)
+						if (dirEntries.length > 0) {
+							return dirEntries.map(entry => ({
+								name: entry.name,
+								path: entry.path,
+								isDirectory: entry.isDirectory,
+								isFile: entry.isFile,
+								size: entry.stat.size,
+								mtime: entry.stat.mtime.toISOString()
+							}))
+						}
+					}
+					// Otherwise return default value
 					this.#console.warn("Index file not found for directory", { uri, error: indexErr.message })
 					return opts.defaultValue
 				}

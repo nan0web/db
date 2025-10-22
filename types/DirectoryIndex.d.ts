@@ -3,6 +3,7 @@ declare class DirectoryIndex {
     static COLUMNS: string[];
     static FULL_INDEX: string;
     static INDEX: string;
+    static Directory: typeof Directory;
     /**
      * Encodes into string rows
      * @param {Array<[string, DocumentStat]>} entries - Entries to encode
@@ -82,6 +83,7 @@ declare class DirectoryIndex {
     columns: string[];
     /** @type {Array<[string, DocumentStat]>} */
     entries: Array<[string, DocumentStat]>;
+    get Directory(): typeof Directory;
     /**
      * Encodes entries according to specified format
      * @param {Object} [input]
@@ -99,3 +101,4 @@ declare class DirectoryIndex {
     } | undefined): string;
 }
 import DocumentStat from "./DocumentStat.js";
+import Directory from "./Directory.js";
