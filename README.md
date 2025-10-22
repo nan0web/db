@@ -1,6 +1,8 @@
 # @nan0web/db
 
-<!-- %PACKAGE_STATUS% -->
+|[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
+|---|---|---|---|---|
+ |🟢 `97.7%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.8%` |✅ d.ts 📜 system.md |1.0.1 |
 
 Agnostic document database and data manipulation utilities. Designed to be
 flexible, minimal and powerful — the tool that supports any data format and
@@ -172,8 +174,8 @@ How many d.ts files should cover the source?
 
 ## Contributing
 
-How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)
+How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
 
 ## License
 
-ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)
+ISC LICENSE – [see full text](https://github.com/nan0web/db/blob/main/LICENSE)
