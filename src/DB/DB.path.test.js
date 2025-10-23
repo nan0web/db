@@ -274,14 +274,16 @@ suite("DB URI Core", () => {
 			assert.strictEqual(result, "api")
 		})
 
-		it('should return uri if from and to are absolute and from do not starts with to', async () => {
+		it('should return uri if from and to are absolute and from do not starts with to', () => {
+			const db = new DB()
 			const result = db.relative("/root/api", "/root2/")
 			assert.strictEqual(result, "/root2/")
 		})
 
-		it('should return uri if to is relative', async () => {
-			const result = db.relative("root/api", "/root2/")
-			assert.strictEqual(result, "/root2/")
+		it('should return uri if to is relative', () => {
+			const db = new DB()
+			const result = db.relative("root/api", "sibling")
+			assert.strictEqual(result, "sibling")
 		})
 
 		it.todo('should navigate sibling directories', () => {

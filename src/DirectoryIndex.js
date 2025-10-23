@@ -2,7 +2,7 @@ import { FilterString } from "@nan0web/types"
 import DocumentStat from "./DocumentStat.js"
 import Directory from "./Directory.js"
 
-class DirectoryIndex {
+export default class DirectoryIndex {
 	static COLUMNS = ["name", "mtimeMs.36", "size.36"]
 	static FULL_INDEX = "index.txtl"
 	static INDEX = "index.txt"
@@ -426,7 +426,7 @@ class DirectoryIndex {
 
 	/**
 	 * Creates DirectoryIndex instance from input
-	 * @param {object|DirectoryIndex} input
+	 * @param {string | Partial<DirectoryIndex>} input
 	 * @returns {DirectoryIndex}
 	 */
 	static from(input) {
@@ -447,4 +447,3 @@ class DirectoryIndex {
 	}
 }
 
-export default DirectoryIndex

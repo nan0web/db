@@ -1,5 +1,4 @@
-export default DirectoryIndex;
-declare class DirectoryIndex {
+export default class DirectoryIndex {
     static COLUMNS: string[];
     static FULL_INDEX: string;
     static INDEX: string;
@@ -60,10 +59,10 @@ declare class DirectoryIndex {
     static decode(source: string | object): DirectoryIndex;
     /**
      * Creates DirectoryIndex instance from input
-     * @param {object|DirectoryIndex} input
+     * @param {string | Partial<DirectoryIndex>} input
      * @returns {DirectoryIndex}
      */
-    static from(input: object | DirectoryIndex): DirectoryIndex;
+    static from(input: string | Partial<DirectoryIndex>): DirectoryIndex;
     /**
      * Returns directory for current path.
      * @param {string} path

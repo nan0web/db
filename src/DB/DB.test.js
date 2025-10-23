@@ -158,7 +158,7 @@ suite("DB", () => {
 
 	describe('find', () => {
 		it('should yield specific URI if found', async () => {
-			const dbInstance = new DB({ data: new Map([['test.txt', 'content']]) })
+			const dbInstance = new DB({ predefined: new Map([['test.txt', 'content']]) })
 			await dbInstance.connect()
 			dbInstance.meta.set("?loaded", new DocumentStat({ mtimeMs: 1_000 }))
 
@@ -188,26 +188,9 @@ suite("DB", () => {
 				['file2.md', 'content2'],
 				['file3.txt', 'content3']
 			])
-			const dbInstance = new DB({ data: mockData })
+			const dbInstance = new DB({ predefined: mockData })
 			await dbInstance.connect()
 			dbInstance.meta.set("?loaded", new DocumentStat({ mtimeMs: 1_000 }))
-
-			const results = []
-			for await (const entry of dbInstance.find((key) => key.endsWith('.txt'))) {
-				results.push(entry)
-			}
-
-			assert.deepStrictEqual(results, ['file1.txt', 'file3.txt'])
-		})
-
-		it.todo('should yield URIs matching function (fs version)', async () => {
-			const mockData = new Map([
-				['file1.txt', 'content1'],
-				['file2.md', 'content2'],
-				['file3.txt', 'content3']
-			])
-			const dbInstance = new DB({ data: mockData })
-			dbInstance.meta.set("?loaded", new DocumentStat())
 
 			const results = []
 			for await (const entry of dbInstance.find((key) => key.endsWith('.txt'))) {
@@ -517,14 +500,17 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					["dir1/_", { a: 1 }],
 					["dir1/dir2/_", { b: 2 }],
+					["docs.json", { title: "docs" }]
 				]
 			})
 			await db.connect()
 
-			const result = await db.getInheritance('dir1/dir2/file')
+			const r1 = await db.getInheritance('dir1/dir2/file')
 			// a: 1 comes from dir1/_
 			// b: 2 comes from dir1/dir2/_
-			assert.deepEqual(result, { a: 1, b: 2, global: 'value' })
+			assert.deepEqual(r1, { a: 1, b: 2, global: 'value' })
+			const r2 = await db.fetch("docs.json")
+			assert.deepStrictEqual(r2, { global: "value", title: "docs" })
 		})
 
 		it('should cache inheritance data', async () => {
