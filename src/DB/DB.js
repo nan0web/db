@@ -1496,6 +1496,7 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async saveIndex(dirUri, entries) {
+		this.#console.debug("saveIndex()", dirUri, { entries })
 		if (!entries) {
 			const base = this.normalize(dirUri)
 			entries = Array.from(this.meta.entries()).filter(

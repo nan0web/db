@@ -2,7 +2,7 @@
 
 |[Статус](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Документація|Покриття тестами|Функції|Версія Npm|
 |---|---|---|---|---|
- |🟢 `97.7%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.8%` |✅ d.ts 📜 system.md |1.0.1 |
+|🟢 `99.4%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `97.4%` |✅ d.ts 📜 system.md 🕹️ playground |1.0.2 |
 
 Агностична документна база даних та утиліти для маніпуляції даними. Розроблена як
 гнучкий, мінімальний і потужний інструмент — що підтримує будь-який формат даних та

@@ -240,12 +240,12 @@ export default class DB {
     requireConnected(): Promise<void>;
     /**
      * Searches for URI matching condition
-     * @param {string | ((key: string, value: any) => boolean)} uri - Search pattern or callback
+     * @param {string | ((path: string) => boolean)} uri - Search pattern or callback
      * @param {number} [depth=0] - Maximum depth to search
      * @yields {string} Full URI path of found documents
      * @returns {AsyncGenerator<string, void, unknown>}
      */
-    find(uri: string | ((key: string, value: any) => boolean), depth?: number | undefined): AsyncGenerator<string, void, unknown>;
+    find(uri: string | ((path: string) => boolean), depth?: number | undefined): AsyncGenerator<string, void, unknown>;
     /**
      * Connects to the database. This method should be overridden by subclasses.
      * @abstract
@@ -470,13 +470,6 @@ export default class DB {
      * @returns {Promise<object>} Data with resolved references
      */
     resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
-    /**
- * @private
- * Auto-updates index.jsonl and index.txt after document save
- * @param {string} uri - URI of saved document
- * @returns {Promise<void>}
- */
-    private _updateIndex0;
     /**
      * @private
      * Auto-updates index.jsonl and index.txt after document save for all parent directories
