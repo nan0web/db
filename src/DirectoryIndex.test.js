@@ -287,6 +287,58 @@ us.html h7v381 8c`
 	})
 })
 
+describe('DirectoryIndex - Utility Methods', () => {
+	it('isIndex returns true for index paths', () => {
+		assert.strictEqual(DirectoryIndex.isIndex('index.txt'), true)
+		assert.strictEqual(DirectoryIndex.isIndex('dir/index.txt'), true)
+		assert.strictEqual(DirectoryIndex.isIndex('file.txt'), false)
+	})
+
+	it('isFullIndex returns true for full index paths', () => {
+		assert.strictEqual(DirectoryIndex.isFullIndex('index.txtl'), true)
+		assert.strictEqual(DirectoryIndex.isFullIndex('dir/index.txtl'), true)
+		assert.strictEqual(DirectoryIndex.isFullIndex('index.txt'), false)
+	})
+
+	it('getIndexesToUpdate returns affected indexes', () => {
+		const mockDb = {
+			dirname: (path) => {
+				if (path === 'file.txt') return '.'
+				if (path === 'dir/file.txt') return 'dir'
+				if (path === 'dir') return '.'
+				return path.substring(0, path.lastIndexOf('/')) || '.'
+			}
+		}
+		const indexes = DirectoryIndex.getIndexesToUpdate(mockDb, 'dir/sub/file.txt')
+		assert.deepStrictEqual(indexes.sort(), [
+			'dir/index.txt',
+			'dir/sub/index.txt',
+			'index.txt'
+		])
+	})
+
+	it('dirname returns correct parent path', () => {
+		assert.strictEqual(DirectoryIndex.dirname('file.txt'), '.')
+		assert.strictEqual(DirectoryIndex.dirname('dir/file.txt'), 'dir')
+		assert.strictEqual(DirectoryIndex.dirname('dir/sub/file.txt'), 'dir/sub')
+		assert.strictEqual(DirectoryIndex.dirname('/root/file'), '/root')
+	})
+
+	it('from creates instance correctly', () => {
+		const entries = [['file.txt', new DocumentStat({})]]
+		const index1 = DirectoryIndex.from({ entries })
+		assert.ok(index1 instanceof DirectoryIndex)
+		assert.strictEqual(index1.entries.length, 1)
+
+		const index2 = DirectoryIndex.from(`file.txt h7v37t 2s`)
+		assert.ok(index2 instanceof DirectoryIndex)
+		assert.strictEqual(index2.entries.length, 1)
+
+		const index3 = DirectoryIndex.from(index1)
+		assert.strictEqual(index3, index1)
+	})
+})
+
 describe("DirectoryIndex - getDirectoryEntries", () => {
 	it("returns immediate children for root directory", async () => {
 		const db = {

@@ -357,6 +357,53 @@ suite("DB", () => {
 			const db = new BaseDB()
 			await assert.rejects(() => db.ensureAccess('uri', 'x'), /Access level must be one of \[r, w, d\]/)
 		})
+
+		it("should allow access without driver (open access)", async () => {
+			const db = new DB()
+			await db.ensureAccess("file.txt", "r")
+			await db.ensureAccess("file.txt", "w")
+			await db.ensureAccess("file.txt", "d")
+		})
+
+		it("should throw on unauthorized ensureAccess", async () => {
+			const db = new BaseDB()
+			db.driver = {
+				async ensure() {
+					return { granted: false }
+				}
+			}
+
+			await assert.rejects(() => db.ensureAccess("file.txt", "r"), /Access denied/)
+		})
+
+		it("should allow access via driver", async () => {
+			const db = new DB({
+				driver: {
+					async ensure(uri, level, context) {
+						return { granted: true }
+					}
+				}
+			})
+
+			await db.ensureAccess("file.txt", "r")
+		})
+
+		it("should pass context to driver", async () => {
+			let calledContext
+			const db = new BaseDB({
+				driver: {
+					async ensure(uri, level, context) {
+						calledContext = context
+						return { granted: true }
+					}
+				}
+			})
+
+			const testContext = { user: { name: "test" }, token: "abc", ip: "127.0.0.1" }
+			await db.ensureAccess("file.txt", "r", testContext)
+
+			assert.deepStrictEqual(calledContext, testContext)
+		})
 	})
 
 	describe('push', () => {

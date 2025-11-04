@@ -10,12 +10,13 @@ import { runDataUtilsDemo } from "./data-utils.js"
 import { runFetchAdvancedDemo } from "./fetch-advanced.js"
 import { runIndexUtilsDemo } from "./index-utils.js"
 import { runSimpleDemos } from "./simple-demos.js"
+import { runDriverDemos } from "./drivers/index.js"
 
 const console = new Logger({ level: "info" })
 
 // Clear screen and show logo
 console.clear()
-console.info(Logger.style(Logger.LOGO, { color: "cyan" }))
+console.info(Logger.style(Logger.LOGO, { color: Logger.MAGENTA }))
 
 async function chooseDemo() {
 	const demos = [
@@ -24,13 +25,14 @@ async function chooseDemo() {
 		{ name: "Data Utils (flatten/merge/find)", value: "data" },
 		{ name: "Advanced Fetch (refs/inherit)", value: "fetch" },
 		{ name: "Directory Indexes", value: "index" },
+		{ name: "Driver Examples", value: "drivers" },
 		{ name: "← Exit", value: "exit" }
 	]
 
 	const choice = await select({
 		title: "Select DB playground demo:",
-		prompt: "[db]: ",
-		invalidPrompt: Logger.style("[db invalid]", { color: "red" }) + ": ",
+		prompt: Logger.style("[db]: ", { color: Logger.MAGENTA }),
+		invalidPrompt: Logger.style("[db invalid]", { color: Logger.RED }) + ": ",
 		options: demos.map(d => d.name),
 		console
 	})
@@ -64,6 +66,9 @@ async function main() {
 					break
 				case "index":
 					await runIndexUtilsDemo(console)
+					break
+				case "drivers":
+					await runDriverDemos(console)
 					break
 				case "exit":
 					console.success("Thanks for exploring @nan0web/db! 🚀")

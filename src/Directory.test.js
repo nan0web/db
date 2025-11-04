@@ -3,6 +3,15 @@ import assert from 'node:assert/strict'
 import Directory from './Directory.js'
 
 suite('Directory', () => {
+	describe('Static Properties', () => {
+		it('should have correct default constants', () => {
+			assert.strictEqual(Directory.FILE, '_')
+			assert.strictEqual(Directory.GLOBALS, '_/')
+			assert.strictEqual(Directory.INDEX, 'index')
+			assert.deepStrictEqual(Directory.DATA_EXTNAMES, [".json", ".yaml", ".yml", ".nano", ".csv", ".md"])
+		})
+	})
+
 	describe('isGlobal', () => {
 		it('should return true for paths starting with GLOBALS prefix', () => {
 			assert.strictEqual(Directory.isGlobal('_/langs'), true)
@@ -57,6 +66,21 @@ suite('Directory', () => {
 			assert.equal(Directory.getGlobalName('sub/_/'), '')
 			assert.equal(Directory.getGlobalName(null), '')
 			assert.equal(Directory.getGlobalName(undefined), '')
+		})
+	})
+
+	describe('isRoot', () => {
+		it('should return true for root paths', () => {
+			assert.strictEqual(Directory.isRoot('.'), true)
+			assert.strictEqual(Directory.isRoot('/'), true)
+			assert.strictEqual(Directory.isRoot('./'), true)
+			assert.strictEqual(Directory.isRoot(''), true)
+		})
+
+		it('should return false for non-root paths', () => {
+			assert.strictEqual(Directory.isRoot('folder'), false)
+			assert.strictEqual(Directory.isRoot('/folder'), false)
+			assert.strictEqual(Directory.isRoot('dir/'), false)
 		})
 	})
 

@@ -1,6 +1,32 @@
 /**
- * Base database class for document storage and retrieval
+ * Base database class for document storage and retrieval.
+ * Provides core functionality for managing documents, metadata, and directory operations.
+ * Supports inheritance, global variables, and reference resolution through the `fetch` method.
+ * Designed to be extended for specific storage backends (e.g., filesystem, browser, remote APIs).
+ *
+ * Key features:
+ * - URI-based path resolution and normalization
+ * - Caching via in-memory Maps for data and metadata
+ * - Access control via driver protocol
+ * - Hierarchical directory traversal with indexing support
+ * - Data merging with reference handling using the Data utility class
+ *
+ * Usage example:
+ * ```js
+ * const db = new DB({ cwd: 'https://api.example.com', root: 'v1' });
+ * await db.connect();
+ * const data = await db.fetch('users/profile');
+ * await db.set('users/profile', { name: 'John' });
+ * await db.push(); // Persist changes
+ * ```
+ *
+ * Extensibility:
+ * - Override `loadDocument`, `saveDocument`, `statDocument` for custom storage
+ * - Attach multiple DB instances for federated access
+ * - Use `extract(uri)` to create sub-databases for isolated scopes
+ *
  * @class
+ * @extends {DBDriverProtocol} - Optional driver for access control
  */
 export default class DB {
     static Data: typeof Data;
@@ -26,31 +52,39 @@ export default class DB {
      * - console for the debug, silent = true by default.
      *
      * @param {object} input
-     * @param {string} [input.root="."]
-     * @param {string} [input.cwd="."]
-     * @param {boolean} [input.connected=false]
-     * @param {Map<string, any | false>} [input.data=new Map()]
-     * @param {Map<string, DocumentStat>} [input.meta=new Map()]
+     * @param {string} [input.root="."] - Root path for URI resolution
+     * @param {string} [input.cwd="."] - Current working directory (base for absolute paths)
+     * @param {DBDriverProtocol} [input.driver=new DBDriverProtocol()] - Access control driver
+     * @param {boolean} [input.connected=false] - Connection status
+     * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
+     * @param {Map<string, DocumentStat>} [input.meta=new Map()] - Metadata cache
+     * @param {object} [input.context={}] - Authentication/authorization context
      * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
-     * @param {DB[]} [input.dbs=[]]
-     * @param {Console | NoConsole} [input.console=new NoConsole()]
+     * @param {DB[]} [input.dbs=[]] - Attached sub-databases
+     * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
      */
     constructor(input?: {
         root?: string | undefined;
         cwd?: string | undefined;
+        driver?: DBDriverProtocol | undefined;
         connected?: boolean | undefined;
         data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
+        context?: object;
         predefined?: Map<string, any> | (readonly [string, any])[] | undefined;
         dbs?: DB[] | undefined;
         console?: Console | NoConsole | undefined;
     });
+    /** @type {DBDriverProtocol} */
+    driver: DBDriverProtocol;
     /** @type {string} */
     encoding: string;
     /** @type {Map<string, any | false>} */
     data: Map<string, any | false>;
     /** @type {Map<string, DocumentStat>} */
     meta: Map<string, DocumentStat>;
+    /** @type {object} */
+    context: object;
     /** @type {boolean} */
     connected: boolean;
     /** @type {string} */
@@ -80,7 +114,7 @@ export default class DB {
     /** @returns {Console | NoConsole} */
     get console(): Console | NoConsole;
     /**
-     * Returns Data helper class that is assign to DB or its extension.
+     * Returns Data helper class that is assigned to DB or its extension.
      * Define your own Data provider to extend its logic, no need to extend getter.
      * ```js
      * class DataExtended extends DB {
@@ -94,7 +128,7 @@ export default class DB {
      */
     get Data(): typeof Data;
     /**
-     * Returns static.Directory that is assign to DB or its extension.
+     * Returns static.Directory that is assigned to DB or its extension.
      * Define your own static.Directory, no need to extend getter.
      * ```js
      * class DirectoryExtended extends Directory {
@@ -113,7 +147,7 @@ export default class DB {
      */
     get Index(): typeof DirectoryIndex;
     /**
-     * Returns static.GetOptions that is assign to DB or its extension.
+     * Returns static.GetOptions that is assigned to DB or its extension.
      * Define your own static.GetOptions, no need to extend getter.
      * ```js
      * class GetOptionsExtended extends GetOptions {
@@ -128,27 +162,30 @@ export default class DB {
     get GetOptions(): typeof GetOptions;
     isRoot(dir: any): boolean;
     /**
-     * Attaches another DB instance
+     * Attaches another DB instance to this database for federated access.
+     * Allows routing operations across multiple databases.
      * @param {DB} db - Database to attach
      * @returns {void}
+     * @throws {TypeError} If non-DB instance is provided
      */
     attach(db: DB): void;
     /**
-     * Detaches a database
+     * Detaches a database instance from this database.
      * @param {DB} db - Database to detach
      * @returns {DB[]|boolean} Array of detached database or false if not found
      */
     detach(db: DB): DB[] | boolean;
     /**
-     * Creates a new DB instance with a subset of the data and meta.
+     * Creates a new DB instance with a subset of the data and meta, scoped to a specific URI prefix.
+     * Useful for creating isolated sub-databases (e.g., user-specific data).
      * @param {string} uri The URI to extract from the current DB.
-     * @returns {DB}
+     * @returns {DB} New DB instance with filtered data and metadata
      */
     extract(uri: string): DB;
     /**
      * Extracts file extension with leading dot from URI
      * @param {string} uri
-     * @returns {string}
+     * @returns {string} Extension (e.g., ".txt") or empty string
      * @example
      * db.extname("file.TXT") // => .txt
      */
@@ -163,14 +200,15 @@ export default class DB {
     relative(from: string, to?: string | undefined): string;
     /**
      * Get string representation of the database
-     * @returns {string}
+     * @returns {string} Formatted string like "DB /root [utf-8]"
      */
     toString(): string;
     /**
      * Dumps current database into destination database.
-     * @param {DB} dest
+     * Copies all documents and builds indexes in the destination.
+     * @param {DB} dest - Destination database
      * @param {object} [options]
-     * @param {({ uri, url, data, current, total }) => void} [options.onProgress]
+     * @param {({ uri, url, data, current, total }) => void} [options.onProgress] - Progress callback
      * @returns {Promise<{ total: number, processed: number, ignored: number, updatedURIs: string[] }>}
      */
     dump(dest: DB, options?: {
@@ -189,7 +227,9 @@ export default class DB {
     }>;
     /**
      * Build indexes inside the directory.
-     * @param {string} dir
+     * Generates `index.txt` and `index.txtl` files for efficient traversal.
+     * @param {string} dir - Directory URI (default: '.')
+     * @returns {Promise<void>}
      */
     buildIndexes(dir?: string): Promise<void>;
     /**
@@ -204,6 +244,8 @@ export default class DB {
      * Reads the content of a directory at the specified URI.
      * For FetchDB it loads index.txt or manifest.json.
      * For NodeFsDB it uses readdirSync recursively.
+     *
+     * Supports filtering, depth limiting, and skipping stats/indexes for performance.
      *
      * @async
      * @generator
@@ -234,8 +276,9 @@ export default class DB {
      */
     readBranch(uri: string, depth?: number | undefined): Promise<AsyncGenerator<DocumentEntry, void, unknown>>;
     /**
-     * Ensures DB is connected
+     * Ensures DB is connected. Throws if connection fails.
      * @returns {Promise<void>}
+     * @throws {Error} If connection cannot be established
      */
     requireConnected(): Promise<void>;
     /**
@@ -248,26 +291,29 @@ export default class DB {
     find(uri: string | ((path: string) => boolean), depth?: number | undefined): AsyncGenerator<string, void, unknown>;
     /**
      * Connects to the database. This method should be overridden by subclasses.
+     * Initializes in-memory data from predefined and builds directory metadata.
      * @abstract
      * @returns {Promise<void>}
      */
     connect(): Promise<void>;
     /**
-     * Gets document content
+     * Gets document content from cache or loads if missing.
+     * Supports default fallback value for missing documents.
      * @param {string} uri - Document URI
-     * @param {object | GetOptions} [opts] - Options.
+     * @param {object | GetOptions} [opts] - Options or GetOptions instance
      * @returns {Promise<any>} Document content
      */
     get(uri: string, opts?: object | GetOptions): Promise<any>;
     /**
-     * Sets document content
+     * Sets document content in cache and updates metadata timestamp.
      * @param {string} uri - Document URI
      * @param {any} data - Document data
-     * @returns {Promise<any>} Document content
+     * @returns {Promise<any>} The set data
      */
     set(uri: string, data: any): Promise<any>;
     /**
-     * Gets document statistics
+     * Gets document statistics from cache or loads if missing.
+     * Supports extension fallback for extension-less URIs.
      * @param {string} uri - Document URI
      * @returns {Promise<DocumentStat | undefined>}
      */
@@ -281,12 +327,13 @@ export default class DB {
     resolve(...args: string[]): Promise<string>;
     /**
      * Normalize path segments to absolute path
+     * Handles .., ., and duplicate slashes.
      * @param  {...string} args - Path segments
      * @returns {string} Normalized path
      */
     normalize(...args: string[]): string;
     /**
-     * Checks if current uri has shceme in it, such as http://, https://, ftp://, file://, etc.
+     * Checks if current uri has scheme in it, such as http://, https://, ftp://, file://, etc.
      * @param {string} uri
      * @returns {boolean}
      */
@@ -299,6 +346,7 @@ export default class DB {
     isAbsolute(uri: string): boolean;
     /**
      * Resolves path segments to absolute path synchronously
+     * Combines cwd, root, and args with normalization.
      * @param  {...string} args - Path segments
      * @returns {string} Resolved absolute path
      */
@@ -307,7 +355,7 @@ export default class DB {
      * Returns base name of URI with the removedSuffix (if provided).
      * If removeSuffix is true the extension will be removed.
      * @param {string} uri
-     * @param {string | true} [removeSuffix]
+     * @param {string | true} [removeSuffix] - Suffix to remove or true for extension
      * @returns {string}
      */
     basename(uri: string, removeSuffix?: string | true | undefined): string;
@@ -321,8 +369,9 @@ export default class DB {
     absolute(...args: string[]): string;
     /**
      * Loads a document.
-     * Must be overwritten to has the proper file or database document read operation.
+     * Must be overwritten to have the proper file or database document read operation.
      * In a basic class it just loads already saved data in the db.data map.
+     * Supports extension fallback for extension-less URIs.
      * @param {string} uri - Document URI
      * @param {any} [defaultValue] - Default value if document not found
      * @returns {Promise<any>}
@@ -338,8 +387,9 @@ export default class DB {
     loadDocumentAs(ext: string, uri: string, defaultValue: any): Promise<any>;
     /**
      * Saves a document.
-     * Must be overwritten to has the proper file or database document save operation.
+     * Must be overwritten to have the proper file or database document save operation.
      * In a basic class it just sets a document in the db.data map and db.meta map.
+     * Updates indexes after save.
      * @param {string} uri - Document URI
      * @param {any} document - Document data
      * @returns {Promise<boolean>}
@@ -347,7 +397,7 @@ export default class DB {
     saveDocument(uri: string, document: any): Promise<boolean>;
     /**
      * Reads statistics for a specific document.
-     * Must be overwritten to has the proper file or database document stat operation.
+     * Must be overwritten to have the proper file or database document stat operation.
      * In a basic class it just returns a document stat from the db.meta map if exists.
      * @note Must be overwritten by platform-specific implementation
      * @param {string} uri - Document URI
@@ -371,21 +421,25 @@ export default class DB {
      */
     dropDocument(uri: string): Promise<boolean>;
     /**
-     * Ensures access for given URI and level, if not @throws an error.
-     * @note Must be overwritten by platform specific application
+     * Ensures access to document with context.
+     * Delegates to driver for authorization checks.
      * @param {string} uri - Document URI
-     * @param {string} [level='r'] Access level
+     * @param {'r'|'w'|'d'} level - Access level
+     * @param {object} [context=this.context] - Auth context: { user, token, ip }
      * @returns {Promise<void>}
+     * @throws {Error} - Access denied
      */
-    ensureAccess(uri: string, level?: string | undefined): Promise<void>;
+    ensureAccess(uri: string, level?: 'r' | 'w' | 'd', context?: object): Promise<void>;
     /**
      * Synchronize data with persistent storage
+     * Saves changed documents where local mtime > remote stat mtime.
      * @param {string|undefined} [uri] Optional specific URI to save
      * @returns {Promise<string[]>} Array of saved URIs
      */
     push(uri?: string | undefined): Promise<string[]>;
     /**
      * Moves a document from one URI to another URI
+     * Loads source, saves to target, drops source, updates indexes.
      * @param {string} from - Source URI
      * @param {string} to - Target URI
      * @returns {Promise<boolean>} Success status
@@ -393,11 +447,13 @@ export default class DB {
     moveDocument(from: string, to: string): Promise<boolean>;
     /**
      * Disconnect from database
+     * Clears connection state. Subclasses should override for cleanup.
      * @returns {Promise<void>}
      */
     disconnect(): Promise<void>;
     /**
      * Lists immediate entries in a directory by scanning meta keys.
+     * Filters to direct children only.
      * @param {string} uri - The directory URI (e.g., "content", ".", "dir/")
      * @returns {Promise<DocumentEntry[]>}
      * @throws {Error} If directory does not exist
@@ -405,6 +461,8 @@ export default class DB {
     listDir(uri: string): Promise<DocumentEntry[]>;
     /**
      * Push stream of progress state
+     * Traverses directory with sorting, limiting, and loading options.
+     * Yields StreamEntry with cumulative stats and errors.
      * @param {string} uri - Starting URI
      * @param {object} options - Stream options
      * @param {Function} [options.filter] - Filter function
@@ -428,24 +486,29 @@ export default class DB {
     }): AsyncGenerator<StreamEntry, void, unknown>;
     /**
      * Returns TRUE if uri is a data file.
+     * Checks against supported DATA_EXTNAMES.
      * @param {string} uri
      * @returns {boolean}
      */
     isData(uri: string): boolean;
     /**
      * Gets inheritance data for a given path
+     * Loads and merges directory-level settings (e.g., _.json files) up the hierarchy.
+     * Caches results to avoid redundant loads.
      * @param {string} path - Document path
      * @returns {Promise<any>} Inheritance data
      */
     getInheritance(path: string): Promise<any>;
     /**
      * Gets global variables for a given path, global variables are stored in _/ subdirectory
+     * Traverses up hierarchy, loading files from _/ directories.
      * @param {string} path - Document path
      * @returns {Promise<any>} Global variables data
      */
     getGlobals(path: string): Promise<any>;
     /**
      * Fetch document with inheritance, globals and references processing
+     * Handles extension lookup, directory resolution, and merging.
      * @param {string} uri
      * @param {object | FetchOptions} [opts]
      * @returns {Promise<any>}
@@ -453,6 +516,7 @@ export default class DB {
     fetch(uri: string, opts?: object | FetchOptions): Promise<any>;
     /**
      * Merges data from multiple sources following nano-db-fetch patterns.
+     * Handles inheritance, globals, and references with circular protection.
      * @param {string} uri - The URI to fetch and merge data for
      * @param {FetchOptions} [opts] - Fetch options
      * @param {Set<string>} [visited] - For internal circular reference protection
@@ -463,6 +527,7 @@ export default class DB {
     _getParentReferenceKey(key: any): any;
     /**
      * Handles document references and resolves them recursively with circular reference protection.
+     * Supports fragment references (e.g., #prop/subprop) and merges siblings.
      * @param {object} data - Document data with potential references
      * @param {string} [basePath] - Base path for resolving relative references
      * @param {object|FetchOptions} [opts] - Options that will be passed to fetch
@@ -471,12 +536,11 @@ export default class DB {
      */
     resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
     /**
-     * @private
      * Auto-updates index.jsonl and index.txt after document save for all parent directories
      * @param {string} uri - URI of saved document
      * @returns {Promise<void>}
      */
-    private _updateIndex;
+    _updateIndex(uri: string): Promise<void>;
     /**
      * Saves index data to both index.jsonl and index.txt files
      * @param {string} dirUri Directory URI where indexes should be saved
@@ -492,6 +556,7 @@ export default class DB {
     loadIndex(dirUri?: string | undefined): Promise<DirectoryIndex>;
     #private;
 }
+import DBDriverProtocol from "./DriverProtocol.js";
 import DocumentStat from "../DocumentStat.js";
 import { NoConsole } from "@nan0web/log";
 import Data from "../Data.js";

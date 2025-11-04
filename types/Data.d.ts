@@ -1,5 +1,6 @@
 /**
  * Flattens a nested object into a single-level object with path-like keys.
+ * Preserves empty objects/arrays as-is.
  * @static
  * @param {Object} obj - The object to flatten.
  * @param {string} [parent=''] - Parent key prefix (used recursively).
@@ -9,6 +10,8 @@
 export function flatten(obj: any, parent?: string | undefined, res?: any): any;
 /**
  * Unflattens an object with path-like keys into a nested structure.
+ * Handles array indices and ensures objects are created before assignment.
+ * Sorts keys for deterministic rebuilding.
  * @static
  * @param {Object} data - The flattened object to unflatten.
  * @returns {Object} The unflattened nested object.
@@ -17,6 +20,7 @@ export function unflatten(data: any): any;
 /**
  * Deep merges two objects, creating a new object.
  * Arrays are replaced rather than merged.
+ * Preserves original objects without mutation.
  * @static
  * @param {Object} target - The target object to merge into.
  * @param {Object} source - The source object to merge from.
@@ -25,6 +29,8 @@ export function unflatten(data: any): any;
 export function merge(target: any, source: any): any;
 /**
  * Finds a value in an object by path.
+ * Supports array indices via wrapper (e.g., '[0]').
+ * Returns undefined if path not found or intermediate value is null/undefined.
  * @static
  * @param {string|string[]} path - The path to search (as string or array).
  * @param {Object} obj - The object to search in.
@@ -47,6 +53,7 @@ export function mergeFlat(target: Array<Array<string, any>>, source: Array<Array
 }): Array<Array<string, any>>;
 /**
  * Gets flat sibling entries of a specific key.
+ * Filters flat entries at the same level (excluding self).
  * @static
  * @param {Array<Array<string, any>>|Object} flat - Flattened data.
  * @param {string} key - The target key to find siblings for.
@@ -58,10 +65,29 @@ export default Data;
 /**
  * Data manipulation utilities for flattening/unflattening objects and deep merging.
  * Every data is stored somewhere, so manipulating with paths and parent items also provided.
+ * Supports reference handling for $ref keys in flat structures.
+ * Used internally by DB for inheritance, globals, and reference resolution.
+ *
+ * Key features:
+ * - Path-based find with array index support (e.g., 'arr/[0]/key')
+ * - Deep merge that replaces arrays and merges objects
+ * - Flatten/unflatten with custom dividers and array wrappers
+ * - Parent path extraction for hierarchical data
+ *
+ * Usage:
+ * ```js
+ * const flat = Data.flatten({ a: { b: 1 } }); // { 'a/b': 1 }
+ * const nested = Data.unflatten(flat); // { a: { b: 1 } }
+ * const merged = Data.merge({ a: 1 }, { b: 2 }); // { a: 1, b: 2 }
+ * ```
+ *
+ * Configuration:
+ * - `Data.OBJECT_DIVIDER = '/'` - Key path separator
+ * - `Data.ARRAY_WRAPPER = '[]'` - Array index wrapper
+ *
  * @class
  */
 declare class Data {
-    /** @comment #dev/data.md */
     /** @type {string} */
     static OBJECT_DIVIDER: string;
     /** @type {string} */
@@ -94,6 +120,7 @@ declare class Data {
     static setObjectDivider(divider: string): void;
     /**
      * Flattens a nested object into a single-level object with path-like keys.
+     * Preserves empty objects/arrays as-is.
      * @static
      * @param {Object} obj - The object to flatten.
      * @param {string} [parent=''] - Parent key prefix (used recursively).
@@ -103,6 +130,8 @@ declare class Data {
     static flatten(obj: any, parent?: string | undefined, res?: any): any;
     /**
      * Finds a value in an object by path.
+     * Supports array indices via wrapper (e.g., '[0]').
+     * Returns undefined if path not found or intermediate value is null/undefined.
      * @static
      * @param {string|string[]} path - The path to search (as string or array).
      * @param {Object} obj - The object to search in.
@@ -111,6 +140,7 @@ declare class Data {
     static find(path: string | string[], obj: any): any;
     /**
      * Finds a value in an object by path, optionally skipping scalar values.
+     * Backtracks to find nearest non-scalar parent if skipScalar=true.
      * @static
      * @param {string[]} path - The path to search.
      * @param {Object} obj - The object to search in.
@@ -123,6 +153,8 @@ declare class Data {
     };
     /**
      * Unflattens an object with path-like keys into a nested structure.
+     * Handles array indices and ensures objects are created before assignment.
+     * Sorts keys for deterministic rebuilding.
      * @static
      * @param {Object} data - The flattened object to unflatten.
      * @returns {Object} The unflattened nested object.
@@ -131,6 +163,7 @@ declare class Data {
     /**
      * Deep merges two objects, creating a new object.
      * Arrays are replaced rather than merged.
+     * Preserves original objects without mutation.
      * @static
      * @param {Object} target - The target object to merge into.
      * @param {Object} source - The source object to merge from.
@@ -153,6 +186,7 @@ declare class Data {
     }): Array<Array<string, any>>;
     /**
      * Gets the parent key of a flattened key path.
+     * Removes the last segment after OBJECT_DIVIDER.
      * @static
      * @param {string} key - The key path.
      * @returns {string} The parent key path.
@@ -160,6 +194,7 @@ declare class Data {
     static getParentKey(key: string): string;
     /**
      * Gets flat sibling entries of a specific key.
+     * Filters flat entries at the same level (excluding self).
      * @static
      * @param {Array<Array<string, any>>|Object} flat - Flattened data.
      * @param {string} key - The target key to find siblings for.
@@ -169,6 +204,7 @@ declare class Data {
     static flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string | undefined): Array<Array<string, any>>;
     /**
      * Gets all parent paths of a given path.
+     * Includes root if not avoided; appends suffix to each.
      * @static
      * @param {string} path - The path to get parents of.
      * @param {string} [suffix=""] - Suffix to append to each parent path.

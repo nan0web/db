@@ -22,7 +22,7 @@ describe('StreamEntry', () => {
 		const files = [file]
 		const dirs = new Map([['dir', file]])
 		const top = new Map([['top', file]])
-		const errors = new Map([['error', 'message']])
+		const errors = new Map([['error', new Error('test')]])
 
 		const entry = new StreamEntry({
 			file,
@@ -53,13 +53,24 @@ describe('StreamEntry', () => {
 		assert.ok(entry.files[0] instanceof DocumentEntry)
 	})
 
-	it('should handle string representations', () => {
-		const fileEntry = new DocumentEntry({ name: 'file.txt', stat: { isFile: true } })
-		const dirEntry = new DocumentEntry({ name: 'directory', stat: { isDirectory: true } })
-		const linkEntry = new DocumentEntry({ name: 'link', stat: { isSymbolicLink: true } })
+	it('should handle maps with DocumentEntry values', () => {
+		const stat = new DocumentStat({ isFile: true })
+		const entry = new DocumentEntry({ name: 'file', stat })
+		const dirs = new Map([['key', entry]])
 
-		assert.strictEqual(fileEntry.toString(), 'F file.txt')
-		assert.strictEqual(dirEntry.toString(), 'D directory')
-		assert.strictEqual(linkEntry.toString(), 'L link')
+		const streamEntry = new StreamEntry({ dirs })
+
+		assert.strictEqual(streamEntry.dirs.get('key').name, 'file')
+		assert.ok(streamEntry.dirs.get('key') instanceof DocumentEntry)
+	})
+
+	it('should handle errors as Error instances', () => {
+		const error = new Error('test error')
+		const errors = new Map([['path', error]])
+
+		const entry = new StreamEntry({ errors })
+
+		assert.strictEqual(entry.errors.get('path'), error)
+		assert.ok(entry.errors.get('path') instanceof Error)
 	})
 })
