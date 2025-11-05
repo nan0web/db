@@ -64,12 +64,13 @@ export default class DBDriverProtocol {
      * Performs authorization check based on level and context.
      * @param {string} uri - Resource URI
      * @param {'r'|'w'|'d'} level - Access level
-     * @param {object} [context={}] - Context: { user, token, ip, ... }
+     * @param {AuthContext} context - Auth context: { username, role, roles, user }
      * @returns {Promise<{ granted: boolean }>}
      * @throws {Error} - Access denied
      */
-    ensure(uri: string, level: 'r' | 'w' | 'd', context?: object): Promise<{
+    ensure(uri: string, level: 'r' | 'w' | 'd', context: AuthContext): Promise<{
         granted: boolean;
     }>;
 }
 import DocumentStat from "../DocumentStat.js";
+import AuthContext from "./AuthContext.js";

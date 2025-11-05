@@ -1,5 +1,6 @@
 export default DB;
 import DB from "./DB.js";
+import DBDriverProtocol from "./DriverProtocol.js";
 import GetOptions from "./GetOptions.js";
 import FetchOptions from "./FetchOptions.js";
-export { DB, GetOptions, FetchOptions };
+export { DB, DBDriverProtocol, GetOptions, FetchOptions };

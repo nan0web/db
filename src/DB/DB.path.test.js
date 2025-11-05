@@ -25,7 +25,7 @@ suite("DB URI Core", () => {
 
 		it("handles root boundary correctly", () => {
 			const db = new DB({ root: "/base", cwd: "/cwd" })
-			assert.strictEqual(db.resolveSync(".."), "")
+			assert.strictEqual(db.resolveSync(".."), ".")
 		})
 	})
 
@@ -88,7 +88,8 @@ suite("DB URI Core", () => {
 		it("should handle empty root from extract", () => {
 			const db = new DB({ cwd: "https://example.com", root: "." })
 			const extracted = db.extract("content")
-			assert.strictEqual(extracted.root, "content/")
+			assert.strictEqual(extracted.cwd, "https://example.com/content")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("page.json"), "page.json")
 			assert.strictEqual(extracted.absolute("page.json"), "https://example.com/content/page.json")
 		})
@@ -105,7 +106,7 @@ suite("DB URI Core", () => {
 			await db.connect()
 			const blogDb = db.extract("blog")
 
-			assert.strictEqual(blogDb.root, "content/blog/")
+			assert.strictEqual(blogDb.cwd, "https://example.com/content/blog")
 			assert.deepStrictEqual(blogDb.data.get("post1.json"), { title: "Blog Post 1" })
 			assert.strictEqual(blogDb.resolveSync("post1.json"), "post1.json")
 			assert.strictEqual(blogDb.absolute("post1.json"), "https://example.com/content/blog/post1.json")
@@ -125,7 +126,8 @@ suite("DB URI Core", () => {
 			const apiV1Db = db.extract("v1")
 			const usersDb = apiV1Db.extract("users")
 
-			assert.strictEqual(usersDb.root, "api/v1/users/")
+			assert.strictEqual(usersDb.cwd, "https://example.com/api/v1/users")
+			assert.strictEqual(usersDb.root, ".")
 			const john = await usersDb.loadDocument("john.json")
 			assert.deepStrictEqual(john, { name: "John" })
 			const mary = await usersDb.loadDocument("mary.json")
@@ -148,7 +150,8 @@ suite("DB URI Core", () => {
 			await db.connect()
 
 			const blogDb = db.extract("blog")
-			assert.strictEqual(blogDb.root, "content/blog/")
+			assert.strictEqual(blogDb.cwd, "/var/www/content/blog")
+			assert.strictEqual(blogDb.root, ".")
 			assert.deepStrictEqual(blogDb.data.get("post1.yaml"), { title: "First Post" })
 			assert.deepStrictEqual(blogDb.data.get("post2.yaml"), { title: "Second Post" })
 
@@ -156,7 +159,7 @@ suite("DB URI Core", () => {
 			assert.strictEqual(blogDb.resolveSync("post1.yaml"), "post1.yaml")
 			assert.strictEqual(blogDb.absolute("post1.yaml"), "/var/www/content/blog/post1.yaml")
 
-			// Перевірка метаданих
+			// Check metadata
 			assert.strictEqual(blogDb.meta.has("post1.yaml"), true)
 		})
 
@@ -174,12 +177,11 @@ suite("DB URI Core", () => {
 
 			const userDb = db.extract("user")
 
-			// Перевіряємо, що ми витягнули тільки користувацькі дані
+			// Verify only user data extracted
 			assert.strictEqual(userDb.meta.has("profile.json"), true)
 			assert.strictEqual(userDb.meta.has("avatar.png"), true)
 			assert.strictEqual(userDb.meta.has("config.yaml"), false)
 
-			// Перевіряємо права URI
 			assert.strictEqual(userDb.resolveSync("profile.json"), "profile.json")
 			assert.strictEqual(userDb.absolute("profile.json"), "https://example.com/private/user/profile.json")
 		})
@@ -190,7 +192,8 @@ suite("DB URI Core", () => {
 				root: "content/"
 			})
 			const extracted = db.extract("blog")
-			assert.strictEqual(extracted.root, "content/blog/")
+			assert.strictEqual(extracted.cwd, "/var/www/content/blog")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("post1.json"), "post1.json")
 			assert.strictEqual(extracted.absolute("post1.json"), "/var/www/content/blog/post1.json")
 		})
@@ -201,7 +204,8 @@ suite("DB URI Core", () => {
 				root: "."
 			})
 			const extracted = db.extract("content/blog")
-			assert.strictEqual(extracted.root, "content/blog/")
+			assert.strictEqual(extracted.cwd, "/var/www/content/blog")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("a/post1.json"), "a/post1.json")
 			assert.strictEqual(extracted.absolute("a/post1.json"), "/var/www/content/blog/a/post1.json")
 		})
@@ -212,7 +216,8 @@ suite("DB URI Core", () => {
 				root: "."
 			})
 			const extracted = db.extract("blog")
-			assert.strictEqual(extracted.root, "blog/")
+			assert.strictEqual(extracted.cwd, "/content/blog")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("post1.json"), "post1.json")
 			assert.strictEqual(extracted.absolute("post1.json"), "/content/blog/post1.json")
 		})
@@ -223,7 +228,8 @@ suite("DB URI Core", () => {
 				root: "api/v1"
 			})
 			const extracted = db.extract("users/profiles")
-			assert.strictEqual(extracted.root, "api/v1/users/profiles/")
+			assert.strictEqual(extracted.cwd, "https://example.com/api/v1/users/profiles")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("alice.json"), "alice.json")
 			assert.strictEqual(extracted.absolute("alice.json"), "https://example.com/api/v1/users/profiles/alice.json")
 		})
@@ -231,7 +237,8 @@ suite("DB URI Core", () => {
 		it("should correctly handle empty root extraction", () => {
 			const db = new DB({ cwd: "https://example.com", root: "content" })
 			const extracted = db.extract("")
-			assert.strictEqual(extracted.root, "content/")
+			assert.strictEqual(extracted.cwd, "https://example.com/content")
+			assert.strictEqual(extracted.root, ".")
 			assert.strictEqual(extracted.resolveSync("page.json"), "page.json")
 			assert.strictEqual(extracted.absolute("page.json"), "https://example.com/content/page.json")
 		})
@@ -250,7 +257,8 @@ suite("DB URI Core", () => {
 			const extracted = db.extract('dir/')
 			const file1 = await extracted.loadDocument('file1.txt', "")
 			const file2 = await extracted.fetch('file2.txt')
-			assert.strictEqual(extracted.root, 'root/dir/')
+			assert.strictEqual(extracted.cwd, '/root/dir/')
+			assert.strictEqual(extracted.root, '.')
 			assert.strictEqual(extracted.data.size, 2)
 			assert.strictEqual(extracted.meta.size, 3)
 			assert.strictEqual(file1, "content1")
@@ -325,7 +333,7 @@ suite("DB URI Core", () => {
 
 		it("resolves relative paths correctly", () => {
 			const db = new DB({ cwd: "/cwd/", root: "root/dir/fixtures" })
-			assert.equal(db.absolute("../file"), "/cwd/root/dir/file")
+			assert.equal(db.absolute("../file"), "/cwd/root/dir/fixtures/file")
 		})
 
 		it('should throw not implemented error', () => {
@@ -485,7 +493,7 @@ suite("DB URI Core", () => {
 		})
 		it("should resolve / directories", async () => {
 			const path = await db.resolve("api", "/users")
-			assert.equal(path, "users")
+			assert.equal(path, "/users")
 		})
 		it("should resolve .. directories", async () => {
 			const path = await db.resolve("api/v1/", "../users")
@@ -498,12 +506,12 @@ suite("DB URI Core", () => {
 		it("should not resolve .. beyond root", async () => {
 			// Test cases for ../ resolution behavior at root level
 			const testCases = [
-				{ args: ["/", "..", "_"], expected: "_" },
-				{ args: ["/path", "..", "_"], expected: "_" },
-				{ args: ["/deeply/nested/path", "..", "_"], expected: "deeply/nested/_" },
+				{ args: ["/", "..", "_"], expected: "/_" },
+				{ args: ["/path", "..", "_"], expected: "/_" },
+				{ args: ["/deeply/nested/path", "..", "_"], expected: "/deeply/nested/_" },
 				{ args: ["_", "..", "_"], expected: "_" },
 				{ args: ["playground/_", "..", "_"], expected: "playground/_" },
-				{ args: ["/playground/_", "..", "_"], expected: "playground/_" },
+				{ args: ["/playground/_", "..", "_"], expected: "/playground/_" },
 			]
 
 			for (const { args, expected } of testCases) {
@@ -517,8 +525,8 @@ suite("DB URI Core", () => {
 			[["a", "b", "c.txt"], "a/b/c.txt"],
 			[["../../", "var", "www"], "var/www"],
 			[["."], "."],
-			[["/", "404.json"], "404.json"],
-			[["/root", "/dir", "file.txt"], "dir/file.txt"],
+			[["/", "404.json"], "/404.json"],
+			[["/root", "/dir", "file.txt"], "/dir/file.txt"],
 		]
 		for (const [args, exp] of expected) {
 			const db = new DB()

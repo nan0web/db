@@ -8,7 +8,9 @@ import DocumentEntry from "../DocumentEntry.js"
 import StreamEntry from "../StreamEntry.js"
 import GetOptions from "./GetOptions.js"
 import FetchOptions from "./FetchOptions.js"
+import AuthContext from "./AuthContext.js"
 import DBDriverProtocol from "./DriverProtocol.js"
+import { absolute, basename, dirname, extname, isAbsolute, isRemote, normalize, relative, resolveSync } from "./path.js"
 
 /**
  * Base database class for document storage and retrieval.
@@ -19,17 +21,18 @@ import DBDriverProtocol from "./DriverProtocol.js"
  * Key features:
  * - URI-based path resolution and normalization
  * - Caching via in-memory Maps for data and metadata
- * - Access control via driver protocol
+ * - Access control via driver protocol with AuthContext
  * - Hierarchical directory traversal with indexing support
  * - Data merging with reference handling using the Data utility class
  *
  * Usage example:
  * ```js
- * const db = new DB({ cwd: 'https://api.example.com', root: 'v1' });
- * await db.connect();
- * const data = await db.fetch('users/profile');
- * await db.set('users/profile', { name: 'John' });
- * await db.push(); // Persist changes
+ * const context = new AuthContext({ role: 'user' })
+ * const db = new DB({ cwd: 'https://api.example.com', root: 'v1', context })
+ * await db.connect()
+ * const data = await db.fetch('users/profile', undefined)
+ * await db.set('users/profile', { name: 'John' })
+ * await db.push(ctx)
  * ```
  *
  * Extensibility:
@@ -55,8 +58,8 @@ export default class DB {
 	data = new Map()
 	/** @type {Map<string, DocumentStat>} */
 	meta = new Map()
-	/** @type {object} */
-	context = {}
+	/** @type {AuthContext} */
+	context = new AuthContext()
 	/** @type {boolean} */
 	connected = false
 	/** @type {string} */
@@ -81,6 +84,7 @@ export default class DB {
 	 * - connection status,
 	 * - attached databases,
 	 * - console for the debug, silent = true by default.
+	 * - auth context for access control.
 	 *
 	 * @param {object} input
 	 * @param {string} [input.root="."] - Root path for URI resolution
@@ -89,7 +93,7 @@ export default class DB {
 	 * @param {boolean} [input.connected=false] - Connection status
 	 * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
 	 * @param {Map<string, DocumentStat>} [input.meta=new Map()] - Metadata cache
-	 * @param {object} [input.context={}] - Authentication/authorization context
+	 * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
 	 * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
 	 * @param {DB[]} [input.dbs=[]] - Attached sub-databases
 	 * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
@@ -112,7 +116,7 @@ export default class DB {
 		this.driver = driver
 		this.data = data instanceof Map ? data : new Map(data)
 		this.meta = meta instanceof Map ? meta : new Map(meta)
-		this.context = { ...context }
+		this.context = AuthContext.from(context)
 		this.#console = consoleInput
 		this.connected = connected
 		// Ensure that we have DB instances in the array
@@ -247,10 +251,19 @@ export default class DB {
 	}
 
 	/**
-	 * Creates a new DB instance with a subset of the data and meta, scoped to a specific URI prefix.
-	 * Useful for creating isolated sub-databases (e.g., user-specific data).
+	 * Creates a new DB instance with a subset of the data and meta,
+	 * scoped to a specific URI prefix.
+	 *
+	 * The returned database works as if the supplied `uri` were its
+	 * virtual root:
+	 *   - `root` property reflects the new virtual root (`.../uri/`).
+	 *   - `cwd` is inherited from the parent so that `absolute()` still
+	 *     produces full URLs.
+	 *   - `resolveSync()` is overridden to return paths **relative** to the
+	 *     extracted root (i.e. the prefix is stripped).
+	 *
 	 * @param {string} uri The URI to extract from the current DB.
-	 * @returns {DB} New DB instance with filtered data and metadata
+	 * @returns {DB} New DB instance with filtered data and metadata.
 	 */
 	extract(uri) {
 		this.#console.debug("extract()", uri)
@@ -265,15 +278,13 @@ export default class DB {
 				.map(([key, value]) => [String(key.substring(prefix.length) || "."), value])
 		)
 
-		let newRoot = this.normalize(this.root, uri)
-		if (!newRoot.endsWith("/")) newRoot += "/"
+		let cwd = this.absolute(uri)
 
 		const data = extractor(this.data.entries())
 		const meta = extractor(this.meta.entries())
 
 		const db = new Class({
-			root: newRoot,
-			cwd: this.cwd,
+			cwd,
 			data,
 			meta,
 			console: this.console,
@@ -282,17 +293,16 @@ export default class DB {
 		this.#console.debug("extract().done", uri, { db })
 		return db
 	}
+
 	/**
-	 * Extracts file extension with leading dot from URI
-	 * @param {string} uri
-	 * @returns {string} Extension (e.g., ".txt") or empty string
-	 * @example
-	 * db.extname("file.TXT") // => .txt
-	 */
+		 * Extracts file extension with leading dot from URI
+		 * @param {string} uri
+		 * @returns {string} Extension (e.g., ".txt") or empty string
+		 * @example
+		 * db.extname("file.TXT") // => .txt
+		 */
 	extname(uri) {
-		this.#console.debug("extname()", uri)
-		const arr = uri.split(".")
-		return arr.length > 1 ? `.${arr.pop()}`.toLowerCase() : ""
+		return extname(uri)
 	}
 
 	/**
@@ -303,11 +313,7 @@ export default class DB {
 	 * @returns {string} Relative path
 	 */
 	relative(from, to = this.root) {
-		if (from.startsWith("/") && to.startsWith("/")) {
-			if (!to.endsWith("/")) to += "/"
-			return from.startsWith(to) ? from.substring(to.length) : to
-		}
-		return to
+		return relative(from, to)
 	}
 
 	/**
@@ -413,7 +419,8 @@ export default class DB {
 	 * @async
 	 * @generator
 	 * @param {string} uri - The URI of the directory to read
-	 * @param {object} options - Read directory options
+	 * @param {object} [options] - Read directory options
+	 * @param {AuthContext | object} [options.context] - Auth context
 	 * @param {number} [options.depth=-1] - The depth to which subdirectories should be read (-1 means unlimited)
 	 * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
 	 * @param {boolean} [options.includeDirs=false] - Whether to skip or include directories.
@@ -431,11 +438,13 @@ export default class DB {
 			includeDirs = false,
 			filter,
 			depth = -1,
+			context,
 		} = options
 
 		this.#console.debug("readDir()", uri, { uri, options })
 
-		const dirUri = await this.resolve(uri)
+		const authContext = AuthContext.from(context || this.context)
+		await this.ensureAccess(uri, "r", authContext)
 
 		if (!skipIndex) {
 			const indexPath = this.resolveSync(this.Index.FULL_INDEX)
@@ -452,12 +461,12 @@ export default class DB {
 					return
 				}
 			}
-			const indexTxtPath = this.resolveSync(dirUri, this.Index.INDEX)
-			const entries = await this.loadDocument(indexTxtPath, "")
+			const indexTxtPath = this.resolveSync(uri, this.Index.INDEX)
+			const entries = await this.loadDocument(indexTxtPath, undefined, authContext)
 			if (entries) {
 				const index = DirectoryIndex.decode(entries)
 				for (const [name, stat] of index.entries) {
-					const path = this.resolveSync(dirUri, name)
+					const path = this.resolveSync(uri, name)
 					const entry = new DocumentEntry({ path, name: name, stat: stat })
 					if (!filter || filter(entry)) {
 						yield entry
@@ -466,8 +475,8 @@ export default class DB {
 				if (Math.abs(depth) > 0) {
 					for (const [name, item] of index.entries) {
 						if (item.isDirectory) {
-							const subdir = this.resolveSync(dirUri, name)
-							yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+							const subdir = this.resolveSync(uri, name)
+							yield* this.readDir(subdir, { ...options, depth: depth - 1, context: authContext })
 						}
 					}
 				}
@@ -476,7 +485,7 @@ export default class DB {
 		}
 
 		try {
-			const list = await this.listDir(uri)
+			const list = await this.listDir(uri, authContext)
 			const files = []
 			const dirs = []
 
@@ -499,8 +508,8 @@ export default class DB {
 					yield dir
 				}
 				if (Math.abs(depth) > 0) {
-					const subdir = this.resolveSync(dirUri, dir.name)
-					yield* this.readDir(subdir, { ...options, depth: depth - 1 })
+					const subdir = this.resolveSync(uri, dir.name)
+					yield* this.readDir(subdir, { ...options, depth: depth - 1, context: authContext })
 				}
 			}
 
@@ -509,7 +518,7 @@ export default class DB {
 				yield file
 			}
 		} catch (/** @type {any} */err) {
-			this.#console.warn(`Failed to list directory: ${dirUri}`, err)
+			this.#console.warn(`Failed to list directory: ${uri}`, err)
 		}
 	}
 
@@ -628,16 +637,24 @@ export default class DB {
 	 * Gets document content from cache or loads if missing.
 	 * Supports default fallback value for missing documents.
 	 * @param {string} uri - Document URI
-	 * @param {object | GetOptions} [opts] - Options or GetOptions instance
+	 * @param {object | GetOptions} [input] - Options or GetOptions instance
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>} Document content
 	 */
-	async get(uri, opts = new this.GetOptions()) {
-		opts = this.GetOptions.from(opts)
+	async get(uri, input = {}, context) {
+		let opts
+		if (context !== undefined) {
+			opts = this.GetOptions.from(input)
+		} else {
+			opts = this.GetOptions.from(input || {})
+			context = this.context
+		}
+		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
 		this.#console.debug("get()", uri, { opts })
-		await this.ensureAccess(uri, "r")
+		await this.ensureAccess(uri, "r", authContext)
 		if (!this.data.has(uri) || false === this.data.get(uri)) {
-			const data = await this.loadDocument(uri, opts.defaultValue)
+			const data = await this.loadDocument(uri, opts.defaultValue, authContext)
 			this.#console.debug("get().done", uri, { data, cache: false })
 			this.data.set(uri, data)
 			return data
@@ -651,12 +668,13 @@ export default class DB {
 	 * Sets document content in cache and updates metadata timestamp.
 	 * @param {string} uri - Document URI
 	 * @param {any} data - Document data
-	 * @param {object} context - Authorization context
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>} The set data
 	 */
 	async set(uri, data, context = this.context) {
+		const authContext = AuthContext.from(context)
 		this.#console.debug("set()", uri, { data })
-		await this.ensureAccess(uri, "w", context)
+		await this.ensureAccess(uri, "w", authContext)
 		this.data.set(uri, data)
 		const meta = this.meta.has(uri) ? this.meta.get(uri) : {}
 		this.meta.set(uri, new DocumentStat({ ...meta, mtimeMs: Date.now() }))
@@ -667,13 +685,15 @@ export default class DB {
 	 * Gets document statistics from cache or loads if missing.
 	 * Supports extension fallback for extension-less URIs.
 	 * @param {string} uri - Document URI
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<DocumentStat | undefined>}
 	 */
-	async stat(uri) {
+	async stat(uri, context = this.context) {
+		const authContext = AuthContext.from(context)
 		this.#console.debug("stat()", uri)
-		await this.ensureAccess(uri, "r")
+		await this.ensureAccess(uri, "r", authContext)
 		if (!this.meta.has(uri)) {
-			const stat = await this.statDocument(uri)
+			const stat = await this.statDocument(uri, authContext)
 			this.#console.debug("stat().done", uri, { stat, cache: false })
 			this.meta.set(uri, stat)
 		}
@@ -700,41 +720,7 @@ export default class DB {
 	 * @returns {string} Normalized path
 	 */
 	normalize(...args) {
-		let startsWithSlash = false
-		const segments = []
-
-		for (const arg of args) {
-			if (arg) {
-				if (arg.startsWith("/")) {
-					startsWithSlash = true
-				}
-				const parts = arg.split("/").filter(seg => seg !== "" && seg !== ".")
-				for (const part of parts) {
-					if (part === "..") {
-						if (segments.length > 0) {
-							segments.pop()
-						} else if (startsWithSlash) {
-							startsWithSlash = false
-						}
-					} else {
-						segments.push(part)
-					}
-				}
-			}
-		}
-
-		let result = segments.join("/")
-		if (args.length > 0 && args[args.length - 1].endsWith("/") && result !== "") {
-			result += "/"
-		}
-		if (result.startsWith("/")) {
-			result = result.slice(1)
-		}
-		// if (startsWithSlash) {
-		// 	result = "/" + result
-		// }
-
-		return result || (startsWithSlash ? "/" : "")
+		return normalize(...args)
 	}
 	/**
 	 * Checks if current uri has scheme in it, such as http://, https://, ftp://, file://, etc.
@@ -742,7 +728,7 @@ export default class DB {
 	 * @returns {boolean}
 	 */
 	isRemote(uri) {
-		return /^[a-z]+:\/\//i.test(uri)
+		return isRemote(uri)
 	}
 	/**
 	 * Checks if current uri is absolute (started from /) or remote.
@@ -750,7 +736,7 @@ export default class DB {
 	 * @returns {boolean}
 	 */
 	isAbsolute(uri) {
-		return uri.startsWith("/") || this.isRemote(uri)
+		return isAbsolute(uri)
 	}
 	/**
 	 * Resolves path segments to absolute path synchronously
@@ -759,22 +745,7 @@ export default class DB {
 	 * @returns {string} Resolved absolute path
 	 */
 	resolveSync(...args) {
-		this.#console.debug("resolveAsync()", { cwd: this.cwd, root: this.root, args })
-
-		let rels = []
-		args.forEach(arg => {
-			if (this.isAbsolute(arg)) rels = []
-			rels.push(arg)
-		})
-
-		const path = this.normalize(...rels)
-		const base = this.normalize(this.root)
-
-		if (path.startsWith(base)) {
-			return path.slice(base.length).replace(/^\/+/, '') || "."
-		}
-
-		return path
+		return resolveSync(this.cwd, this.root, ...args)
 	}
 
 	/**
@@ -785,30 +756,16 @@ export default class DB {
 	 * @returns {string}
 	 */
 	basename(uri, removeSuffix = "") {
-		const parts = uri.split("/")
-		let base = ""
-		if (uri.endsWith("/")) {
-			base = parts.length > 1 ? parts[parts.length - 2] + "/" : ""
-		} else if (parts.length) {
-			base = parts.pop() || ""
-		}
-		if (base === removeSuffix) return base
-		const suffix = true === removeSuffix ? this.extname(uri) : String(removeSuffix)
-		if (suffix && base.endsWith(suffix) && suffix !== base) {
-			return base.slice(0, -suffix.length)
-		}
-		return base
+		return basename(uri, removeSuffix)
 	}
 
+	/**
+	 * Returns directory name of URI
+	 * @param {string} uri
+	 * @returns {string}
+	 */
 	dirname(uri) {
-		const parts = uri.split("/")
-		if (uri.endsWith("/")) {
-			return parts.length > 1 ? parts.slice(0, parts.length - 2).join("/") + "/" : "/"
-		}
-		if (parts.length > 1) {
-			return parts.slice(0, -1).join("/") + "/"
-		}
-		return "/"
+		return dirname(uri)
 	}
 	/**
 	 * Gets absolute path
@@ -818,20 +775,7 @@ export default class DB {
 	 */
 	absolute(...args) {
 		this.#console.debug("absolute()", { args })
-
-		// If cwd contains URL scheme (http://, https://, file://, etc.)
-		if (this.isRemote(this.cwd)) {
-			try {
-				let url = new URL(this.cwd)
-				let path = this.normalize(this.root, ...args)
-				url.pathname = this.normalize(url.pathname || '/', path)
-				return String(url)
-			} catch (e) {
-				this.#console.warn("Incorrect scheme", { cwd: this.cwd })
-			}
-		}
-		let path = this.normalize(this.cwd, this.root, ...args)
-		return path.startsWith('/') ? path : '/' + path
+		return absolute(this.cwd, this.root, ...args)
 	}
 	/**
 	 * Loads a document.
@@ -840,21 +784,21 @@ export default class DB {
 	 * Supports extension fallback for extension-less URIs.
 	 * @param {string} uri - Document URI
 	 * @param {any} [defaultValue] - Default value if document not found
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>}
 	 */
-	async loadDocument(uri, defaultValue = undefined) {
-		// uri = await this.resolve(uri)
+	async loadDocument(uri, defaultValue, context = this.context) {
 		this.#console.debug("loadDocument()", uri, { defaultValue })
+		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
-		// if (abs.startsWith("/")) abs = abs.slice(1)
-		await this.ensureAccess(uri, "r")
+		await this.ensureAccess(uri, "r", authContext)
 		if (this.data.has(uri)) {
 			return this.data.get(uri)
 		}
 		const extname = this.extname(uri)
 		if (!extname) {
 			for (const ext of this.Directory.DATA_EXTNAMES) {
-				const data = await this.loadDocument(uri + ext, null)
+				const data = await this.loadDocument(uri + ext, null, authContext)
 				if (null !== data) {
 					return data
 				}
@@ -868,11 +812,13 @@ export default class DB {
 	 * @param {string} ext The extension of the document.
 	 * @param {string} uri The URI to load the document from.
 	 * @param {any} defaultValue The default value to return if the document does not exist.
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>} The loaded document or the default value.
 	 */
-	async loadDocumentAs(ext, uri, defaultValue) {
+	async loadDocumentAs(ext, uri, defaultValue, context = this.context) {
 		this.#console.debug("loadDocumentAs()", uri, { ext, defaultValue })
-		return await this.loadDocument(uri, defaultValue)
+		const authContext = AuthContext.from(context)
+		return await this.loadDocument(uri, defaultValue, authContext)
 	}
 
 	/**
@@ -882,11 +828,13 @@ export default class DB {
 	 * Updates indexes after save.
 	 * @param {string} uri - Document URI
 	 * @param {any} document - Document data
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<boolean>}
 	 */
-	async saveDocument(uri, document) {
+	async saveDocument(uri, document, context = this.context) {
 		this.#console.debug("saveDocument()", uri, { document })
-		await this.ensureAccess(uri, "w")
+		const authContext = AuthContext.from(context)
+		await this.ensureAccess(uri, "w", authContext)
 		const abs = this.normalize(await this.resolve(uri))
 		this.data.set(abs, document)
 		const stat = DocumentStat.from(this.meta.get(abs) ?? {})
@@ -904,19 +852,21 @@ export default class DB {
 	 * In a basic class it just returns a document stat from the db.meta map if exists.
 	 * @note Must be overwritten by platform-specific implementation
 	 * @param {string} uri - Document URI
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<DocumentStat>}
 	 */
-	async statDocument(uri) {
+	async statDocument(uri, context = this.context) {
 		this.#console.debug("statDocument()", uri)
+		const authContext = AuthContext.from(context)
 		if ("." === uri) uri = "./"
-		await this.ensureAccess(uri)
+		await this.ensureAccess(uri, "r", authContext)
 		const isDir = uri.endsWith("/")
 		const abs = (this.normalize(await this.resolve(uri)) || ".") + (isDir ? "/" : "")
 
 		const extname = this.extname(abs)
 		if (!extname) {
 			for (const ext of this.Directory.DATA_EXTNAMES) {
-				const stat = await this.statDocument(uri + ext)
+				const stat = await this.statDocument(uri + ext, authContext)
 				if (stat.exists) {
 					return stat
 				}
@@ -930,11 +880,13 @@ export default class DB {
 	 * Writes data to a document with overwrite
 	 * @param {string} uri - Document URI
 	 * @param {string} chunk - Data to write
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<boolean>} Success status
 	 */
-	async writeDocument(uri, chunk) {
+	async writeDocument(uri, chunk, context = this.context) {
 		this.#console.debug("writeDocument()", uri, { chunk })
-		await this.ensureAccess(uri, "w")
+		const authContext = AuthContext.from(context)
+		await this.ensureAccess(uri, "w", authContext)
 		return false
 	}
 
@@ -942,13 +894,15 @@ export default class DB {
 	 * Delete document from storage
 	 * @note Must be overwritten by platform specific application
 	 * @param {string} uri - Document URI
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<boolean>}
 	 * Always returns false for base implementation not knowing
 	 * to implement delete on top of generic interface
 	 */
-	async dropDocument(uri) {
+	async dropDocument(uri, context = this.context) {
 		this.#console.debug("dropDocument()", uri)
-		await this.ensureAccess(uri, "d")
+		const authContext = AuthContext.from(context)
+		await this.ensureAccess(uri, "d", authContext)
 		this.data.delete(uri)
 		this.meta.delete(uri)
 		return false
@@ -958,13 +912,15 @@ export default class DB {
 	 * Ensures access to document with context.
 	 * Delegates to driver for authorization checks.
 	 * @param {string} uri - Document URI
-	 * @param {'r'|'w'|'d'} level - Access level
-	 * @param {object} [context=this.context] - Auth context: { user, token, ip }
+	 * @param {'r'|'w'|'d'} [level="r"] - Access level
+	 * @param {AuthContext | object} [context=this.context] - Auth context: { username, role, roles, user }
 	 * @returns {Promise<void>}
 	 * @throws {Error} - Access denied
 	 */
 	async ensureAccess(uri, level = "r", context = this.context) {
 		this.#console.debug("ensureAccess()", uri, { level, context })
+
+		const authContext = AuthContext.from(context)
 
 		if (!['r', 'w', 'd'].includes(level)) {
 			throw new TypeError([
@@ -981,10 +937,10 @@ export default class DB {
 		}
 
 		try {
-			const result = await this.driver.ensure(uri, level, context)
-			if (!result?.granted) {
+			const result = await this.driver.ensure(uri, level, authContext)
+			if (!result || !result.granted) {
 				const msg = `Access denied to ${uri} (level: ${level})`
-				this.#console.warn(msg, { context })
+				this.#console.warn(msg, { context: authContext })
 				throw new Error(msg)
 			}
 			this.#console.debug("Access granted by driver", { uri, level })
@@ -997,24 +953,26 @@ export default class DB {
 	 * Synchronize data with persistent storage
 	 * Saves changed documents where local mtime > remote stat mtime.
 	 * @param {string|undefined} [uri] Optional specific URI to save
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<string[]>} Array of saved URIs
 	 */
-	async push(uri = undefined) {
+	async push(uri = undefined, context = this.context) {
 		this.#console.debug("push()", uri)
+		const authContext = AuthContext.from(context)
 		if (uri) {
-			await this.ensureAccess(uri, "w")
+			await this.ensureAccess(uri, "w", authContext)
 		} else {
 			for (const [key] of this.data) {
-				await this.ensureAccess(key, "w")
+				await this.ensureAccess(key, "w", authContext)
 			}
 		}
 		const changed = []
 		for (const [key, value] of this.data) {
 			const meta = this.meta.get(key) ?? { mtimeMs: 0 }
-			const stat = await this.statDocument(key)
+			const stat = await this.statDocument(key, authContext)
 			if (meta.mtimeMs > stat.mtimeMs) {
 				changed.push(key)
-				await this.saveDocument(key, value)
+				await this.saveDocument(key, value, authContext)
 			}
 		}
 		this.#console.info("Data pushed to storage", { changedUris: changed })
@@ -1026,15 +984,17 @@ export default class DB {
 	 * Loads source, saves to target, drops source, updates indexes.
 	 * @param {string} from - Source URI
 	 * @param {string} to - Target URI
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<boolean>} Success status
 	 */
-	async moveDocument(from, to) {
+	async moveDocument(from, to, context = this.context) {
 		this.#console.debug("moveDocument()", { from, to })
-		await this.ensureAccess(to, "w")
-		await this.ensureAccess(from, "r")
-		const data = await this.loadDocument(from)
-		await this.saveDocument(to, data)
-		await this.dropDocument(from)
+		const authContext = AuthContext.from(context)
+		await this.ensureAccess(to, "w", authContext)
+		await this.ensureAccess(from, "r", authContext)
+		const data = await this.loadDocument(from, undefined, authContext)
+		await this.saveDocument(to, data, authContext)
+		await this.dropDocument(from, authContext)
 		const abs = this.normalize(await this.resolve(from))
 		await this._updateIndex(abs)
 		return true
@@ -1055,11 +1015,14 @@ export default class DB {
 	 * Lists immediate entries in a directory by scanning meta keys.
 	 * Filters to direct children only.
 	 * @param {string} uri - The directory URI (e.g., "content", ".", "dir/")
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<DocumentEntry[]>}
 	 * @throws {Error} If directory does not exist
 	 */
-	async listDir(uri) {
+	async listDir(uri, context = this.context) {
 		this.#console.debug("listDir()", uri)
+		const authContext = AuthContext.from(context)
+		await this.ensureAccess(uri, "r", authContext)
 		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
 		const depth = (uri.endsWith("/") ? uri.slice(0, -1) : uri).split("/").length
 		const keys = Array.from(this.meta.keys())
@@ -1084,7 +1047,8 @@ export default class DB {
 	 * Traverses directory with sorting, limiting, and loading options.
 	 * Yields StreamEntry with cumulative stats and errors.
 	 * @param {string} uri - Starting URI
-	 * @param {object} options - Stream options
+	 * @param {object} [options] - Stream options
+	 * @param {AuthContext | object} [options.context] - Auth context
 	 * @param {Function} [options.filter] - Filter function
 	 * @param {number} [options.limit] - Limit number of entries
 	 * @param {'name'|'mtime'|'size'} [options.sort] - The sort criteria
@@ -1104,8 +1068,10 @@ export default class DB {
 			skipStat = false,
 			skipSymbolicLink = false,
 			load = false,
+			context,
 		} = options
 		this.#console.debug("findStream()", uri, { options })
+		const authContext = AuthContext.from(context || this.context)
 		/** @type {Map<string, DocumentEntry>} */
 		let dirs = new Map()
 		/** @type {Map<string, DocumentEntry>} */
@@ -1128,10 +1094,10 @@ export default class DB {
 
 		const totalSize = { dirs: 0, files: 0 }
 
-		await this.ensureAccess(uri)
+		await this.ensureAccess(uri, "r", authContext)
 
 		const files = []
-		for await (const file of this.readDir(uri, { skipStat, skipSymbolicLink, filter })) {
+		for await (const file of this.readDir(uri, { skipStat, skipSymbolicLink, filter, context: authContext })) {
 			files.push(file)
 			if (file.stat.error) {
 				errors.set(file.path, file.stat.error)
@@ -1161,7 +1127,7 @@ export default class DB {
 			yield entry
 			if (!skipStat) this.meta.set(file.path, file.stat)
 			if (load && this.isData(file.path)) {
-				const data = await this.loadDocument(file.path)
+				const data = await this.loadDocument(file.path, undefined, authContext)
 				this.data.set(file.path, data)
 			}
 			if (limit > 0 && files.length >= limit) break
@@ -1193,7 +1159,7 @@ export default class DB {
 		// Load root inheritance data
 		if (!this._inheritanceCache.has('/')) {
 			try {
-				const rootData = await this.loadDocument(this.Directory.FILE, {})
+				const rootData = await this.loadDocument(this.Directory.FILE)
 				this._inheritanceCache.set('/', rootData)
 				this.#console.debug("getInheritance().loaded", path, { rootData })
 			} catch (/** @type {any} */ err) {
@@ -1207,7 +1173,7 @@ export default class DB {
 			if (!this._inheritanceCache.has(dirPath)) {
 				try {
 					const uri = this.resolveSync(dirPath, this.Directory.FILE)
-					const dirData = await this.loadDocument(uri, {})
+					const dirData = await this.loadDocument(uri)
 					this._inheritanceCache.set(dirPath, dirData)
 					this.#console.debug("getInheritance().loaded", path, { dirPath, dirData })
 				} catch (/** @type {any} */ err) {
@@ -1262,13 +1228,25 @@ export default class DB {
 	 * Fetch document with inheritance, globals and references processing
 	 * Handles extension lookup, directory resolution, and merging.
 	 * @param {string} uri
-	 * @param {object | FetchOptions} [opts]
+	 * @param {object | FetchOptions} [input]
+	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>}
 	 */
-	async fetch(uri, opts = new FetchOptions()) {
-		this.#console.debug("fetch()", uri, { uri, opts })
-		opts = FetchOptions.from(opts)
+	async fetch(uri, input = {}, context) {
+		let opts
+		if (context !== undefined) {
+			opts = FetchOptions.from(input)
+		} else {
+			opts = FetchOptions.from(input || {})
+			context = this.context
+		}
+		// make reference‑resolution on by default (tests rely on it)
+		if (opts.refs === undefined) opts.refs = true
+		if (opts.inherit === undefined) opts.inherit = true
+		if (opts.globals === undefined) opts.globals = true
 
+		const authContext = AuthContext.from(context)
+		this.#console.debug("fetch()", uri, { uri, opts })
 		// Handle extension-less URIs by trying common extensions
 		let ext = this.extname(uri)
 		let mightBeDirectory = false
@@ -1283,9 +1261,9 @@ export default class DB {
 					do {
 						extname = arr.shift()
 						const path = this.resolveSync(uri, this.Directory.INDEX + extname)
-						const stat = await this.statDocument(path)
+						const stat = await this.statDocument(path, authContext)
 						if (stat.exists) {
-							return await this.fetchMerged(path, opts)
+							return await this.fetchMerged(path, opts, authContext)
 						}
 					} while (extname)
 				} catch (/** @type {any} */ err) {
@@ -1298,9 +1276,9 @@ export default class DB {
 			const extsToTry = this.Directory.DATA_EXTNAMES
 			for (const extension of extsToTry) {
 				const fullUri = uri + extension
-				const stat = await this.statDocument(fullUri)
+				const stat = await this.statDocument(fullUri, authContext)
 				if (stat.exists) {
-					return await this.fetchMerged(fullUri, opts)
+					return await this.fetchMerged(fullUri, opts, authContext)
 				}
 			}
 
@@ -1312,7 +1290,7 @@ export default class DB {
 		// If extension is not supported, try to load as is
 		if (!this.Directory.DATA_EXTNAMES.includes(ext)) {
 			try {
-				return await this.loadDocumentAs(".txt", uri, opts.defaultValue)
+				return await this.loadDocumentAs(".txt", uri, opts.defaultValue, authContext)
 			} catch (/** @type {any} */ err) {
 				// If loading fails, return default value
 				this.#console.warn("Error loading document with unsupported extension", { uri, error: err.message })
@@ -1322,7 +1300,7 @@ export default class DB {
 
 		// Try to load as file with extension
 		try {
-			const result = await this.fetchMerged(uri, opts)
+			const result = await this.fetchMerged(uri, opts, authContext)
 			return result
 		} catch (/** @type {any} */ err) {
 			// If it's a potential directory and directories are allowed, try as directory
@@ -1332,12 +1310,12 @@ export default class DB {
 					if (indexPath === uri) {
 						throw new Error("Impossible to have the same directory path as a request uri")
 					}
-					const result = await this.fetchMerged(indexPath, opts)
+					const result = await this.fetchMerged(indexPath, opts, authContext)
 					return result
 				} catch (/** @type {any} */ indexErr) {
 					// If index file doesn't exist, return listing
 					if (opts.allowDirs) {
-						const dirEntries = await this.listDir(uri)
+						const dirEntries = await this.listDir(uri, authContext)
 						if (dirEntries.length > 0) {
 							return dirEntries.map(entry => ({
 								name: entry.name,
@@ -1365,31 +1343,37 @@ export default class DB {
 	 * Handles inheritance, globals, and references with circular protection.
 	 * @param {string} uri - The URI to fetch and merge data for
 	 * @param {FetchOptions} [opts] - Fetch options
-	 * @param {Set<string>} [visited] - For internal circular reference protection
+	 * @param {AuthContext | Set<string>} [contextOrVisited] - Auth context or visited set
+	 * @param {Set<string>} [visited=new Set()] - For internal circular reference protection
 	 * @returns {Promise<any>} Merged data object
 	 */
-	async fetchMerged(uri, opts = new FetchOptions(), visited = new Set()) {
-		this.#console.debug("fetchMerged()", uri, { uri, opts, visited: Array.from(visited) })
+	async fetchMerged(uri, opts = new FetchOptions(), contextOrVisited = this.context, visited = new Set()) {
+		const authContext = AuthContext.from(contextOrVisited)
+		let visitedSet = visited
+		if (contextOrVisited instanceof Set) {
+			visitedSet = contextOrVisited
+		}
+		this.#console.debug("fetchMerged()", uri, { uri, opts, visited: Array.from(visitedSet) })
 		opts = FetchOptions.from(opts)
 		const extname = this.extname(uri)
 		const isData = !extname || this.Directory.DATA_EXTNAMES.includes(extname)
 
 		// Prevent self-repeating
-		if (visited.has(uri)) {
+		if (visitedSet.has(uri)) {
 			this.#console.warn("Circular inheritance chain detected", { uri })
 			return opts.defaultValue
 		}
-		const nextVisited = new Set(visited).add(uri)
+		const nextVisited = new Set(visitedSet).add(uri)
 
 		// Load the document first
-		let data = await this.loadDocument(uri)
+		let data = await this.loadDocument(uri, undefined, authContext)
 		const isExtensible = "object" === typeof data && null !== data && !Array.isArray(data)
 
 		if (opts.inherit && isExtensible) {
 			// Always load root inheritance first
 			if (!this._inheritanceCache.has('/')) {
 				const rootUri = this.resolveSync('/', Directory.FILE)
-				const rootInheritance = await this.loadDocument(rootUri, {})
+				const rootInheritance = await this.loadDocument(rootUri, {}, authContext)
 				this._inheritanceCache.set('/', rootInheritance)
 			}
 			let dir = uri
@@ -1400,9 +1384,9 @@ export default class DB {
 					dir = this.dirname(dir)
 					let currentDir = this.resolveSync(dir, this.Directory.FILE)
 					if (currentDir.startsWith("/")) currentDir = currentDir.slice(1)
-					const stat = await this.statDocument(currentDir)
+					const stat = await this.statDocument(currentDir, authContext)
 					if (stat && stat.exists) {
-						const data = await this.loadDocument(currentDir)
+						const data = await this.loadDocument(currentDir, {}, authContext)
 						parentData = this.Data.merge(parentData, data)
 						dirs.push({ dir: currentDir, data: data })
 					}
@@ -1443,6 +1427,7 @@ export default class DB {
 		const path = this.Data.OBJECT_DIVIDER + inKey
 		return key.endsWith(path) ? key.split(path)[0] : key
 	}
+
 	/**
 	 * Handles document references and resolves them recursively with circular reference protection.
 	 * Supports fragment references (e.g., #prop/subprop) and merges siblings.
@@ -1462,6 +1447,7 @@ export default class DB {
 		const flat = this.Data.flatten(data)
 		const refKeys = this._findReferenceKeys(flat)
 		const newFlat = { ...flat }
+		const circulars = new Set()
 
 		for (const [key, refPath] of refKeys) {
 			try {
@@ -1474,9 +1460,10 @@ export default class DB {
 					continue
 				}
 
+				const dir = this.dirname(basePath)
 				const absPath = refString.startsWith('/')
 					? this.normalize(refString)
-					: this.resolveSync(basePath, '..', refString)
+					: this.resolveSync(dir, refString)
 
 				// Avoid reading the same file we're currently processing
 				// This prevents infinite loops when a file references itself
@@ -1487,6 +1474,7 @@ export default class DB {
 
 				if (visited.has(absPath)) {
 					this.#console.warn("Circular reference skipped", { ref: absPath })
+					circulars.add(key)
 					continue
 				}
 
@@ -1609,7 +1597,7 @@ export default class DB {
 		]
 		for (const path of indexes) {
 			try {
-				const entries = await this.loadDocument(path, "")
+				const entries = await this.loadDocument(path)
 				if (!entries) {
 					throw new Error(["Empty index", path].join(": "))
 				}

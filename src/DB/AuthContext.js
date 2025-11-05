@@ -28,16 +28,28 @@ export default class AuthContext {
 	 * @param {any} [input.user=null] - Full user object
 	 */
 	constructor(input = {}) {
+		const known = {
+			username: '',
+			role: 'guest',
+			roles: [],
+			user: null,
+		}
 		const {
-			username = this.username,
-			role = this.role,
-			roles = this.roles,
-			user = this.user,
+			username = known.username,
+			role = known.role,
+			roles = known.roles,
+			user = known.user,
 		} = input
 		this.username = String(username)
 		this.role = String(role)
 		this.roles = Array.isArray(roles) ? [...roles] : []
 		this.user = user
+		// Copy unknown properties
+		for (let k in input) {
+			if (!['username', 'role', 'roles', 'user'].includes(k)) {
+				this[k] = input[k]
+			}
+		}
 	}
 
 	/**

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { NoConsole } from '@nan0web/log'
 import BaseDB, { DocumentEntry, DocumentStat, StreamEntry } from '../index.js'
 import { GetOptions, FetchOptions } from "./index.js"
+import AuthContext from './AuthContext.js'
 
 const defaultStructure = [
 	["_", { global: 'value' }],
@@ -182,7 +183,7 @@ suite("DB", () => {
 			assert.deepEqual(uris, ["test.txt"])
 		})
 
-		it.todo('should yield URIs matching function (loaded version)', async () => {
+		it('should yield URIs matching function (loaded version)', async () => {
 			const mockData = new Map([
 				['file1.txt', 'content1'],
 				['file2.md', 'content2'],
@@ -288,7 +289,7 @@ suite("DB", () => {
 	})
 
 	describe('saveDocument', () => {
-		it.skip('should call ensureAccess [w]rite and return true', async () => {
+		it('should call ensureAccess [w]rite and return true', async () => {
 			const uri = 'doc.txt'
 			const result = await db.saveDocument(uri, 'data')
 			assert.strictEqual(result, true)
@@ -330,7 +331,7 @@ suite("DB", () => {
 	})
 
 	describe('moveDocument', () => {
-		it.skip('should move document to another location', async () => {
+		it('should move document to another location', async () => {
 			const db = new DB({
 				predefined: [
 					["from.txt", "Some information here"]
@@ -402,7 +403,14 @@ suite("DB", () => {
 			const testContext = { user: { name: "test" }, token: "abc", ip: "127.0.0.1" }
 			await db.ensureAccess("file.txt", "r", testContext)
 
-			assert.deepStrictEqual(calledContext, testContext)
+			assert.deepStrictEqual(calledContext, new AuthContext({
+				user: { name: "test" },
+				token: "abc",
+				ip: "127.0.0.1",
+				username: "",
+				role: "guest",
+				roles: []
+			}))
 		})
 	})
 
@@ -538,7 +546,6 @@ suite("DB", () => {
 
 			const result = await db.getInheritance('dir1/dir2/file')
 			assert.deepEqual(result, { global: 'value', a: 1, b: 2 })
-			// assert.deepEqual(db.console.output(), [])
 		})
 
 		it('should handle missing inheritance files', async () => {
@@ -553,9 +560,7 @@ suite("DB", () => {
 			await db.connect()
 
 			const r1 = await db.getInheritance('dir1/dir2/file')
-			// a: 1 comes from dir1/_
-			// b: 2 comes from dir1/dir2/_
-			assert.deepEqual(r1, { a: 1, b: 2, global: 'value' })
+			assert.deepEqual(r1, { global: 'value', a: 1, b: 2 })
 			const r2 = await db.fetch("docs.json")
 			assert.deepStrictEqual(r2, { global: "value", title: "docs" })
 		})
@@ -882,7 +887,7 @@ suite("DB", () => {
 	})
 
 	describe('resolveReferences', () => {
-		it.todo('should resolve simple references', async () => {
+		it('should resolve simple references', async () => {
 			const db = new DB({
 				predefined: [
 					['ref.json', 'referenced value']
@@ -984,7 +989,6 @@ suite("DB", () => {
 			await db.connect()
 			const data = { [db.Data.REFERENCE_KEY]: 'parent.json', child: 'value' }
 
-			// const result = await db.processExtensions(data)
 			const result = await db.resolveReferences(data, "index.json")
 			assert.deepEqual(result, { parent: 'value', child: 'value' })
 		})
@@ -992,7 +996,6 @@ suite("DB", () => {
 		it('should return data if no extension', async () => {
 			const data = { key: 'value' }
 
-			// const result = await db.processExtensions(data)
 			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { key: 'value' })
 		})
@@ -1000,7 +1003,6 @@ suite("DB", () => {
 		it('should keep data including $ref if extension cannot be resolved', async () => {
 			const data = { $ref: 'missing.json', key: 'value' }
 
-			// const result = await db.processExtensions(data)
 			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, { $ref: 'missing.json', key: 'value' })
 		})
@@ -1053,8 +1055,8 @@ suite("DB", () => {
 			const resultA = await db.fetch("doc-a.json")
 			const resultB = await db.fetch("doc-b.json")
 
-			assert.deepEqual(resultA, { $ref: "doc-a.json", a: true, b: true })
-			assert.deepEqual(resultB, { $ref: "doc-b.json", b: true, a: true })
+			assert.deepEqual(resultA, { $ref: "doc-b.json", a: true, b: true })
+			assert.deepEqual(resultB, { $ref: "doc-a.json", b: true, a: true })
 		})
 	})
 

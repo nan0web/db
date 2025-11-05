@@ -7,17 +7,18 @@
  * Key features:
  * - URI-based path resolution and normalization
  * - Caching via in-memory Maps for data and metadata
- * - Access control via driver protocol
+ * - Access control via driver protocol with AuthContext
  * - Hierarchical directory traversal with indexing support
  * - Data merging with reference handling using the Data utility class
  *
  * Usage example:
  * ```js
- * const db = new DB({ cwd: 'https://api.example.com', root: 'v1' });
- * await db.connect();
- * const data = await db.fetch('users/profile');
- * await db.set('users/profile', { name: 'John' });
- * await db.push(); // Persist changes
+ * const context = new AuthContext({ role: 'user' })
+ * const db = new DB({ cwd: 'https://api.example.com', root: 'v1', context })
+ * await db.connect()
+ * const data = await db.fetch('users/profile', undefined)
+ * await db.set('users/profile', { name: 'John' })
+ * await db.push(ctx)
  * ```
  *
  * Extensibility:
@@ -50,6 +51,7 @@ export default class DB {
      * - connection status,
      * - attached databases,
      * - console for the debug, silent = true by default.
+     * - auth context for access control.
      *
      * @param {object} input
      * @param {string} [input.root="."] - Root path for URI resolution
@@ -58,7 +60,7 @@ export default class DB {
      * @param {boolean} [input.connected=false] - Connection status
      * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
      * @param {Map<string, DocumentStat>} [input.meta=new Map()] - Metadata cache
-     * @param {object} [input.context={}] - Authentication/authorization context
+     * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
      * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
      * @param {DB[]} [input.dbs=[]] - Attached sub-databases
      * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
@@ -70,7 +72,7 @@ export default class DB {
         connected?: boolean | undefined;
         data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
-        context?: object;
+        context?: AuthContext | object;
         predefined?: Map<string, any> | (readonly [string, any])[] | undefined;
         dbs?: DB[] | undefined;
         console?: Console | NoConsole | undefined;
@@ -83,8 +85,8 @@ export default class DB {
     data: Map<string, any | false>;
     /** @type {Map<string, DocumentStat>} */
     meta: Map<string, DocumentStat>;
-    /** @type {object} */
-    context: object;
+    /** @type {AuthContext} */
+    context: AuthContext;
     /** @type {boolean} */
     connected: boolean;
     /** @type {string} */
@@ -176,19 +178,28 @@ export default class DB {
      */
     detach(db: DB): DB[] | boolean;
     /**
-     * Creates a new DB instance with a subset of the data and meta, scoped to a specific URI prefix.
-     * Useful for creating isolated sub-databases (e.g., user-specific data).
+     * Creates a new DB instance with a subset of the data and meta,
+     * scoped to a specific URI prefix.
+     *
+     * The returned database works as if the supplied `uri` were its
+     * virtual root:
+     *   - `root` property reflects the new virtual root (`.../uri/`).
+     *   - `cwd` is inherited from the parent so that `absolute()` still
+     *     produces full URLs.
+     *   - `resolveSync()` is overridden to return paths **relative** to the
+     *     extracted root (i.e. the prefix is stripped).
+     *
      * @param {string} uri The URI to extract from the current DB.
-     * @returns {DB} New DB instance with filtered data and metadata
+     * @returns {DB} New DB instance with filtered data and metadata.
      */
     extract(uri: string): DB;
     /**
-     * Extracts file extension with leading dot from URI
-     * @param {string} uri
-     * @returns {string} Extension (e.g., ".txt") or empty string
-     * @example
-     * db.extname("file.TXT") // => .txt
-     */
+         * Extracts file extension with leading dot from URI
+         * @param {string} uri
+         * @returns {string} Extension (e.g., ".txt") or empty string
+         * @example
+         * db.extname("file.TXT") // => .txt
+         */
     extname(uri: string): string;
     /**
      * Relative path resolver for file systems.
@@ -250,7 +261,8 @@ export default class DB {
      * @async
      * @generator
      * @param {string} uri - The URI of the directory to read
-     * @param {object} options - Read directory options
+     * @param {object} [options] - Read directory options
+     * @param {AuthContext | object} [options.context] - Auth context
      * @param {number} [options.depth=-1] - The depth to which subdirectories should be read (-1 means unlimited)
      * @param {boolean} [options.skipStat=false] - Whether to skip collecting file statistics
      * @param {boolean} [options.includeDirs=false] - Whether to skip or include directories.
@@ -261,13 +273,14 @@ export default class DB {
      * @returns {AsyncGenerator<DocumentEntry, void, unknown>}
      */
     readDir(uri: string, options?: {
+        context?: AuthContext | object;
         depth?: number | undefined;
         skipStat?: boolean | undefined;
         includeDirs?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
         skipIndex?: boolean | undefined;
         filter?: Function | undefined;
-    }): AsyncGenerator<DocumentEntry, void, unknown>;
+    } | undefined): AsyncGenerator<DocumentEntry, void, unknown>;
     /**
      * Reads a specific branch at given depth
      * @param {string} uri - URI for the branch
@@ -300,24 +313,27 @@ export default class DB {
      * Gets document content from cache or loads if missing.
      * Supports default fallback value for missing documents.
      * @param {string} uri - Document URI
-     * @param {object | GetOptions} [opts] - Options or GetOptions instance
+     * @param {object | GetOptions} [input] - Options or GetOptions instance
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>} Document content
      */
-    get(uri: string, opts?: object | GetOptions): Promise<any>;
+    get(uri: string, input?: object | GetOptions, context?: AuthContext | object): Promise<any>;
     /**
      * Sets document content in cache and updates metadata timestamp.
      * @param {string} uri - Document URI
      * @param {any} data - Document data
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>} The set data
      */
-    set(uri: string, data: any): Promise<any>;
+    set(uri: string, data: any, context?: AuthContext | object): Promise<any>;
     /**
      * Gets document statistics from cache or loads if missing.
      * Supports extension fallback for extension-less URIs.
      * @param {string} uri - Document URI
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<DocumentStat | undefined>}
      */
-    stat(uri: string): Promise<DocumentStat | undefined>;
+    stat(uri: string, context?: AuthContext | object): Promise<DocumentStat | undefined>;
     /**
      * Resolves path segments to absolute path
      * @note Must be overwritten by platform-specific implementation
@@ -359,7 +375,12 @@ export default class DB {
      * @returns {string}
      */
     basename(uri: string, removeSuffix?: string | true | undefined): string;
-    dirname(uri: any): string;
+    /**
+     * Returns directory name of URI
+     * @param {string} uri
+     * @returns {string}
+     */
+    dirname(uri: string): string;
     /**
      * Gets absolute path
      * @note Must be overwritten by platform-specific implementation
@@ -374,17 +395,19 @@ export default class DB {
      * Supports extension fallback for extension-less URIs.
      * @param {string} uri - Document URI
      * @param {any} [defaultValue] - Default value if document not found
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>}
      */
-    loadDocument(uri: string, defaultValue?: any): Promise<any>;
+    loadDocument(uri: string, defaultValue?: any, context?: AuthContext | object): Promise<any>;
     /**
      * Loads a document using a specific extension handler.
      * @param {string} ext The extension of the document.
      * @param {string} uri The URI to load the document from.
      * @param {any} defaultValue The default value to return if the document does not exist.
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>} The loaded document or the default value.
      */
-    loadDocumentAs(ext: string, uri: string, defaultValue: any): Promise<any>;
+    loadDocumentAs(ext: string, uri: string, defaultValue: any, context?: AuthContext | object): Promise<any>;
     /**
      * Saves a document.
      * Must be overwritten to have the proper file or database document save operation.
@@ -392,59 +415,65 @@ export default class DB {
      * Updates indexes after save.
      * @param {string} uri - Document URI
      * @param {any} document - Document data
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<boolean>}
      */
-    saveDocument(uri: string, document: any): Promise<boolean>;
+    saveDocument(uri: string, document: any, context?: AuthContext | object): Promise<boolean>;
     /**
      * Reads statistics for a specific document.
      * Must be overwritten to have the proper file or database document stat operation.
      * In a basic class it just returns a document stat from the db.meta map if exists.
      * @note Must be overwritten by platform-specific implementation
      * @param {string} uri - Document URI
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<DocumentStat>}
      */
-    statDocument(uri: string): Promise<DocumentStat>;
+    statDocument(uri: string, context?: AuthContext | object): Promise<DocumentStat>;
     /**
      * Writes data to a document with overwrite
      * @param {string} uri - Document URI
      * @param {string} chunk - Data to write
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<boolean>} Success status
      */
-    writeDocument(uri: string, chunk: string): Promise<boolean>;
+    writeDocument(uri: string, chunk: string, context?: AuthContext | object): Promise<boolean>;
     /**
      * Delete document from storage
      * @note Must be overwritten by platform specific application
      * @param {string} uri - Document URI
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<boolean>}
      * Always returns false for base implementation not knowing
      * to implement delete on top of generic interface
      */
-    dropDocument(uri: string): Promise<boolean>;
+    dropDocument(uri: string, context?: AuthContext | object): Promise<boolean>;
     /**
      * Ensures access to document with context.
      * Delegates to driver for authorization checks.
      * @param {string} uri - Document URI
-     * @param {'r'|'w'|'d'} level - Access level
-     * @param {object} [context=this.context] - Auth context: { user, token, ip }
+     * @param {'r'|'w'|'d'} [level="r"] - Access level
+     * @param {AuthContext | object} [context=this.context] - Auth context: { username, role, roles, user }
      * @returns {Promise<void>}
      * @throws {Error} - Access denied
      */
-    ensureAccess(uri: string, level?: 'r' | 'w' | 'd', context?: object): Promise<void>;
+    ensureAccess(uri: string, level?: "r" | "w" | "d" | undefined, context?: AuthContext | object): Promise<void>;
     /**
      * Synchronize data with persistent storage
      * Saves changed documents where local mtime > remote stat mtime.
      * @param {string|undefined} [uri] Optional specific URI to save
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<string[]>} Array of saved URIs
      */
-    push(uri?: string | undefined): Promise<string[]>;
+    push(uri?: string | undefined, context?: AuthContext | object): Promise<string[]>;
     /**
      * Moves a document from one URI to another URI
      * Loads source, saves to target, drops source, updates indexes.
      * @param {string} from - Source URI
      * @param {string} to - Target URI
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<boolean>} Success status
      */
-    moveDocument(from: string, to: string): Promise<boolean>;
+    moveDocument(from: string, to: string, context?: AuthContext | object): Promise<boolean>;
     /**
      * Disconnect from database
      * Clears connection state. Subclasses should override for cleanup.
@@ -455,16 +484,18 @@ export default class DB {
      * Lists immediate entries in a directory by scanning meta keys.
      * Filters to direct children only.
      * @param {string} uri - The directory URI (e.g., "content", ".", "dir/")
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<DocumentEntry[]>}
      * @throws {Error} If directory does not exist
      */
-    listDir(uri: string): Promise<DocumentEntry[]>;
+    listDir(uri: string, context?: AuthContext | object): Promise<DocumentEntry[]>;
     /**
      * Push stream of progress state
      * Traverses directory with sorting, limiting, and loading options.
      * Yields StreamEntry with cumulative stats and errors.
      * @param {string} uri - Starting URI
-     * @param {object} options - Stream options
+     * @param {object} [options] - Stream options
+     * @param {AuthContext | object} [options.context] - Auth context
      * @param {Function} [options.filter] - Filter function
      * @param {number} [options.limit] - Limit number of entries
      * @param {'name'|'mtime'|'size'} [options.sort] - The sort criteria
@@ -476,6 +507,7 @@ export default class DB {
      * @returns {AsyncGenerator<StreamEntry, void, unknown>}
      */
     findStream(uri: string, options?: {
+        context?: AuthContext | object;
         filter?: Function | undefined;
         limit?: number | undefined;
         sort?: "size" | "name" | "mtime" | undefined;
@@ -483,7 +515,7 @@ export default class DB {
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
         load?: boolean | undefined;
-    }): AsyncGenerator<StreamEntry, void, unknown>;
+    } | undefined): AsyncGenerator<StreamEntry, void, unknown>;
     /**
      * Returns TRUE if uri is a data file.
      * Checks against supported DATA_EXTNAMES.
@@ -510,19 +542,21 @@ export default class DB {
      * Fetch document with inheritance, globals and references processing
      * Handles extension lookup, directory resolution, and merging.
      * @param {string} uri
-     * @param {object | FetchOptions} [opts]
+     * @param {object | FetchOptions} [input]
+     * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>}
      */
-    fetch(uri: string, opts?: object | FetchOptions): Promise<any>;
+    fetch(uri: string, input?: object | FetchOptions, context?: AuthContext | object): Promise<any>;
     /**
      * Merges data from multiple sources following nano-db-fetch patterns.
      * Handles inheritance, globals, and references with circular protection.
      * @param {string} uri - The URI to fetch and merge data for
      * @param {FetchOptions} [opts] - Fetch options
-     * @param {Set<string>} [visited] - For internal circular reference protection
+     * @param {AuthContext | Set<string>} [contextOrVisited] - Auth context or visited set
+     * @param {Set<string>} [visited=new Set()] - For internal circular reference protection
      * @returns {Promise<any>} Merged data object
      */
-    fetchMerged(uri: string, opts?: FetchOptions | undefined, visited?: Set<string> | undefined): Promise<any>;
+    fetchMerged(uri: string, opts?: FetchOptions | undefined, contextOrVisited?: AuthContext | Set<string> | undefined, visited?: Set<string> | undefined): Promise<any>;
     _findReferenceKeys(flat: any): any;
     _getParentReferenceKey(key: any): any;
     /**
@@ -558,6 +592,7 @@ export default class DB {
 }
 import DBDriverProtocol from "./DriverProtocol.js";
 import DocumentStat from "../DocumentStat.js";
+import AuthContext from "./AuthContext.js";
 import { NoConsole } from "@nan0web/log";
 import Data from "../Data.js";
 import Directory from "../Directory.js";
