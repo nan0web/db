@@ -24,11 +24,10 @@ import DocumentEntry from "./DocumentEntry.js"
 import DocumentStat from "./DocumentStat.js"
 import StreamEntry from "./StreamEntry.js"
 import Data from "./Data.js"
-
 export {
 	Directory, DirectoryIndex,
 	DocumentEntry, DocumentStat, StreamEntry, Data,
 	DB, DBDriverProtocol, GetOptions, FetchOptions, AuthContext,
 }
-
+export * from "./DB/path.js"
 export default DB

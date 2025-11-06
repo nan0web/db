@@ -2,7 +2,7 @@
 
 |[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
 |---|---|---|---|---|
- |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.1%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.0 |
+ |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.3%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.1 |
 
 Agnostic document database and data manipulation utilities. Designed to be
 flexible, minimal and powerful — the tool that supports any data format and
@@ -167,11 +167,177 @@ const b = { y: "two", x: { two: 2 }, arr: [1] }
 const merged = Data.merge(a, b)
 console.info(merged) // ← { x: { one: 1, two: 2 }, y: 'two', arr: [ 1 ] }
 ```
+## Path Utilities
+
+`@nan0web/db/path` provides URI/path resolution functions for cross-platform use.
+Supports normalization, basename/dirname extraction, and absolute/relative resolution.
+
+### Import Path Utilities
+
+How to import path utilities?
+```js
+import { normalize, basename, dirname, absolute, resolveSync } from '@nan0web/db/path'
+console.info(normalize("a/b/../c")) // ← a/c
+console.info(basename("path/to/file.txt")) // ← file.txt
+console.info(dirname("path/to/file.txt")) // ← path/to/
+console.info(absolute("/base", "root", "file")) // ← /base/root/file
+console.info(resolveSync("/base", ".", "file.txt")) // ← file.txt
+```
+### `normalize(...segments)`
+Normalizes path segments, handling `../`, `./`, and duplicate slashes.
+
+How to normalize path segments?
+```js
+import { normalize } from '@nan0web/db/path'
+console.info(normalize("a/b/../c")) // ← a/c
+console.info(normalize("a//b///c")) // ← a/b/c
+console.info(normalize("dir/sub/")) // ← dir/sub/
+```
+### `basename(uri, [suffix])`
+Extracts basename, optionally removing suffix or extension.
+
+How to extract basename?
+```js
+import { basename } from '@nan0web/db/path'
+console.info(basename("/dir/file.txt")) // ← file.txt
+console.info(basename("/dir/file.txt", ".txt")) // ← file
+console.info(basename("/dir/file.txt", true)) // ← file (remove ext)
+console.info(basename("/dir/")) // ← dir/
+```
+### `dirname(uri)`
+Extracts parent directory path.
+
+How to extract dirname?
+```js
+import { dirname } from '@nan0web/db/path'
+console.info(dirname("/a/b/file")) // ← /a/b/
+console.info(dirname("/a/b/")) // ← /a/
+console.info(dirname("/file")) // ← /
+console.info(dirname("file.txt")) // ← .
+```
+### `extname(uri)`
+Extracts file extension with dot (lowercase).
+
+How to extract extension?
+```js
+import { extname } from '@nan0web/db/path'
+console.info(extname("file.TXT")) // ← .txt
+console.info(extname("archive.tar.gz")) // ← .gz
+console.info(extname("noext")) // ← ''
+console.info(extname("/dir/")) // ← ''
+```
+### `resolveSync(cwd, root, ...segments)`
+Resolves segments relative to cwd/root (synchronous).
+
+How to resolve path synchronously?
+```js
+import { resolveSync } from '@nan0web/db/path'
+console.info(resolveSync("/base", ".", "a/b/../c")) // ← a/c
+```
+### `relative(from, to)`
+Computes relative path from `from` to `to`.
+
+How to compute relative path?
+```js
+import { relative } from '@nan0web/db/path'
+console.info(relative("/a/b", "/a/c")) // ← c
+console.info(relative("/root/dir", "/root/")) // ← dir
+```
+### `absolute(cwd, root, ...segments)`
+Builds absolute path/URL from cwd, root, and segments.
+
+How to build absolute path?
+```js
+import { absolute } from '@nan0web/db/path'
+console.info(absolute("/base", "root", "file")) // ← /base/root/file
+console.info(absolute("https://ex.com", "api", "v1")) // ← https://ex.com/api/v1
+```
+### `isRemote(uri)` & `isAbsolute(uri)`
+Checks if URI is remote or absolute.
+
+How to check URI type?
+```js
+import { isRemote, isAbsolute } from '@nan0web/db/path'
+console.info(isRemote("https://ex.com")) // ← true
+console.info(isAbsolute("/abs/path")) // ← true
+console.info(isAbsolute("./rel")) // ← false
+```
 ## Java•Script types & Autocomplete
 Package is fully typed with jsdoc and d.ts.
 
 How many d.ts files should cover the source?
 
+## Drivers & Extensions
+
+Drivers extend DB with storage backends. Extend `DBDriverProtocol` for custom logic.
+
+### Basic Driver Extension
+
+How to extend DBDriverProtocol?
+```js
+import { DBDriverProtocol } from '@nan0web/db'
+class MyDriver extends DBDriverProtocol {
+	async read(uri) {
+		// Custom read logic
+		return { data: 'from custom storage' }
+	}
+}
+const driver = new MyDriver()
+console.log(await driver.read("/path")) // ← { data: 'from custom storage' }
+```
+### Using Driver in DB
+
+How to attach driver to DB?
+```js
+import { DB, DBDriverProtocol } from '@nan0web/db'
+class SimpleDriver extends DBDriverProtocol {
+	async read(uri) { return `Read: ${uri}` }
+	async write(uri, data) { return true }
+}
+class ExtendedDB extends DB {
+	constructor() {
+		super({ driver: new SimpleDriver() })
+		this.loadDocument = async (uri) => await this.driver.read(uri)
+		this.saveDocument = async (uri, data) => await this.driver.write(uri, data)
+	}
+}
+const db = new ExtendedDB()
+await db.connect()
+console.info(await db.get('/test')) // ← Read: test
+```
+## Authentication & Authorization
+
+Use `AuthContext` for role-based access in DB operations.
+
+### Basic AuthContext Usage
+
+How to create AuthContext?
+```js
+import { AuthContext } from '@nan0web/db'
+const ctx = new AuthContext({ role: 'user', roles: ['user', 'guest'] })
+console.info(ctx.hasRole('user')) // ← true
+console.info(ctx.role) // ← user
+```
+### AuthContext with DB Access
+
+How to use AuthContext in DB?
+```js
+import { DB, AuthContext } from '@nan0web/db'
+const db = new DB()
+const ctx = new AuthContext({ role: 'admin' })
+await db.set('secure/file.txt', 'secret', ctx)
+console.info(await db.get('secure/file.txt', {}, ctx)) // ← secret
+```
+### Handling Access Failures
+
+How to handle auth failures?
+```js
+import { AuthContext } from '@nan0web/db'
+const ctx = new AuthContext()
+ctx.fail(new Error('Access denied'))
+console.info(ctx.fails) // ← [Error: Access denied]
+console.info(ctx.hasRole('admin')) // ← false
+```
 ## Contributing
 
 How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)

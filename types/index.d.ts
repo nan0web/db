@@ -1,3 +1,4 @@
+export * from "./DB/path.js";
 export default DB;
 import Directory from "./Directory.js";
 import DirectoryIndex from "./DirectoryIndex.js";

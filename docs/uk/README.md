@@ -2,7 +2,7 @@
 
 |[Статус](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Документація|Покриття тестами|Функції|Версія Npm|
 |---|---|---|---|---|
- |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.1%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.0 |
+ |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.3%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.1 |
 
 Агностична документна база даних та утиліти для маніпуляції даними. Розроблена як
 гнучкий, мінімальний і потужний інструмент — що підтримує будь-який формат даних та
@@ -86,7 +86,7 @@ CLI-пісочниця для безпечних експериментів:
 git clone https://github.com/nan0web/db.git
 cd db
 npm install
-npm run playground
+npm run play
 ```
 
 ## Посилання API
@@ -97,11 +97,11 @@ npm run playground
 Завантажує/повертає вміст документу з його URI.
 
 * **Параметри**
-  * `uri` *(string)* – URI документу.
-  * `GetOpts.defaultValue` *(any)* – значення за замовчуванням, якщо документ не знайдено.
+	* `uri` *(string)* – URI документу.
+	* `GetOpts.defaultValue` *(any)* – значення за замовчуванням, якщо документ не знайдено.
 
 * **Повертає**
-  * *(any)* – Вміст документу або значення за замовчуванням.
+	* *(any)* – Вміст документу або значення за замовчуванням.
 
 Як отримати значення документу?
 ```js
@@ -177,11 +177,172 @@ const b = { y: "two", x: { two: 2 }, arr: [1] }
 const merged = Data.merge(a, b)
 console.info(merged) // ← { x: { one: 1, two: 2 }, y: 'two', arr: [ 1 ] }
 ```
-## Типи Java•Script та автозаповнення
-Пакет повністю типізовано з jsdoc і d.ts.
+## Шляхові утиліти
 
-Скільки файлів d.ts має покривати джерело?
+`@nan0web/db/path` надає функції вирішення URI/шляхів для використання на різних платформах.
+Підтримує нормалізацію, отримання basename/dirname та вирішення абсолютних/відносних шляхів.
 
+### Імпорт шляхових утиліт
+
+Як імпортувати шляхові утиліти?
+```js
+import { normalize, basename, dirname, absolute, resolveSync } from '@nan0web/db/path'
+console.info(normalize("a/b/../c")) // ← a/c
+console.info(basename("path/to/file.txt")) // ← file.txt
+console.info(dirname("path/to/file.txt")) // ← path/to/
+console.info(absolute("/base", "root", "file")) // ← /base/root/file
+console.info(resolveSync("/base", ".", "file.txt")) // ← file.txt
+```
+### `normalize(...segments)`
+Нормалізує сегменти шляху, обробляє `../`, `./` та дубльовані слеші.
+
+Як нормалізувати сегменти шляху?
+```js
+import { normalize } from '@nan0web/db/path'
+console.info(normalize("a/b/../c")) // ← a/c
+console.info(normalize("a//b///c")) // ← a/b/c
+console.info(normalize("dir/sub/")) // ← dir/sub/
+```
+### `basename(uri, [suffix])`
+Витягує базове ім'я, при бажанні видаляє суфікс або розширення.
+
+Як витягти базове ім'я?
+```js
+import { basename } from '@nan0web/db/path'
+console.info(basename("/dir/file.txt")) // ← file.txt
+console.info(basename("/dir/file.txt", ".txt")) // ← file
+console.info(basename("/dir/file.txt", true)) // ← file (видалити розширення)
+console.info(basename("/dir/")) // ← dir/
+```
+### `dirname(uri)`
+Витягує шлях батьківського каталогу.
+
+Як витягти шлях каталогу?
+```js
+import { dirname } from '@nan0web/db/path'
+console.info(dirname("/a/b/file")) // ← /a/b/
+console.info(dirname("/a/b/")) // ← /a/
+console.info(dirname("/file")) // ← /
+console.info(dirname("file.txt")) // ← .
+```
+### `extname(uri)`
+Витягує розширення файлу з крапкою (у нижньому регістрі).
+
+Як витягти розширення?
+```js
+import { extname } from '@nan0web/db/path'
+console.info(extname("file.TXT")) // ← .txt
+console.info(extname("archive.tar.gz")) // ← .gz
+console.info(extname("noext")) // ← ''
+console.info(extname("/dir/")) // ← ''
+```
+### `resolveSync(cwd, root, ...segments)`
+Вирішує сегменти відносно cwd/root (синхронно).
+
+Як вирішити шлях синхронно?
+```js
+import { resolveSync } from '@nan0web/db/path'
+console.info(resolveSync("/base", ".", "a/b/../c")) // ← a/c
+```
+### `relative(from, to)`
+Обчислює відносний шлях від `from` до `to`.
+
+Як обчислити відносний шлях?
+```js
+import { relative } from '@nan0web/db/path'
+console.info(relative("/a/b", "/a/c")) // ← c
+console.info(relative("/root/dir", "/root/")) // ← dir
+```
+### `absolute(cwd, root, ...segments)`
+Будує абсолютний шлях/URL з cwd, root та сегментів.
+
+Як створити абсолютний шлях?
+```js
+import { absolute } from '@nan0web/db/path'
+console.info(absolute("/base", "root", "file")) // ← /base/root/file
+console.info(absolute("https://ex.com", "api", "v1")) // ← https://ex.com/api/v1
+```
+### `isRemote(uri)` & `isAbsolute(uri)`
+Перевіряє, чи URI є віддаленим або абсолютним.
+
+Як перевірити тип URI?
+```js
+import { isRemote, isAbsolute } from '@nan0web/db/path'
+console.info(isRemote("https://ex.com")) // ← true
+console.info(isAbsolute("/abs/path")) // ← true
+console.info(isAbsolute("./rel")) // ← false
+```
+## Драйвери та розширення
+
+Драйвери розширюють DB бекендами сховищ. Наслідуйте `DBDriverProtocol` для власної логіки.
+
+### Базове розширення драйвера
+
+Як розширити DBDriverProtocol?
+```js
+import { DBDriverProtocol } from '@nan0web/db'
+class MyDriver extends DBDriverProtocol {
+	async read(uri) {
+		// Власна логіка читання
+		return { data: 'з власного сховища' }
+	}
+}
+const driver = new MyDriver()
+console.log(await driver.read("/шлях")) // ← { data: 'з власного сховища' }
+```
+### Використання драйвера в DB
+
+Як приєднати драйвер до DB?
+```js
+import { DB, DBDriverProtocol } from '@nan0web/db'
+class SimpleDriver extends DBDriverProtocol {
+	async read(uri) { return `Прочитано: ${uri}` }
+	async write(uri, data) { return true }
+}
+class ExtendedDB extends DB {
+	constructor() {
+		super({ driver: new SimpleDriver() })
+		this.loadDocument = async (uri) => await this.driver.read(uri)
+		this.saveDocument = async (uri, data) => await this.driver.write(uri, data)
+	}
+}
+const db = new ExtendedDB()
+await db.connect()
+console.info(await db.get('/тест')) // ← Прочитано: тест
+```
+## Аутентифікація та авторизація
+
+Використовуйте `AuthContext` для керування доступом на основі ролей під час операцій з DB.
+
+### Базове використання AuthContext
+
+Як створити AuthContext?
+```js
+import { AuthContext } from '@nan0web/db'
+const ctx = new AuthContext({ role: 'user', roles: ['user', 'guest'] })
+console.info(ctx.hasRole('user')) // ← true
+console.info(ctx.role) // ← user
+```
+### AuthContext з доступом до DB
+
+Як використовувати AuthContext в DB?
+```js
+import { DB, AuthContext } from '@nan0web/db'
+const db = new DB()
+const ctx = new AuthContext({ role: 'admin' })
+await db.set('secure/file.txt', 'secret', ctx)
+console.info(await db.get('secure/file.txt', {}, ctx)) // ← secret
+```
+### Обробка невдалих спроб доступу
+
+Як обробити відмову в доступі?
+```js
+import { AuthContext } from '@nan0web/db'
+const ctx = new AuthContext()
+ctx.fail(new Error('Доступ заборонено'))
+console.info(ctx.fails) // ← [Error: Доступ заборонено]
+console.info(ctx.hasRole('admin')) // ← false
+```
 ## Допомога у розвитку
 
 Як брати участь? – [див. CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
@@ -189,3 +350,4 @@ console.info(merged) // ← { x: { one: 1, two: 2 }, y: 'two', arr: [ 1 ] }
 ## Ліцензія
 
 ISC License – [див. повний текст](https://github.com/nan0web/db/blob/main/LICENSE)
+

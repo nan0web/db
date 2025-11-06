@@ -91,9 +91,9 @@ export default class DBDriverProtocol {
     /**
      * Deletes the document.
      * @param {string} absoluteURI - Resource URI
-     * @returns {Promise<boolean | undefined>} - TRUE on success, FALSE on failure, undefined if not realized.
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    delete(absoluteURI: string): Promise<boolean | undefined>;
+    delete(absoluteURI: string): Promise<boolean | void>;
     /**
      * Lists directory contents if ends with / its directory, otherwise file.
      * @example

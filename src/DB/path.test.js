@@ -224,7 +224,7 @@ suite("Path Utilities", () => {
 
 		it("should calculate file path", () => {
 			assert.equal(dirname("some/url/with/a-file.txt"), "some/url/with/")
-			assert.equal(dirname("a-file.txt"), "/")
+			assert.equal(dirname("a-file.txt"), ".")
 		})
 
 		it("should calculate directory path", () => {
@@ -297,6 +297,35 @@ suite("Path Utilities", () => {
 			assert.equal(isAbsolute("./relative/path"), false)
 			assert.equal(isAbsolute("../parent/path"), false)
 			assert.equal(isAbsolute("simple-filename"), false)
+		})
+	})
+
+	// Test import path functionality
+	describe('Import path module', () => {
+		it('should properly export all path utilities through @nan0web/db/path', async () => {
+			// This test verifies that the exports work correctly when imported as a module
+			const pathModule = await import('./path.js')
+
+			assert.ok(pathModule.resolveSync, 'resolveSync should be exported')
+			assert.ok(pathModule.normalize, 'normalize should be exported')
+			assert.ok(pathModule.basename, 'basename should be exported')
+			assert.ok(pathModule.dirname, 'dirname should be exported')
+			assert.ok(pathModule.extname, 'extname should be exported')
+			assert.ok(pathModule.relative, 'relative should be exported')
+			assert.ok(pathModule.absolute, 'absolute should be exported')
+			assert.ok(pathModule.isRemote, 'isRemote should be exported')
+			assert.ok(pathModule.isAbsolute, 'isAbsolute should be exported')
+
+			// Test that functions are actually functions
+			assert.equal(typeof pathModule.resolveSync, 'function')
+			assert.equal(typeof pathModule.normalize, 'function')
+			assert.equal(typeof pathModule.basename, 'function')
+			assert.equal(typeof pathModule.dirname, 'function')
+			assert.equal(typeof pathModule.extname, 'function')
+			assert.equal(typeof pathModule.relative, 'function')
+			assert.equal(typeof pathModule.absolute, 'function')
+			assert.equal(typeof pathModule.isRemote, 'function')
+			assert.equal(typeof pathModule.isAbsolute, 'function')
 		})
 	})
 })

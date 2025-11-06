@@ -19,6 +19,8 @@ export default class AuthContext {
 	roles = []
 	/** @type {any} */
 	user = null
+	/** @type {any[]} */
+	#fails = []
 
 	/**
 	 * @param {object} [input={}] - Context data
@@ -26,6 +28,7 @@ export default class AuthContext {
 	 * @param {string} [input.role='guest'] - Primary role
 	 * @param {string[]} [input.roles=[]] - Array of roles
 	 * @param {any} [input.user=null] - Full user object
+	 * @param {any[]} [input.fails=[]] - Stored errors of fail access.
 	 */
 	constructor(input = {}) {
 		const known = {
@@ -33,23 +36,31 @@ export default class AuthContext {
 			role: 'guest',
 			roles: [],
 			user: null,
+			fails: [],
 		}
 		const {
 			username = known.username,
 			role = known.role,
 			roles = known.roles,
 			user = known.user,
+			fails = known.fails,
 		} = input
 		this.username = String(username)
 		this.role = String(role)
 		this.roles = Array.isArray(roles) ? [...roles] : []
 		this.user = user
+		this.#fails = fails
 		// Copy unknown properties
 		for (let k in input) {
 			if (!['username', 'role', 'roles', 'user'].includes(k)) {
 				this[k] = input[k]
 			}
 		}
+	}
+
+	/** @returns {any[]} */
+	get fails() {
+		return this.#fails
 	}
 
 	/**
@@ -59,6 +70,14 @@ export default class AuthContext {
 	 */
 	hasRole(role) {
 		return this.roles.includes(role) || this.role === role
+	}
+
+	/**
+	 * Adds a fail error message.
+	 * @param {any} err
+	 */
+	fail(err) {
+		this.#fails.push(err)
 	}
 
 	/**

@@ -5,6 +5,11 @@
 	"main": "./src/index.js",
 	"types": "./types/index.d.ts",
 	"type": "module",
+	"files": [
+		"src/**/*.js",
+		"!src/**/*.test.js",
+		"types/**/*.d.ts"
+	],
 	"scripts": {
 		"build": "tsc",
 		"clean": "rm -rf .cache/ && rm -rf dist/",
@@ -26,9 +31,9 @@
 			"import": "./src/index.js",
 			"types": "./types/index.d.ts"
 		},
-		"./*": {
-			"import": "./src/utils/*.js",
-			"types": "./types/utils/*.d.ts"
+		"./path": {
+			"import": "./src/DB/path.js",
+			"types": "./types/DB/path.d.ts"
 		}
 	},
 	"keywords": [
@@ -51,10 +56,5 @@
 	},
 	"peerDependencies": {
 		"@nan0web/types": "^1.0.0"
-	},
-	"files": [
-		"src/**/*.js",
-		"!src/**/*.test.js",
-		"types/**/*.d.ts"
-	]
+	}
 }

@@ -9,6 +9,7 @@ import { runBasicOperationsDemo } from "./basic-operations.js"
 import { runDataUtilsDemo } from "./data-utils.js"
 import { runFetchAdvancedDemo } from "./fetch-advanced.js"
 import { runIndexUtilsDemo } from "./index-utils.js"
+import { runPathUtilsDemo } from "./path-utils.js"
 import { runSimpleDemos } from "./simple-demos.js"
 import { runDriverDemos } from "./drivers/index.js"
 
@@ -25,6 +26,7 @@ async function chooseDemo() {
 		{ name: "Data Utils (flatten/merge/find)", value: "data" },
 		{ name: "Advanced Fetch (refs/inherit)", value: "fetch" },
 		{ name: "Directory Indexes", value: "index" },
+		{ name: "Path Utilities (normalize/basename/etc.)", value: "path" },
 		{ name: "Driver Examples", value: "drivers" },
 		{ name: "← Exit", value: "exit" }
 	]
@@ -66,6 +68,9 @@ async function main() {
 					break
 				case "index":
 					await runIndexUtilsDemo(console)
+					break
+				case "path":
+					await runPathUtilsDemo(console)
 					break
 				case "drivers":
 					await runDriverDemos(console)

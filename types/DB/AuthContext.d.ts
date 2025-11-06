@@ -23,12 +23,14 @@ export default class AuthContext {
      * @param {string} [input.role='guest'] - Primary role
      * @param {string[]} [input.roles=[]] - Array of roles
      * @param {any} [input.user=null] - Full user object
+     * @param {any[]} [input.fails=[]] - Stored errors of fail access.
      */
     constructor(input?: {
         username?: string | undefined;
         role?: string | undefined;
         roles?: string[] | undefined;
         user?: any;
+        fails?: any[] | undefined;
     } | undefined);
     /** @type {string} */
     username: string;
@@ -38,10 +40,18 @@ export default class AuthContext {
     roles: string[];
     /** @type {any} */
     user: any;
+    /** @returns {any[]} */
+    get fails(): any[];
     /**
      * Checks if the context has a specific role.
      * @param {string} role - Role to check
      * @returns {boolean}
      */
     hasRole(role: string): boolean;
+    /**
+     * Adds a fail error message.
+     * @param {any} err
+     */
+    fail(err: any): void;
+    #private;
 }

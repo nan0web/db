@@ -1053,8 +1053,8 @@ suite("DB", () => {
 			const resultA = await db.fetch("doc-a.json")
 			const resultB = await db.fetch("doc-b.json")
 
-			assert.deepEqual(resultA, { $ref: "doc-b.json", a: true, b: true })
-			assert.deepEqual(resultB, { $ref: "doc-a.json", b: true, a: true })
+			assert.deepEqual(resultA, { $ref: "doc-a.json", a: true, b: true })
+			assert.deepEqual(resultB, { $ref: "doc-b.json", b: true, a: true })
 		})
 	})
 

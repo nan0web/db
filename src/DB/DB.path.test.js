@@ -26,6 +26,7 @@ suite("DB URI Core", () => {
 		it("handles root boundary correctly", () => {
 			const db = new DB({ root: "/base", cwd: "/cwd" })
 			assert.strictEqual(db.resolveSync(".."), ".")
+			assert.strictEqual(db.resolveSync(db.dirname("test1.txt"), "test1.txt"), "test1.txt")
 		})
 	})
 
@@ -294,7 +295,7 @@ suite("DB URI Core", () => {
 			assert.strictEqual(result, "sibling")
 		})
 
-		it.todo('should navigate sibling directories', () => {
+		it('should navigate sibling directories', () => {
 			const db = new DB()
 			const from = '/api/users/list'
 			const to = '/api/posts/recent'
@@ -426,7 +427,7 @@ suite("DB URI Core", () => {
 
 		it("should calculate file path", () => {
 			assert.equal(db.dirname("some/url/with/a-file.txt"), "some/url/with/")
-			assert.equal(db.dirname("a-file.txt"), "/")
+			assert.equal(db.dirname("a-file.txt"), ".")
 		})
 
 		it("should calculate directory path", () => {

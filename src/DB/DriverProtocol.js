@@ -138,7 +138,7 @@ export default class DBDriverProtocol {
 	/**
 	 * Deletes the document.
 	 * @param {string} absoluteURI - Resource URI
-	 * @returns {Promise<boolean | undefined>} - TRUE on success, FALSE on failure, undefined if not realized.
+	 * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
 	 */
 	async delete(absoluteURI) {
 		if (this.driver) {

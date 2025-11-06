@@ -17,6 +17,17 @@ import DBDefault,
 	DocumentStat,
 	StreamEntry,
 } from './index.js'
+import {
+	normalize,
+	basename,
+	dirname,
+	extname,
+	resolveSync,
+	relative,
+	absolute,
+	isRemote,
+	isAbsolute
+} from './DB/path.js'
 
 const fs = new FS()
 let pkg
@@ -280,11 +291,240 @@ function testRender() {
 
 	/**
 	 * @docs
+	 * ## Path Utilities
+	 *
+	 * `@nan0web/db/path` provides URI/path resolution functions for cross-platform use.
+	 * Supports normalization, basename/dirname extraction, and absolute/relative resolution.
+	 *
+	 * ### Import Path Utilities
+	 */
+	it("How to import path utilities?", () => {
+		//import { normalize, basename, dirname, absolute, resolveSync } from '@nan0web/db/path'
+		console.info(normalize("a/b/../c")) // ← a/c
+		console.info(basename("path/to/file.txt")) // ← file.txt
+		console.info(dirname("path/to/file.txt")) // ← path/to/
+		console.info(absolute("/base", "root", "file")) // ← /base/root/file
+		console.info(resolveSync("/base", ".", "file.txt")) // ← file.txt
+		assert.equal(console.output()[0][1], "a/c")
+		assert.equal(console.output()[1][1], "file.txt")
+		assert.equal(console.output()[2][1], "path/to/")
+		assert.equal(console.output()[3][1], "/base/root/file")
+		assert.equal(console.output()[4][1], "file.txt")
+	})
+
+	/**
+	 * @docs
+	 * ### `normalize(...segments)`
+	 * Normalizes path segments, handling `../`, `./`, and duplicate slashes.
+	 */
+	it("How to normalize path segments?", () => {
+		//import { normalize } from '@nan0web/db/path'
+		console.info(normalize("a/b/../c")) // ← a/c
+		console.info(normalize("a//b///c")) // ← a/b/c
+		console.info(normalize("dir/sub/")) // ← dir/sub/
+		assert.equal(console.output()[0][1], "a/c")
+		assert.equal(console.output()[1][1], "a/b/c")
+		assert.equal(console.output()[2][1], "dir/sub/")
+	})
+
+	/**
+	 * @docs
+	 * ### `basename(uri, [suffix])`
+	 * Extracts basename, optionally removing suffix or extension.
+	 */
+	it("How to extract basename?", () => {
+		//import { basename } from '@nan0web/db/path'
+		console.info(basename("/dir/file.txt")) // ← file.txt
+		console.info(basename("/dir/file.txt", ".txt")) // ← file
+		console.info(basename("/dir/file.txt", true)) // ← file (remove ext)
+		console.info(basename("/dir/")) // ← dir/
+		assert.equal(console.output()[0][1], "file.txt")
+		assert.equal(console.output()[1][1], "file")
+		assert.equal(console.output()[2][1], "file")
+		assert.equal(console.output()[3][1], "dir/")
+	})
+
+	/**
+	 * @docs
+	 * ### `dirname(uri)`
+	 * Extracts parent directory path.
+	 */
+	it("How to extract dirname?", () => {
+		//import { dirname } from '@nan0web/db/path'
+		console.info(dirname("/a/b/file")) // ← /a/b/
+		console.info(dirname("/a/b/")) // ← /a/
+		console.info(dirname("/file")) // ← /
+		console.info(dirname("file.txt")) // ← .
+		assert.equal(console.output()[0][1], "/a/b/")
+		assert.equal(console.output()[1][1], "/a/")
+		assert.equal(console.output()[2][1], "/")
+		assert.equal(console.output()[3][1], ".")
+	})
+
+	/**
+	 * @docs
+	 * ### `extname(uri)`
+	 * Extracts file extension with dot (lowercase).
+	 */
+	it("How to extract extension?", () => {
+		//import { extname } from '@nan0web/db/path'
+		console.info(extname("file.TXT")) // ← .txt
+		console.info(extname("archive.tar.gz")) // ← .gz
+		console.info(extname("noext")) // ← ''
+		console.info(extname("/dir/")) // ← ''
+		assert.equal(console.output()[0][1], ".txt")
+		assert.equal(console.output()[1][1], ".gz")
+		assert.equal(console.output()[2][1], "")
+		assert.equal(console.output()[3][1], "")
+	})
+
+	/**
+	 * @docs
+	 * ### `resolveSync(cwd, root, ...segments)`
+	 * Resolves segments relative to cwd/root (synchronous).
+	 */
+	it("How to resolve path synchronously?", () => {
+		//import { resolveSync } from '@nan0web/db/path'
+		console.info(resolveSync("/base", ".", "a/b/../c")) // ← a/c
+		assert.equal(console.output()[0][1], "a/c")
+	})
+
+	/**
+	 * @docs
+	 * ### `relative(from, to)`
+	 * Computes relative path from `from` to `to`.
+	 */
+	it("How to compute relative path?", () => {
+		//import { relative } from '@nan0web/db/path'
+		console.info(relative("/a/b", "/a/c")) // ← c
+		console.info(relative("/root/dir", "/root/")) // ← dir
+		assert.equal(console.output()[0][1], "c")
+		assert.equal(console.output()[1][1], "dir")
+	})
+
+	/**
+	 * @docs
+	 * ### `absolute(cwd, root, ...segments)`
+	 * Builds absolute path/URL from cwd, root, and segments.
+	 */
+	it("How to build absolute path?", () => {
+		//import { absolute } from '@nan0web/db/path'
+		console.info(absolute("/base", "root", "file")) // ← /base/root/file
+		console.info(absolute("https://ex.com", "api", "v1")) // ← https://ex.com/api/v1
+		assert.equal(console.output()[0][1], "/base/root/file")
+		assert.equal(console.output()[1][1], "https://ex.com/api/v1")
+	})
+
+	/**
+	 * @docs
+	 * ### `isRemote(uri)` & `isAbsolute(uri)`
+	 * Checks if URI is remote or absolute.
+	 */
+	it("How to check URI type?", () => {
+		//import { isRemote, isAbsolute } from '@nan0web/db/path'
+		console.info(isRemote("https://ex.com")) // ← true
+		console.info(isAbsolute("/abs/path")) // ← true
+		console.info(isAbsolute("./rel")) // ← false
+		assert.equal(console.output()[0][1], true)
+		assert.equal(console.output()[1][1], true)
+		assert.equal(console.output()[2][1], false)
+	})
+
+	/**
+	 * @docs
 	 * ## Java•Script types & Autocomplete
 	 * Package is fully typed with jsdoc and d.ts.
 	 */
 	it("How many d.ts files should cover the source?", () => {
 		assert.equal(pkg.types, "./types/index.d.ts")
+	})
+
+	/**
+	 * @docs
+	 * ## Drivers & Extensions
+	 *
+	 * Drivers extend DB with storage backends. Extend `DBDriverProtocol` for custom logic.
+	 *
+	 * ### Basic Driver Extension
+	 */
+	it("How to extend DBDriverProtocol?", async () => {
+		//import { DBDriverProtocol } from '@nan0web/db'
+		class MyDriver extends DBDriverProtocol {
+			async read(uri) {
+				// Custom read logic
+				return { data: 'from custom storage' }
+			}
+		}
+		const driver = new MyDriver()
+		console.log(await driver.read("/path")) // ← { data: 'from custom storage' }
+		assert.deepStrictEqual(console.output()[0][1], { data: 'from custom storage' })
+	})
+
+	/**
+	 * @docs
+	 * ### Using Driver in DB
+	 */
+	it("How to attach driver to DB?", async () => {
+		//import { DB, DBDriverProtocol } from '@nan0web/db'
+		class SimpleDriver extends DBDriverProtocol {
+			async read(uri) { return `Read: ${uri}` }
+			async write(uri, data) { return true }
+		}
+		class ExtendedDB extends DB {
+			constructor() {
+				super({ driver: new SimpleDriver() })
+				this.loadDocument = async (uri) => await this.driver.read(uri)
+				this.saveDocument = async (uri, data) => await this.driver.write(uri, data)
+			}
+		}
+		const db = new ExtendedDB()
+		await db.connect()
+		console.info(await db.get('/test')) // ← Read: test
+		assert.equal(console.output()[0][1], 'Read: test')
+	})
+
+	/**
+	 * @docs
+	 * ## Authentication & Authorization
+	 *
+	 * Use `AuthContext` for role-based access in DB operations.
+	 *
+	 * ### Basic AuthContext Usage
+	 */
+	it("How to create AuthContext?", () => {
+		//import { AuthContext } from '@nan0web/db'
+		const ctx = new AuthContext({ role: 'user', roles: ['user', 'guest'] })
+		console.info(ctx.hasRole('user')) // ← true
+		console.info(ctx.role) // ← user
+		assert.equal(console.output()[0][1], true)
+		assert.equal(console.output()[1][1], 'user')
+	})
+
+	/**
+	 * @docs
+	 * ### AuthContext with DB Access
+	 */
+	it("How to use AuthContext in DB?", async () => {
+		//import { DB, AuthContext } from '@nan0web/db'
+		const db = new DB()
+		const ctx = new AuthContext({ role: 'admin' })
+		await db.set('secure/file.txt', 'secret', ctx)
+		console.info(await db.get('secure/file.txt', {}, ctx)) // ← secret
+		assert.equal(console.output()[0][1], 'secret')
+	})
+
+	/**
+	 * @docs
+	 * ### Handling Access Failures
+	 */
+	it("How to handle auth failures?", () => {
+		//import { AuthContext } from '@nan0web/db'
+		const ctx = new AuthContext()
+		ctx.fail(new Error('Access denied'))
+		console.info(ctx.fails) // ← [Error: Access denied]
+		console.info(ctx.hasRole('admin')) // ← false
+		assert.deepStrictEqual(console.output()[0][1], [new Error('Access denied')])
+		assert.equal(console.output()[1][1], false)
 	})
 
 	/**

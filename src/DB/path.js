@@ -207,15 +207,16 @@ export function basename(uri, removeSuffix = '') {
  */
 export function dirname(uri) {
 	const parts = uri.split('/')
+	const fromRoot = uri.startsWith("/")
 	if (uri.endsWith('/')) {
 		return parts.length > 1
 			? parts.slice(0, parts.length - 2).join('/') + '/'
-			: '/'
+			: fromRoot ? '/' : "."
 	}
 	if (parts.length > 1) {
 		return parts.slice(0, -1).join('/') + '/'
 	}
-	return '/'
+	return fromRoot ? '/' : "."
 }
 
 /**
