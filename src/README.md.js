@@ -3,7 +3,20 @@ import assert from 'node:assert/strict'
 import { NoConsole } from "@nan0web/log"
 import FS from "@nan0web/db-fs"
 import { DocsParser, DatasetParser } from "@nan0web/test"
-import { DB, Data } from './index.js'
+import DBDefault,
+{
+	DB,
+	Data,
+	AuthContext,
+	DBDriverProtocol,
+	GetOptions,
+	FetchOptions,
+	Directory,
+	DirectoryIndex,
+	DocumentEntry,
+	DocumentStat,
+	StreamEntry,
+} from './index.js'
 
 const fs = new FS()
 let pkg
@@ -50,6 +63,18 @@ function testRender() {
 		 * ```
 		 */
 		assert.equal(pkg.name, "@nan0web/db")
+		assert.deepStrictEqual(DBDefault, DB)
+		assert.ok(DB instanceof Function)
+		assert.ok(Data instanceof Function)
+		assert.ok(AuthContext instanceof Function)
+		assert.ok(DBDriverProtocol instanceof Function)
+		assert.ok(GetOptions instanceof Function)
+		assert.ok(FetchOptions instanceof Function)
+		assert.ok(Directory instanceof Function)
+		assert.ok(DirectoryIndex instanceof Function)
+		assert.ok(DocumentEntry instanceof Function)
+		assert.ok(DocumentStat instanceof Function)
+		assert.ok(StreamEntry instanceof Function)
 	})
 	/**
 	 * @docs

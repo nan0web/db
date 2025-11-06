@@ -116,3 +116,16 @@
 - Overhead for simple operations
 - Not designed for document-oriented workflows
 - Scaling challenges
+
+
+---
+
+Update README.md.js according to new:
+- cwd + root (resolveSync, absolute) in DB/path.js functionality;
+- updated extract() functionality.
+
+Check the rest changes, it might be I miss some thing.
+
+- [](src/**)
+
+#.

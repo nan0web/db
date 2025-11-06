@@ -27,7 +27,7 @@ class TestAuthDriver extends DBDriverProtocol {
 		this.permissions = permissions
 	}
 
-	async ensure(uri, level, contextInput) {
+	async access(uri, level, contextInput) {
 		const context = AuthContext.from(contextInput)
 		const role = context.role || 'guest'
 
@@ -35,11 +35,11 @@ class TestAuthDriver extends DBDriverProtocol {
 			const allowed = this.permissions[role][level]
 			const isAllowed = allowed.some(pattern => matches(uri, pattern))
 			if (allowed.length === 0 || !isAllowed) {
-				return { granted: false }
+				return false
 			}
 		}
 
-		return { granted: true }
+		return true
 	}
 }
 
@@ -88,7 +88,7 @@ describe('DB Authorization', () => {
 				await db.get('secret/data.json', {}, context)
 			},
 			{
-				message: 'Access denied to secret/data.json (level: r)'
+				message: 'Access denied to secret/data.json { level: r }'
 			}
 		)
 	})
@@ -140,7 +140,7 @@ describe('DB Authorization', () => {
 				await db.set('public/info.txt', 'Public info', context)
 			},
 			{
-				message: 'Access denied to public/info.txt (level: w)'
+				message: 'Access denied to public/info.txt { level: w }'
 			}
 		)
 	})
@@ -167,10 +167,9 @@ describe('DB Authorization', () => {
 
 		const context = new AuthContext({ role: 'admin' })
 
-		// This should not throw
+		// This should not throw, because access is
 		const result = await db.dropDocument('any/file.txt', context)
-		// dropDocument returns false in base implementation
-		assert.equal(result, false)
+		assert.equal(result, true)
 	})
 
 	it('should work with default guest role', async () => {
@@ -201,7 +200,7 @@ describe('DB Authorization', () => {
 				await db.set('private/data.txt', 'Private data', context)
 			},
 			{
-				message: 'Access denied to private/data.txt (level: w)'
+				message: 'Access denied to private/data.txt { level: w }'
 			}
 		)
 	})

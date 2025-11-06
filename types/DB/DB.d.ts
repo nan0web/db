@@ -32,6 +32,7 @@
 export default class DB {
     static Data: typeof Data;
     static Directory: typeof Directory;
+    static Driver: typeof DBDriverProtocol;
     static Index: typeof DirectoryIndex;
     static GetOptions: typeof GetOptions;
     static FetchOptions: typeof FetchOptions;
@@ -54,8 +55,8 @@ export default class DB {
      * - auth context for access control.
      *
      * @param {object} input
-     * @param {string} [input.root="."] - Root path for URI resolution
      * @param {string} [input.cwd="."] - Current working directory (base for absolute paths)
+     * @param {string} [input.root="."] - Root path for URI resolution
      * @param {DBDriverProtocol} [input.driver=new DBDriverProtocol()] - Access control driver
      * @param {boolean} [input.connected=false] - Connection status
      * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
@@ -66,8 +67,8 @@ export default class DB {
      * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
      */
     constructor(input?: {
-        root?: string | undefined;
         cwd?: string | undefined;
+        root?: string | undefined;
         driver?: DBDriverProtocol | undefined;
         connected?: boolean | undefined;
         data?: Map<string, any> | undefined;
@@ -144,6 +145,11 @@ export default class DB {
      * @returns {typeof Directory}
      */
     get Directory(): typeof Directory;
+    /**
+     * Returns static.Driver that is assigned to DBDriverProtocol or its extension
+     * @returns {typeof DBDriverProtocol}
+     */
+    get Driver(): typeof DBDriverProtocol;
     /**
      * @returns {typeof DirectoryIndex}
      */
@@ -443,8 +449,6 @@ export default class DB {
      * @param {string} uri - Document URI
      * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<boolean>}
-     * Always returns false for base implementation not knowing
-     * to implement delete on top of generic interface
      */
     dropDocument(uri: string, context?: AuthContext | object): Promise<boolean>;
     /**

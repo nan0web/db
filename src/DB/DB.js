@@ -46,12 +46,13 @@ import { absolute, basename, dirname, extname, isAbsolute, isRemote, normalize, 
 export default class DB {
 	static Data = Data
 	static Directory = Directory
+	static Driver = DBDriverProtocol
 	static Index = DirectoryIndex
 	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
 	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".html", ".xml", ".md"]
 	/** @type {DBDriverProtocol} */
-	driver = new DBDriverProtocol()
+	driver
 	/** @type {string} */
 	encoding = "utf-8"
 	/** @type {Map<string, any | false>} */
@@ -87,8 +88,8 @@ export default class DB {
 	 * - auth context for access control.
 	 *
 	 * @param {object} input
-	 * @param {string} [input.root="."] - Root path for URI resolution
 	 * @param {string} [input.cwd="."] - Current working directory (base for absolute paths)
+	 * @param {string} [input.root="."] - Root path for URI resolution
 	 * @param {DBDriverProtocol} [input.driver=new DBDriverProtocol()] - Access control driver
 	 * @param {boolean} [input.connected=false] - Connection status
 	 * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
@@ -100,9 +101,9 @@ export default class DB {
 	 */
 	constructor(input = {}) {
 		const {
-			root = this.root,
 			cwd = this.cwd,
-			driver = this.driver,
+			root = this.root,
+			driver,
 			data = this.data,
 			meta = this.meta,
 			context = this.context,
@@ -113,7 +114,7 @@ export default class DB {
 		} = input
 		this.root = root
 		this.cwd = cwd
-		this.driver = driver
+		this.driver = this.Driver.from(driver ?? { cwd, root })
 		this.data = data instanceof Map ? data : new Map(data)
 		this.meta = meta instanceof Map ? meta : new Map(meta)
 		this.context = AuthContext.from(context)
@@ -129,7 +130,7 @@ export default class DB {
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map(from => DB.from(from))
 		this.predefined = predefined instanceof Map ? predefined : new Map(predefined)
-		this.#console.info("DB instance created", String(this))
+		this.console.info("DB instance created", String(this))
 	}
 
 	/**
@@ -194,6 +195,13 @@ export default class DB {
 		return /** @type {typeof DB} */ (this.constructor).Directory
 	}
 	/**
+	 * Returns static.Driver that is assigned to DBDriverProtocol or its extension
+	 * @returns {typeof DBDriverProtocol}
+	 */
+	get Driver() {
+		return /** @type {typeof DB} */ (this.constructor).Driver
+	}
+	/**
 	 * @returns {typeof DirectoryIndex}
 	 */
 	get Index() {
@@ -227,11 +235,11 @@ export default class DB {
 	 */
 	attach(db) {
 		if (!(db instanceof DB)) {
-			this.#console.error("Attempted to attach a non-DB instance")
+			this.console.error("Attempted to attach a non-DB instance")
 			throw new TypeError("It is possible to attach only DB or extended databases")
 		}
 		this.dbs.push(db)
-		this.#console.info("Database attached", { root: db.root, cwd: db.cwd })
+		this.console.info("Database attached", { root: db.root, cwd: db.cwd })
 	}
 
 	/**
@@ -242,11 +250,11 @@ export default class DB {
 	detach(db) {
 		const index = this.dbs.findIndex((d) => d.root === db.root && d.cwd === db.cwd)
 		if (index < 0) {
-			this.#console.warn("Database not found for detachment", { root: db.root, cwd: db.cwd })
+			this.console.warn("Database not found for detachment", { root: db.root, cwd: db.cwd })
 			return false
 		}
 		const detached = this.dbs.splice(index, 1)
-		this.#console.info("Database detached", { root: db.root, cwd: db.cwd })
+		this.console.info("Database detached", { root: db.root, cwd: db.cwd })
 		return detached
 	}
 
@@ -266,7 +274,7 @@ export default class DB {
 	 * @returns {DB} New DB instance with filtered data and metadata.
 	 */
 	extract(uri) {
-		this.#console.debug("extract()", uri)
+		this.console.debug("extract()", uri)
 
 		const prefix = (this.normalize(uri) + "/").replace(/\/{2,}$/, "/")
 
@@ -290,7 +298,7 @@ export default class DB {
 			console: this.console,
 		})
 
-		this.#console.debug("extract().done", uri, { db })
+		this.console.debug("extract().done", uri, { db })
 		return db
 	}
 
@@ -350,9 +358,9 @@ export default class DB {
 				await dest.saveDocument(url, data)
 				updatedURIs.push(url)
 				onProgress({ uri, url, data, current, total })
-				this.#console.info(`Document dumped [${uri}]`, { data })
+				this.console.info(`Document dumped [${uri}]`, { data })
 			} catch (/** @type {any} */ error) {
-				this.#console.error(`Failed to dump document [${uri}]`, { error: error.message })
+				this.console.error(`Failed to dump document [${uri}]`, { error: error.message })
 			}
 		}
 		return {
@@ -441,7 +449,7 @@ export default class DB {
 			context,
 		} = options
 
-		this.#console.debug("readDir()", uri, { uri, options })
+		this.console.debug("readDir()", uri, { uri, options })
 
 		const authContext = AuthContext.from(context || this.context)
 		await this.ensureAccess(uri, "r", authContext)
@@ -518,7 +526,7 @@ export default class DB {
 				yield file
 			}
 		} catch (/** @type {any} */err) {
-			this.#console.warn(`Failed to list directory: ${uri}`, err)
+			this.console.warn(`Failed to list directory: ${uri}`, err)
 		}
 	}
 
@@ -529,7 +537,7 @@ export default class DB {
 	 * @returns {Promise<AsyncGenerator<DocumentEntry, void, unknown>>}
 	 */
 	async readBranch(uri, depth = -1) {
-		this.#console.debug("readBranch()", uri, { uri, depth })
+		this.console.debug("readBranch()", uri, { uri, depth })
 		return this.readDir(uri, { depth })
 	}
 
@@ -539,15 +547,15 @@ export default class DB {
 	 * @throws {Error} If connection cannot be established
 	 */
 	async requireConnected() {
-		this.#console.debug("requireConnected()")
+		this.console.debug("requireConnected()")
 		if (!this.connected) {
 			await this.connect()
 		}
 		if (!this.connected) {
-			this.#console.error("Database connection failed")
+			this.console.error("Database connection failed")
 			throw new Error("DB is not connected")
 		}
-		this.#console.info("Database connected successfully")
+		this.console.info("Database connected successfully")
 	}
 
 	/**
@@ -558,7 +566,7 @@ export default class DB {
 	 * @returns {AsyncGenerator<string, void, unknown>}
 	 */
 	async *find(uri, depth = 0) {
-		this.#console.debug("find()", uri, { depth })
+		this.console.debug("find()", uri, { depth })
 		await this.requireConnected()
 		const entries = []
 		if (this.loaded) {
@@ -566,11 +574,11 @@ export default class DB {
 				entries.push(path)
 			}
 		} else {
-			this.#console.debug("find().readDir()", uri)
+			this.console.debug("find().readDir()", uri)
 			for await (const entry of this.readDir(this.root, { depth: depth + 1 })) {
 				entries.push(entry.path)
 			}
-			this.#console.debug("find().readDir().done", uri, { root: this.root, entries })
+			this.console.debug("find().readDir().done", uri, { root: this.root, entries })
 			this.meta.set("?loaded", new DocumentStat())
 		}
 		if ("function" === typeof uri) {
@@ -593,7 +601,7 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async connect() {
-		this.#console.info("Connecting to database")
+		this.console.info("Connecting to database")
 		for (const [key, value] of this.predefined.entries()) {
 			this.data.set(key, value)
 			const isDir = key.endsWith("/")
@@ -630,7 +638,7 @@ export default class DB {
 			}
 		}
 		this.connected = true
-		this.#console.info("Database connected")
+		this.console.info("Database connected")
 	}
 
 	/**
@@ -651,16 +659,16 @@ export default class DB {
 		}
 		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
-		this.#console.debug("get()", uri, { opts })
+		this.console.debug("get()", uri, { opts })
 		await this.ensureAccess(uri, "r", authContext)
 		if (!this.data.has(uri) || false === this.data.get(uri)) {
 			const data = await this.loadDocument(uri, opts.defaultValue, authContext)
-			this.#console.debug("get().done", uri, { data, cache: false })
+			this.console.debug("get().done", uri, { data, cache: false })
 			this.data.set(uri, data)
 			return data
 		}
 		const data = this.data.get(uri)
-		this.#console.debug("get().done", uri, { data, cache: true })
+		this.console.debug("get().done", uri, { data, cache: true })
 		return data
 	}
 
@@ -673,7 +681,7 @@ export default class DB {
 	 */
 	async set(uri, data, context = this.context) {
 		const authContext = AuthContext.from(context)
-		this.#console.debug("set()", uri, { data })
+		this.console.debug("set()", uri, { data })
 		await this.ensureAccess(uri, "w", authContext)
 		this.data.set(uri, data)
 		const meta = this.meta.has(uri) ? this.meta.get(uri) : {}
@@ -690,15 +698,15 @@ export default class DB {
 	 */
 	async stat(uri, context = this.context) {
 		const authContext = AuthContext.from(context)
-		this.#console.debug("stat()", uri)
+		this.console.debug("stat()", uri)
 		await this.ensureAccess(uri, "r", authContext)
 		if (!this.meta.has(uri)) {
 			const stat = await this.statDocument(uri, authContext)
-			this.#console.debug("stat().done", uri, { stat, cache: false })
+			this.console.debug("stat().done", uri, { stat, cache: false })
 			this.meta.set(uri, stat)
 		}
 		const stat = this.meta.get(uri)
-		this.#console.debug("stat().done", uri, { stat, cache: true })
+		this.console.debug("stat().done", uri, { stat, cache: true })
 		return stat
 	}
 
@@ -709,7 +717,7 @@ export default class DB {
 	 * @returns {Promise<string>} Resolved absolute path
 	 */
 	async resolve(...args) {
-		this.#console.debug("resolve()", { args })
+		this.console.debug("resolve()", { args })
 		return Promise.resolve(this.resolveSync(...args))
 	}
 
@@ -774,7 +782,7 @@ export default class DB {
 	 * @returns {string} Absolute path
 	 */
 	absolute(...args) {
-		this.#console.debug("absolute()", { args })
+		this.console.debug("absolute()", { cwd: this.cwd, root: this.root, args })
 		return absolute(this.cwd, this.root, ...args)
 	}
 	/**
@@ -788,7 +796,7 @@ export default class DB {
 	 * @returns {Promise<any>}
 	 */
 	async loadDocument(uri, defaultValue, context = this.context) {
-		this.#console.debug("loadDocument()", uri, { defaultValue })
+		this.console.debug("loadDocument()", uri, { defaultValue })
 		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
 		await this.ensureAccess(uri, "r", authContext)
@@ -816,7 +824,7 @@ export default class DB {
 	 * @returns {Promise<any>} The loaded document or the default value.
 	 */
 	async loadDocumentAs(ext, uri, defaultValue, context = this.context) {
-		this.#console.debug("loadDocumentAs()", uri, { ext, defaultValue })
+		this.console.debug("loadDocumentAs()", uri, { ext, defaultValue })
 		const authContext = AuthContext.from(context)
 		return await this.loadDocument(uri, defaultValue, authContext)
 	}
@@ -832,7 +840,7 @@ export default class DB {
 	 * @returns {Promise<boolean>}
 	 */
 	async saveDocument(uri, document, context = this.context) {
-		this.#console.debug("saveDocument()", uri, { document })
+		this.console.debug("saveDocument()", uri, { document })
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, "w", authContext)
 		const abs = this.normalize(await this.resolve(uri))
@@ -856,7 +864,7 @@ export default class DB {
 	 * @returns {Promise<DocumentStat>}
 	 */
 	async statDocument(uri, context = this.context) {
-		this.#console.debug("statDocument()", uri)
+		this.console.debug("statDocument()", uri)
 		const authContext = AuthContext.from(context)
 		if ("." === uri) uri = "./"
 		await this.ensureAccess(uri, "r", authContext)
@@ -873,6 +881,18 @@ export default class DB {
 			}
 		}
 
+		if (this.driver) {
+			try {
+				const abs = this.absolute(uri)
+				const stat = await this.driver.stat(abs)
+				if (stat) {
+					return stat
+				}
+			} catch {
+				this.console.error("Cannot stat a document", { uri, abs })
+			}
+		}
+
 		return DocumentStat.from(this.meta.get(abs) ?? {})
 	}
 
@@ -884,10 +904,27 @@ export default class DB {
 	 * @returns {Promise<boolean>} Success status
 	 */
 	async writeDocument(uri, chunk, context = this.context) {
-		this.#console.debug("writeDocument()", uri, { chunk })
+		this.console.debug("writeDocument()", uri, { chunk })
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, "w", authContext)
-		return false
+		if (this.driver) {
+			const abs = this.absolute(uri)
+			try {
+				const result = await this.driver.append(abs, chunk)
+				if (false === result) {
+					throw new Error("Unable to write document")
+				}
+			} catch (error) {
+				this.console.error("Cannot append document", { uri, abs, error })
+				return false
+			}
+		}
+		const str = String(this.data.get(uri) || "")
+		this.data.set(uri, str + chunk)
+		this.meta.set(uri, new DocumentStat({
+			isFile: true, size: str.length + chunk.length, mtimeMs: Date.now()
+		}))
+		return true
 	}
 
 	/**
@@ -896,16 +933,32 @@ export default class DB {
 	 * @param {string} uri - Document URI
 	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<boolean>}
-	 * Always returns false for base implementation not knowing
-	 * to implement delete on top of generic interface
 	 */
 	async dropDocument(uri, context = this.context) {
-		this.#console.debug("dropDocument()", uri)
+		this.console.debug("dropDocument()", uri)
 		const authContext = AuthContext.from(context)
-		await this.ensureAccess(uri, "d", authContext)
+		try {
+			await this.ensureAccess(uri, "d", authContext)
+		} catch (error) {
+			this.console.error("No access to delete the document", { uri, context, error })
+			return false
+		}
+		if (this.driver) {
+			const abs = this.absolute(uri)
+			try {
+				const result = await this.driver.delete(abs)
+				if (false === result) {
+					throw new Error("Could not delete document")
+				}
+			} catch (error) {
+				this.console.error("Cannot delete document", { uri, abs, context, error })
+				return false
+			}
+		}
 		this.data.delete(uri)
 		this.meta.delete(uri)
-		return false
+		this.console.debug("Document deleted", { uri })
+		return true
 	}
 
 	/**
@@ -918,7 +971,7 @@ export default class DB {
 	 * @throws {Error} - Access denied
 	 */
 	async ensureAccess(uri, level = "r", context = this.context) {
-		this.#console.debug("ensureAccess()", uri, { level, context })
+		this.console.debug("ensureAccess()", uri, { level, context })
 
 		const authContext = AuthContext.from(context)
 
@@ -931,22 +984,11 @@ export default class DB {
 			].join("\n"))
 		}
 
-		if (!this.driver) {
-			this.#console.debug("Open access: No driver configured")
-			return
-		}
-
-		try {
-			const result = await this.driver.ensure(uri, level, authContext)
-			if (!result || !result.granted) {
-				const msg = `Access denied to ${uri} (level: ${level})`
-				this.#console.warn(msg, { context: authContext })
-				throw new Error(msg)
+		if (this.driver) {
+			const result = await this.driver.access(uri, level, authContext)
+			if (false === result) {
+				throw new Error(`Access denied to ${uri} { level: ${level} }`)
 			}
-			this.#console.debug("Access granted by driver", { uri, level })
-		} catch (/** @type {any} */ err) {
-			this.#console.warn("Access denied by driver", { uri, level, error: err.message })
-			throw err
 		}
 	}
 	/**
@@ -957,7 +999,7 @@ export default class DB {
 	 * @returns {Promise<string[]>} Array of saved URIs
 	 */
 	async push(uri = undefined, context = this.context) {
-		this.#console.debug("push()", uri)
+		this.console.debug("push()", uri)
 		const authContext = AuthContext.from(context)
 		if (uri) {
 			await this.ensureAccess(uri, "w", authContext)
@@ -975,7 +1017,7 @@ export default class DB {
 				await this.saveDocument(key, value, authContext)
 			}
 		}
-		this.#console.info("Data pushed to storage", { changedUris: changed })
+		this.console.info("Data pushed to storage", { changedUris: changed })
 		return changed
 	}
 
@@ -988,10 +1030,21 @@ export default class DB {
 	 * @returns {Promise<boolean>} Success status
 	 */
 	async moveDocument(from, to, context = this.context) {
-		this.#console.debug("moveDocument()", { from, to })
+		this.console.debug("moveDocument()", { from, to })
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(to, "w", authContext)
 		await this.ensureAccess(from, "r", authContext)
+		if (this.driver) {
+			const absoluteFrom = this.absolute(from)
+			const result = await this.driver.move(absoluteFrom, this.absolute(to))
+			if (true === result) {
+				await this._updateIndex(absoluteFrom)
+			}
+			if (false === result) {
+				return false
+			}
+		}
+
 		const data = await this.loadDocument(from, undefined, authContext)
 		await this.saveDocument(to, data, authContext)
 		await this.dropDocument(from, authContext)
@@ -1006,9 +1059,9 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async disconnect() {
-		this.#console.info("Disconnecting from database")
+		this.console.info("Disconnecting from database")
 		this.connected = false
-		this.#console.info("Database disconnected")
+		this.console.info("Database disconnected")
 	}
 
 	/**
@@ -1020,9 +1073,17 @@ export default class DB {
 	 * @throws {Error} If directory does not exist
 	 */
 	async listDir(uri, context = this.context) {
-		this.#console.debug("listDir()", uri)
+		this.console.debug("listDir()", uri)
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, "r", authContext)
+		if (this.driver) {
+			const abs = this.absolute(uri)
+			try {
+				const entries = await this.driver.listDir(abs)
+			} catch (error) {
+				this.console.error("Cannot list directory", { uri, abs, error })
+			}
+		}
 		const prefix = uri === '.' ? '' : uri.endsWith("/") ? uri : uri + '/'
 		const depth = (uri.endsWith("/") ? uri.slice(0, -1) : uri).split("/").length
 		const keys = Array.from(this.meta.keys())
@@ -1070,7 +1131,7 @@ export default class DB {
 			load = false,
 			context,
 		} = options
-		this.#console.debug("findStream()", uri, { options })
+		this.console.debug("findStream()", uri, { options })
 		const authContext = AuthContext.from(context || this.context)
 		/** @type {Map<string, DocumentEntry>} */
 		let dirs = new Map()
@@ -1153,7 +1214,7 @@ export default class DB {
 	 * @returns {Promise<any>} Inheritance data
 	 */
 	async getInheritance(path) {
-		this.#console.debug("getInheritance()", path)
+		this.console.debug("getInheritance()", path)
 		const inheritanceChain = this.Data.getPathParents(path, "/")
 
 		// Load root inheritance data
@@ -1161,9 +1222,9 @@ export default class DB {
 			try {
 				const rootData = await this.loadDocument(this.Directory.FILE)
 				this._inheritanceCache.set('/', rootData)
-				this.#console.debug("getInheritance().loaded", path, { rootData })
+				this.console.debug("getInheritance().loaded", path, { rootData })
 			} catch (/** @type {any} */ err) {
-				this.#console.warn("Failed to load root inheritance data", { error: err.message })
+				this.console.warn("Failed to load root inheritance data", { error: err.message })
 				this._inheritanceCache.set('/', {})
 			}
 		}
@@ -1175,9 +1236,9 @@ export default class DB {
 					const uri = this.resolveSync(dirPath, this.Directory.FILE)
 					const dirData = await this.loadDocument(uri)
 					this._inheritanceCache.set(dirPath, dirData)
-					this.#console.debug("getInheritance().loaded", path, { dirPath, dirData })
+					this.console.debug("getInheritance().loaded", path, { dirPath, dirData })
 				} catch (/** @type {any} */ err) {
-					this.#console.warn("Failed to load directory inheritance data", { dirPath, error: err.message })
+					this.console.warn("Failed to load directory inheritance data", { dirPath, error: err.message })
 					this._inheritanceCache.set(dirPath, {})
 				}
 			}
@@ -1185,7 +1246,7 @@ export default class DB {
 			mergedData = this.Data.merge(mergedData, dirData)
 		}
 
-		this.#console.debug("getInheritance().done", path, { mergedData })
+		this.console.debug("getInheritance().done", path, { mergedData })
 		return mergedData
 	}
 
@@ -1196,7 +1257,7 @@ export default class DB {
 	 * @returns {Promise<any>} Global variables data
 	 */
 	async getGlobals(path) {
-		this.#console.debug("getGlobals()", path)
+		this.console.debug("getGlobals()", path)
 		let globals = {}
 
 		try {
@@ -1216,11 +1277,11 @@ export default class DB {
 				}
 			}
 		} catch (/** @type {any} */ err) {
-			this.#console.warn("Error reading global variables directory", { path, error: err.message })
+			this.console.warn("Error reading global variables directory", { path, error: err.message })
 			// If no _/ directory or error reading it, continue with empty object
 		}
 
-		this.#console.debug("getGlobals().done", path, { globals })
+		this.console.debug("getGlobals().done", path, { globals })
 		return globals
 	}
 
@@ -1232,7 +1293,7 @@ export default class DB {
 	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>}
 	 */
-	async fetch(uri, input = {}, context) {
+	async fetch(uri, input = {}, context = this.context) {
 		let opts
 		if (context !== undefined) {
 			opts = FetchOptions.from(input)
@@ -1246,7 +1307,7 @@ export default class DB {
 		if (opts.globals === undefined) opts.globals = true
 
 		const authContext = AuthContext.from(context)
-		this.#console.debug("fetch()", uri, { uri, opts })
+		this.console.debug("fetch()", uri, { uri, opts })
 		// Handle extension-less URIs by trying common extensions
 		let ext = this.extname(uri)
 		let mightBeDirectory = false
@@ -1267,7 +1328,7 @@ export default class DB {
 						}
 					} while (extname)
 				} catch (/** @type {any} */ err) {
-					this.#console.warn("Error checking if URI is directory", { uri, error: err.message })
+					this.console.warn("Error checking if URI is directory", { uri, error: err.message })
 					// Not a directory, continue with file extensions
 				}
 			}
@@ -1283,7 +1344,7 @@ export default class DB {
 			}
 
 			// If no file found, return default value
-			this.#console.debug("fetch().fail", uri, { uri, opts })
+			this.console.debug("fetch().fail", uri, { uri, opts })
 			return opts.defaultValue
 		}
 
@@ -1293,7 +1354,7 @@ export default class DB {
 				return await this.loadDocumentAs(".txt", uri, opts.defaultValue, authContext)
 			} catch (/** @type {any} */ err) {
 				// If loading fails, return default value
-				this.#console.warn("Error loading document with unsupported extension", { uri, error: err.message })
+				this.console.warn("Error loading document with unsupported extension", { uri, error: err.message })
 				return opts.defaultValue
 			}
 		}
@@ -1328,12 +1389,12 @@ export default class DB {
 						}
 					}
 					// Otherwise return default value
-					this.#console.warn("Index file not found for directory", { uri, error: indexErr.message })
+					this.console.warn("Index file not found for directory", { uri, error: indexErr.message })
 					return opts.defaultValue
 				}
 			}
 			// Otherwise return default value
-			this.#console.warn("Error fetching document", { uri, error: err.message })
+			this.console.warn("Error fetching document", { uri, error: err.message })
 			return opts.defaultValue
 		}
 	}
@@ -1353,14 +1414,14 @@ export default class DB {
 		if (contextOrVisited instanceof Set) {
 			visitedSet = contextOrVisited
 		}
-		this.#console.debug("fetchMerged()", uri, { uri, opts, visited: Array.from(visitedSet) })
+		this.console.debug("fetchMerged()", uri, { uri, opts, visited: Array.from(visitedSet) })
 		opts = FetchOptions.from(opts)
 		const extname = this.extname(uri)
 		const isData = !extname || this.Directory.DATA_EXTNAMES.includes(extname)
 
 		// Prevent self-repeating
 		if (visitedSet.has(uri)) {
-			this.#console.warn("Circular inheritance chain detected", { uri })
+			this.console.warn("Circular inheritance chain detected", { uri })
 			return opts.defaultValue
 		}
 		const nextVisited = new Set(visitedSet).add(uri)
@@ -1393,7 +1454,7 @@ export default class DB {
 				} while (!this.isRoot(dir))
 				data = this.Data.merge(parentData, data)
 			} catch (/** @type {any} */ err) {
-				this.#console.warn("Error processing inheritance", { dir, dirs, parentData, error: err.message })
+				this.console.warn("Error processing inheritance", { dir, dirs, parentData, error: err.message })
 			}
 		}
 
@@ -1438,7 +1499,7 @@ export default class DB {
 	 * @returns {Promise<object>} Data with resolved references
 	 */
 	async resolveReferences(data, basePath = '', opts = new FetchOptions(), visited = new Set()) {
-		this.#console.debug("resolveReferences()", { data, basePath, visited: Array.from(visited) })
+		this.console.debug("resolveReferences()", { data, basePath, visited: Array.from(visited) })
 
 		if (typeof data !== 'object' || data === null || Array.isArray(data)) {
 			return data
@@ -1468,12 +1529,12 @@ export default class DB {
 				// Avoid reading the same file we're currently processing
 				// This prevents infinite loops when a file references itself
 				if (absPath === basePath) {
-					this.#console.warn("Self-reference skipped", { ref: absPath })
+					this.console.warn("Self-reference skipped", { ref: absPath })
 					continue
 				}
 
 				if (visited.has(absPath)) {
-					this.#console.warn("Circular reference skipped", { ref: absPath })
+					this.console.warn("Circular reference skipped", { ref: absPath })
 					circulars.add(key)
 					continue
 				}
@@ -1526,7 +1587,7 @@ export default class DB {
 				})
 
 			} catch (/** @type {any} */ err) {
-				this.#console.warn("Error resolving reference", { key, error: err.message })
+				this.console.warn("Error resolving reference", { key, error: err.message })
 			}
 		}
 		if (flat[this.Data.REFERENCE_KEY] && "object" === typeof newFlat[this.Data.REFERENCE_KEY] && newFlat[this.Data.REFERENCE_KEY]) {
@@ -1545,7 +1606,7 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async _updateIndex(uri) {
-		this.#console.debug("_updateIndex()", uri)
+		this.console.debug("_updateIndex()", uri)
 		const base = this.basename(uri)
 		if ([this.Index.FULL_INDEX, this.Index.INDEX].includes(base)) {
 			return
@@ -1556,7 +1617,7 @@ export default class DB {
 			const entries = await DirectoryIndex.getDirectoryEntries(this, dirPath)
 			await this.saveIndex(dirPath, entries)
 		}
-		this.#console.debug("_updateIndex().done", uri, {
+		this.console.debug("_updateIndex().done", uri, {
 			indexesUpdated: indexUris.length,
 			paths: indexUris
 		})
@@ -1569,7 +1630,7 @@ export default class DB {
 	 * @returns {Promise<void>}
 	 */
 	async saveIndex(dirUri, entries) {
-		this.#console.debug("saveIndex()", dirUri, { entries })
+		this.console.debug("saveIndex()", dirUri, { entries })
 		if (!entries) {
 			const base = this.normalize(dirUri)
 			entries = Array.from(this.meta.entries()).filter(
@@ -1603,7 +1664,7 @@ export default class DB {
 				}
 				return this.Index.decode(entries)
 			} catch (/** @type {any} */ err) {
-				this.#console.warn(err.message)
+				this.console.warn(err.message)
 			}
 		}
 		// No index found

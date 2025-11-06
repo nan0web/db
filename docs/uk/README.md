@@ -2,7 +2,7 @@
 
 |[Статус](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Документація|Покриття тестами|Функції|Версія Npm|
 |---|---|---|---|---|
-|🟢 `99.4%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `97.4%` |✅ d.ts 📜 system.md 🕹️ playground |1.0.2 |
+ |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.1%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.0 |
 
 Агностична документна база даних та утиліти для маніпуляції даними. Розроблена як
 гнучкий, мінімальний і потужний інструмент — що підтримує будь-який формат даних та
@@ -17,7 +17,7 @@
 - асинхронне спискування каталогів (для fs & fetch шарів)
 - прогрес на основі потоку під час обходу
 
-Дивись як це працює в [песочниці](#песочниця).
+Дивись як це працює в [пісочниці](#пісочниця).
 
 ## Встановлення
 
@@ -79,9 +79,9 @@ const db = new DB({
 const res = await db.fetch("data.json")
 console.info(res) // ← { global: "value", key: "val" }
 ```
-## Песочниця
+## Пісочниця
 
-CLI-песочниця для безпечних експериментів:
+CLI-пісочниця для безпечних експериментів:
 ```bash
 git clone https://github.com/nan0web/db.git
 cd db

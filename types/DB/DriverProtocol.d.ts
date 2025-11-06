@@ -1,4 +1,10 @@
 /**
+ * @typedef {Object} DriverConfig
+ * @property {string} [cwd="."] - Current working directory (base for absolute paths)
+ * @property {string} [root="."] - Root path for URI resolution
+ * @property {DBDriverProtocol} [driver] - Next driver if current fails, undefined by default
+ */
+/**
  * Base protocol for database drivers.
  * Defines the interface for storage backends (e.g., FS, HTTP, DB engines).
  * Optional: Implement ensureAuthorized for access control support.
@@ -8,69 +14,108 @@
  */
 export default class DBDriverProtocol {
     /**
+     * @param {any} input
+     * @returns {DBDriverProtocol}
+     */
+    static from(input: any): DBDriverProtocol;
+    /**
+     * @param {DriverConfig} config
+     */
+    constructor(config?: DriverConfig);
+    /** @type {string} */
+    cwd: string;
+    /** @type {string} */
+    root: string;
+    /** @type {DBDriverProtocol | undefined} */
+    driver: DBDriverProtocol | undefined;
+    /**
      * Connects to the physical environment
      * Initializes the driver (e.g., open connection, mount filesystem).
      * @param {object} [opts] - Connection options
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    connect(opts?: object): Promise<void>;
+    connect(opts?: object): Promise<boolean | void>;
     /**
      * Disconnects from the physical environment
      * Cleans up resources (e.g., close connections).
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    disconnect(): Promise<void>;
+    disconnect(): Promise<boolean | void>;
     /**
      * Checks access to URI
      * Validates permissions before operations.
-     * @param {string} uri
+     * @param {string} absoluteURI
      * @param {'r'|'w'|'d'} level
-     * @returns {Promise<void>}
+     * @param {AuthContext} [context=new AuthContext()]
+     * @returns {Promise<boolean | void>} - TRUE if allowed, FALSE if denied, undefined if not realized.
      */
-    access(uri: string, level: 'r' | 'w' | 'd'): Promise<void>;
+    access(absoluteURI: string, level: 'r' | 'w' | 'd', context?: AuthContext | undefined): Promise<boolean | void>;
     /**
      * Loads a document
      * Reads content from storage.
-     * @param {string} uri
+     * @param {string} absoluteURI
      * @param {any} [defaultValue]
-     * @returns {Promise<any>}
+     * @returns {Promise<any>} - any on success, undefined on failure or if not realized.
      */
-    read(uri: string, defaultValue?: any): Promise<any>;
+    read(absoluteURI: string, defaultValue?: any): Promise<any>;
     /**
      * Saves a document
      * Writes content to storage.
-     * @param {string} uri
+     * @param {string} absoluteURI
      * @param {any} document
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    write(uri: string, document: any): Promise<void>;
+    write(absoluteURI: string, document: any): Promise<boolean | void>;
     /**
      * Appends a chunk to existing document or creates a new one with a chunk.
      * Supports streaming writes.
-     * @param {string} uri
+     * @param {string} absoluteURI
      * @param {string} chunk
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    append(uri: string, chunk: string): Promise<void>;
+    append(absoluteURI: string, chunk: string): Promise<boolean | void>;
     /**
      * Gets statistics for a document
      * Returns metadata like size, mtime, type.
-     * @param {string} uri
-     * @returns {Promise<DocumentStat>}
+     * @param {string} absoluteURI
+     * @returns {Promise<DocumentStat | void>} - Document stats on success or failure, undefined if not realized.
      */
-    stat(uri: string): Promise<DocumentStat>;
+    stat(absoluteURI: string): Promise<DocumentStat | void>;
     /**
-     * Ensures access to URI.
-     * Performs authorization check based on level and context.
-     * @param {string} uri - Resource URI
-     * @param {'r'|'w'|'d'} level - Access level
-     * @param {AuthContext} context - Auth context: { username, role, roles, user }
-     * @returns {Promise<{ granted: boolean }>}
-     * @throws {Error} - Access denied
+     * Moves (renames) document.
+     * @param {string} absoluteFrom
+     * @param {string} absoluteTo
+     * @returns {Promise<boolean | void>} - TRUE on success, FALSE on failure, undefined if not realized.
      */
-    ensure(uri: string, level: 'r' | 'w' | 'd', context: AuthContext): Promise<{
-        granted: boolean;
-    }>;
+    move(absoluteFrom: string, absoluteTo: string): Promise<boolean | void>;
+    /**
+     * Deletes the document.
+     * @param {string} absoluteURI - Resource URI
+     * @returns {Promise<boolean | undefined>} - TRUE on success, FALSE on failure, undefined if not realized.
+     */
+    delete(absoluteURI: string): Promise<boolean | undefined>;
+    /**
+     * Lists directory contents if ends with / its directory, otherwise file.
+     * @example
+     * await driver.listDir("/etc/") // ← ["apache2/", "hosts", "passwd"]
+     * @param {string} absoluteURI - Directory URI
+     * @returns {Promise<string[]>}
+     */
+    listDir(absoluteURI: string): Promise<string[]>;
 }
-import DocumentStat from "../DocumentStat.js";
+export type DriverConfig = {
+    /**
+     * - Current working directory (base for absolute paths)
+     */
+    cwd?: string | undefined;
+    /**
+     * - Root path for URI resolution
+     */
+    root?: string | undefined;
+    /**
+     * - Next driver if current fails, undefined by default
+     */
+    driver?: DBDriverProtocol | undefined;
+};
 import AuthContext from "./AuthContext.js";
+import DocumentStat from "../DocumentStat.js";
