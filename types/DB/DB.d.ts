@@ -61,6 +61,7 @@ export default class DB {
      * @param {boolean} [input.connected=false] - Connection status
      * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
      * @param {Map<string, DocumentStat>} [input.meta=new Map()] - Metadata cache
+     * @param {number} [input.ttl=0] - Cache life time.
      * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
      * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
      * @param {DB[]} [input.dbs=[]] - Attached sub-databases
@@ -73,6 +74,7 @@ export default class DB {
         connected?: boolean | undefined;
         data?: Map<string, any> | undefined;
         meta?: Map<string, DocumentStat> | undefined;
+        ttl?: number | undefined;
         context?: AuthContext | object;
         predefined?: Map<string, any> | (readonly [string, any])[] | undefined;
         dbs?: DB[] | undefined;
@@ -86,6 +88,8 @@ export default class DB {
     data: Map<string, any | false>;
     /** @type {Map<string, DocumentStat>} */
     meta: Map<string, DocumentStat>;
+    /** @type {number} */
+    ttl: number;
     /** @type {AuthContext} */
     context: AuthContext;
     /** @type {boolean} */
@@ -168,6 +172,11 @@ export default class DB {
      * @returns {typeof GetOptions}
      */
     get GetOptions(): typeof GetOptions;
+    /**
+     * @param {string} abs
+     * @returns {DocumentStat}
+     */
+    _statFromMeta(abs: string): DocumentStat;
     isRoot(dir: any): boolean;
     /**
      * Attaches another DB instance to this database for federated access.
@@ -514,7 +523,7 @@ export default class DB {
         context?: AuthContext | object;
         filter?: Function | undefined;
         limit?: number | undefined;
-        sort?: "size" | "name" | "mtime" | undefined;
+        sort?: "name" | "size" | "mtime" | undefined;
         order?: "asc" | "desc" | undefined;
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;

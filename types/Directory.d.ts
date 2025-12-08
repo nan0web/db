@@ -58,6 +58,11 @@ export default class Directory {
      */
     static isRoot(path: string): boolean;
     /**
+     * @param {string} path
+     * @returns {boolean}
+     */
+    static isData(path: string): boolean;
+    /**
      * Returns Global variable name or empty string if incorrect global path.
      * Strips extension from basename if it's a data extension.
      * @param {string} path

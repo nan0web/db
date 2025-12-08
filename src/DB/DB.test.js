@@ -268,11 +268,17 @@ suite("DB", () => {
 		})
 
 		it('should return document if found', async () => {
-			const uri = 'doc.txt'
-			const content = 'document content'
-			db.data.set(uri, content)
-			const result = await db.loadDocument(uri)
-			assert.strictEqual(result, content)
+			const db = new DB({
+				predefined: [
+					["doc.txt", "document content"],
+					["doc.json", { title: "Document" }]
+				]
+			})
+			await db.connect()
+			const r1 = await db.loadDocument("doc.txt")
+			assert.strictEqual(r1, "document content")
+			const r2 = await db.loadDocument("doc")
+			assert.deepStrictEqual(r2, { title: "Document" })
 		})
 
 		it('should try extensions when none provided', async () => {
@@ -302,7 +308,7 @@ suite("DB", () => {
 			const stat = await baseDb.statDocument('path')
 			assert.ok(!stat.exists)
 		})
-		it("should stat document without extension", async () => {
+		it("should not stat document without extension", async () => {
 			const db = new DB({
 				predefined: [
 					["index.json", {}],
@@ -310,7 +316,7 @@ suite("DB", () => {
 			})
 			await db.connect()
 			const stat = await db.statDocument("index")
-			assert.ok(stat.exists)
+			assert.equal(stat.exists, false)
 		})
 	})
 
@@ -860,10 +866,13 @@ suite("DB", () => {
 		})
 
 		it('should skip reference resolution when refs option is false', async () => {
-			const db = new DB()
-			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
-			db.data.set('data.json', { key: '$ref:ref:ref.json#prop/subprop' })
-
+			const db = new DB({
+				predefined: [
+					['ref.json', { prop: { subprop: 'resolved' } }],
+					['data.json', { key: '$ref:ref:ref.json#prop/subprop' }],
+				]
+			})
+			await db.connect()
 			const result = await db.fetch("data.json", { refs: false })
 			assert.deepEqual(result, { key: '$ref:ref:ref.json#prop/subprop' })
 		})
@@ -898,8 +907,12 @@ suite("DB", () => {
 		})
 
 		it('should resolve fragment references', async () => {
-			const db = new DB()
-			db.data.set('ref.json', { prop: { subprop: 'resolved' } })
+			const db = new DB({
+				predefined: [
+					['ref.json', { prop: { subprop: 'resolved' } }]
+				]
+			})
+			await db.connect()
 			const data = { key: '$ref:ref.json#prop/subprop' }
 
 			const result = await db.resolveReferences(data)
@@ -914,8 +927,12 @@ suite("DB", () => {
 		})
 
 		it('should resolve nested references', async () => {
-			const db = new DB()
-			db.data.set('ref.txt', 'referenced value')
+			const db = new DB({
+				predefined: [
+					['ref.txt', 'referenced value']
+				]
+			})
+			await db.connect()
 			const data = { nested: { key: '$ref:ref.txt' } }
 
 			const result = await db.resolveReferences(data)
@@ -951,11 +968,15 @@ suite("DB", () => {
 		})
 
 		it('should resolve nested references (property version) with siblings and object', async () => {
-			const dbInstance = new DB()
-			dbInstance.data.set('ref.json', { color: "red", size: "xl" })
+			const db = new DB({
+				predefined: [
+					["ref.json", { color: "red", size: "xl" }]
+				],
+			})
+			await db.connect()
 			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
 
-			const result = await dbInstance.resolveReferences(data)
+			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, {
 				nested: { key: { size: "xl", color: "blue" } }
 			})

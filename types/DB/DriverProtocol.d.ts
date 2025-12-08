@@ -2,6 +2,7 @@
  * @typedef {Object} DriverConfig
  * @property {string} [cwd="."] - Current working directory (base for absolute paths)
  * @property {string} [root="."] - Root path for URI resolution
+ * @property {typeof Directory} [Directory=Directory] - Directory class with data functionality
  * @property {DBDriverProtocol} [driver] - Next driver if current fails, undefined by default
  */
 /**
@@ -13,6 +14,10 @@
  * @class
  */
 export default class DBDriverProtocol {
+    static Formats: {
+        loaders: ((str: any, ext: any) => any)[];
+        savers: ((doc: any, ext: any) => string | false)[];
+    };
     /**
      * @param {any} input
      * @returns {DBDriverProtocol}
@@ -26,6 +31,8 @@ export default class DBDriverProtocol {
     cwd: string;
     /** @type {string} */
     root: string;
+    /** @type {typeof Directory} */
+    Directory: typeof Directory;
     /** @type {DBDriverProtocol | undefined} */
     driver: DBDriverProtocol | undefined;
     /**
@@ -113,9 +120,14 @@ export type DriverConfig = {
      */
     root?: string | undefined;
     /**
+     * - Directory class with data functionality
+     */
+    Directory?: typeof Directory | undefined;
+    /**
      * - Next driver if current fails, undefined by default
      */
     driver?: DBDriverProtocol | undefined;
 };
+import Directory from "../Directory.js";
 import AuthContext from "./AuthContext.js";
 import DocumentStat from "../DocumentStat.js";

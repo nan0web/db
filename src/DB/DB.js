@@ -12,6 +12,39 @@ import AuthContext from "./AuthContext.js"
 import DBDriverProtocol from "./DriverProtocol.js"
 import { absolute, basename, dirname, extname, isAbsolute, isRemote, normalize, relative, resolveSync } from "./path.js"
 
+class TTLMap extends Map {
+	/**
+	 * @param {number} ttl - Cache life time in miliseconds.
+	 */
+	constructor(ttl) {
+		super()
+		this.ttl = ttl
+	}
+	/**
+	 * @param {any} key
+	 * @param {any} value
+	 */
+	set(key, value) {
+		super.set(key, { value, expires: this.ttl ? Date.now() + this.ttl : 0 })
+		return this
+	}
+	/**
+	 * @param {any} key
+	 * @returns {any}
+	 */
+	get(key) {
+		const entry = super.get(key)
+		if (undefined === entry) {
+			return undefined
+		}
+		if (Date.now() > entry.expires) {
+			super.delete(key)
+			return undefined
+		}
+		return entry.value
+	}
+}
+
 /**
  * Base database class for document storage and retrieval.
  * Provides core functionality for managing documents, metadata, and directory operations.
@@ -59,6 +92,8 @@ export default class DB {
 	data = new Map()
 	/** @type {Map<string, DocumentStat>} */
 	meta = new Map()
+	/** @type {number} */
+	ttl = 0
 	/** @type {AuthContext} */
 	context = new AuthContext()
 	/** @type {boolean} */
@@ -94,6 +129,7 @@ export default class DB {
 	 * @param {boolean} [input.connected=false] - Connection status
 	 * @param {Map<string, any | false>} [input.data=new Map()] - In-memory data cache
 	 * @param {Map<string, DocumentStat>} [input.meta=new Map()] - Metadata cache
+	 * @param {number} [input.ttl=0] - Cache life time.
 	 * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
 	 * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
 	 * @param {DB[]} [input.dbs=[]] - Attached sub-databases
@@ -110,11 +146,15 @@ export default class DB {
 			connected = this.connected,
 			dbs = this.dbs,
 			predefined = this.predefined,
+			ttl = this.ttl,
 			console: consoleInput = new NoConsole({ silent: true }),
 		} = input
 		this.root = root
 		this.cwd = cwd
 		this.driver = this.Driver.from(driver ?? { cwd, root })
+		this.ttl = Number(ttl || 0)
+		this.data = new TTLMap(this.ttl)
+		this.meta = new TTLMap(this.ttl)
 		this.data = data instanceof Map ? data : new Map(data)
 		this.meta = meta instanceof Map ? meta : new Map(meta)
 		this.context = AuthContext.from(context)
@@ -223,6 +263,17 @@ export default class DB {
 	get GetOptions() {
 		return /** @type {typeof DB} */ (this.constructor).GetOptions
 	}
+
+	/**
+	 * @param {string} abs
+	 * @returns {DocumentStat}
+	 */
+	_statFromMeta(abs) {
+		const isFile = undefined !== this.data.get(abs)
+		const mtimeMs = isFile ? Date.now() : 0
+		return DocumentStat.from(this.meta.get(abs) ?? { isFile, mtimeMs })
+	}
+
 	isRoot(dir) {
 		return ["/", ".", "./", ""].includes(dir)
 	}
@@ -797,22 +848,7 @@ export default class DB {
 	 */
 	async loadDocument(uri, defaultValue, context = this.context) {
 		this.console.debug("loadDocument()", uri, { defaultValue })
-		const authContext = AuthContext.from(context)
-		uri = this.normalize(uri)
-		await this.ensureAccess(uri, "r", authContext)
-		if (this.data.has(uri)) {
-			return this.data.get(uri)
-		}
-		const extname = this.extname(uri)
-		if (!extname) {
-			for (const ext of this.Directory.DATA_EXTNAMES) {
-				const data = await this.loadDocument(uri + ext, null, authContext)
-				if (null !== data) {
-					return data
-				}
-			}
-		}
-		return defaultValue
+		return await this.loadDocumentAs(this.extname(uri), uri, defaultValue, context)
 	}
 
 	/**
@@ -826,7 +862,32 @@ export default class DB {
 	async loadDocumentAs(ext, uri, defaultValue, context = this.context) {
 		this.console.debug("loadDocumentAs()", uri, { ext, defaultValue })
 		const authContext = AuthContext.from(context)
-		return await this.loadDocument(uri, defaultValue, authContext)
+		uri = this.normalize(uri)
+		await this.ensureAccess(uri, "r", authContext)
+		const stats = await this.statDocument(uri)
+		if (stats.exists) {
+			if (this.driver) {
+				const abs = this.absolute(uri)
+				const result = await this.driver.read(abs)
+				if (undefined !== result) {
+					return result
+				}
+				return this.data.get(uri)
+			}
+		} else {
+			if (!ext) {
+				for (const ext of this.Directory.DATA_EXTNAMES) {
+					const stats = await this.statDocument(uri + ext)
+					if (stats.exists && stats.isFile) {
+						const data = await this.loadDocument(uri + ext, null, authContext)
+						if (null !== data) {
+							return data
+						}
+					}
+				}
+			}
+		}
+		return defaultValue
 	}
 
 	/**
@@ -844,8 +905,21 @@ export default class DB {
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, "w", authContext)
 		const abs = this.normalize(await this.resolve(uri))
+		if (this.driver) {
+			const abs = this.absolute(uri)
+			try {
+				const result = await this.driver.write(abs, document)
+				if (false === result) {
+					throw new Error("Unable to save with a driver: " + this.driver.constructor.name)
+				}
+			} catch (error) {
+				this.console.error("Cannot save a document", { uri, abs, document, context, error })
+				return false
+			}
+		}
+
 		this.data.set(abs, document)
-		const stat = DocumentStat.from(this.meta.get(abs) ?? {})
+		const stat = this._statFromMeta(abs)
 		stat.isFile = true
 		stat.mtimeMs = Date.now()
 		stat.size = Buffer.byteLength(JSON.stringify(document))
@@ -871,29 +945,19 @@ export default class DB {
 		const isDir = uri.endsWith("/")
 		const abs = (this.normalize(await this.resolve(uri)) || ".") + (isDir ? "/" : "")
 
-		const extname = this.extname(abs)
-		if (!extname) {
-			for (const ext of this.Directory.DATA_EXTNAMES) {
-				const stat = await this.statDocument(uri + ext, authContext)
-				if (stat.exists) {
-					return stat
-				}
-			}
-		}
-
 		if (this.driver) {
+			const abs = this.absolute(uri)
 			try {
-				const abs = this.absolute(uri)
-				const stat = await this.driver.stat(abs)
-				if (stat) {
-					return stat
+				const stats = await this.driver.stat(abs)
+				if (stats) {
+					return stats
 				}
 			} catch {
 				this.console.error("Cannot stat a document", { uri, abs })
 			}
 		}
 
-		return DocumentStat.from(this.meta.get(abs) ?? {})
+		return this._statFromMeta(abs)
 	}
 
 	/**
@@ -976,6 +1040,7 @@ export default class DB {
 		const authContext = AuthContext.from(context)
 
 		if (!['r', 'w', 'd'].includes(level)) {
+			this.console.debug("Incorrect level", { uri, level, context })
 			throw new TypeError([
 				"Access level must be one of [r, w, d]",
 				"r = read",
@@ -987,6 +1052,7 @@ export default class DB {
 		if (this.driver) {
 			const result = await this.driver.access(uri, level, authContext)
 			if (false === result) {
+				this.console.debug("Access denied", { uri, level, context })
 				throw new Error(`Access denied to ${uri} { level: ${level} }`)
 			}
 		}

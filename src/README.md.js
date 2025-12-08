@@ -160,6 +160,7 @@ function testRender() {
 				["data.json", { "$ref": "_/index.json", key: "val" }]
 			])
 		})
+		await db.connect()
 		const res = await db.fetch("data.json")
 		console.info(res) // ← { global: "value", key: "val" }
 		assert.deepStrictEqual(console.output()[0][1], { global: "value", key: "val" })

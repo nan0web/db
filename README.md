@@ -1,8 +1,6 @@
 # @nan0web/db
 
-|[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
-|---|---|---|---|---|
- |🟢 `99.2%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `96.3%` |✅ d.ts 📜 system.md 🕹️ playground |1.1.1 |
+<!-- %PACKAGE_STATUS% -->
 
 Agnostic document database and data manipulation utilities. Designed to be
 flexible, minimal and powerful — the tool that supports any data format and
@@ -76,6 +74,7 @@ const db = new DB({
 		["data.json", { "$ref": "_/index.json", key: "val" }]
 	])
 })
+await db.connect()
 const res = await db.fetch("data.json")
 console.info(res) // ← { global: "value", key: "val" }
 ```
@@ -340,8 +339,8 @@ console.info(ctx.hasRole('admin')) // ← false
 ```
 ## Contributing
 
-How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
+How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)
 
 ## License
 
-ISC LICENSE – [see full text](https://github.com/nan0web/db/blob/main/LICENSE)
+ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)
