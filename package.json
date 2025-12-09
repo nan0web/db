@@ -1,6 +1,6 @@
 {
 	"name": "@nan0web/db",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Every data becomes a database. Agnostic document database and data manipulation utilities.",
 	"main": "./src/index.js",
 	"types": "./types/index.d.ts",
