@@ -1,6 +1,8 @@
 # @nan0web/db
 
-<!-- %PACKAGE_STATUS% -->
+|Package name|[Status](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв)|Documentation|Test coverage|Features|Npm version|
+|---|---|---|---|---|---|
+ |[@nan0web/db](https://github.com/nan0web/db/) |🟢 `98.8%` |🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) |🟢 `93.7%` |✅ d.ts 📜 system.md 🕹️ playground |1.2.0 |
 
 Agnostic document database and data manipulation utilities. Designed to be
 flexible, minimal and powerful — the tool that supports any data format and
@@ -339,8 +341,8 @@ console.info(ctx.hasRole('admin')) // ← false
 ```
 ## Contributing
 
-How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)
+How to participate? – [see CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)
 
 ## License
 
-ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)
+ISC LICENSE – [see full text](https://github.com/nan0web/db/blob/main/LICENSE)
