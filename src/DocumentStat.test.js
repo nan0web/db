@@ -33,13 +33,13 @@ describe('DocumentStat', () => {
 			size: 100,
 			isFile: true,
 			mtimeMs: 1000,
-			error: new Error('test error')
+			error: new Error('test error'),
 		})
 
 		assert.strictEqual(stat.size, 100)
 		assert.strictEqual(stat.isFile, true)
 		assert.strictEqual(stat.mtimeMs, 1000)
-		assert.equal(stat.type, "F")
+		assert.equal(stat.type, 'F')
 		assert.ok(stat.error instanceof Error)
 		assert.strictEqual(stat.error.message, 'test error')
 	})
@@ -47,7 +47,7 @@ describe('DocumentStat', () => {
 	it('should handle function values for type checks', () => {
 		const stat = new DocumentStat({
 			isFile: () => true,
-			isDirectory: () => false
+			isDirectory: () => false,
 		})
 
 		assert.strictEqual(stat.isFile, true)
@@ -60,7 +60,7 @@ describe('DocumentStat', () => {
 			atimeMs: now,
 			btimeMs: now,
 			ctimeMs: now,
-			mtimeMs: now
+			mtimeMs: now,
 		})
 
 		assert.ok(stat.atime instanceof Date)

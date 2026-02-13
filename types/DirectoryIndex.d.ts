@@ -136,5 +136,5 @@ export default class DirectoryIndex {
         inc?: boolean | undefined;
     } | undefined): string;
 }
-import DocumentStat from "./DocumentStat.js";
-import Directory from "./Directory.js";
+import DocumentStat from './DocumentStat.js';
+import Directory from './Directory.js';

@@ -1,4 +1,12 @@
-import { Enum } from "@nan0web/types"
+import { Enum } from '@nan0web/types'
+
+/**
+ * Resolves a value that may be a boolean or a bound method (e.g. from fs.Stats)
+ * @param {*} value
+ * @param {object} context
+ * @returns {boolean}
+ */
+const resolveValue = (value, context) => ('function' === typeof value ? value.call(context) : value)
 
 /**
  * Represents statistics for a document in the filesystem
@@ -99,7 +107,7 @@ class DocumentStat {
 			isSocket = false,
 			isSymbolicLink = false,
 			error = null,
-			type = "",
+			type = '',
 		} = input
 		this.atimeMs = atimeMs
 		this.btimeMs = btimeMs
@@ -115,21 +123,15 @@ class DocumentStat {
 		this.nlink = nlink
 		this.rdev = rdev
 		this.uid = uid
-		const realType = Enum("F", "D", "")(type)
-		const isFile = "F" === realType || isFileInit
-		const isDirectory = "D" === realType || isDirectoryInit
-		// @ts-ignore
-		this.isBlockDevice = "function" === typeof isBlockDevice ? isBlockDevice.bind(input)() : isBlockDevice
-		// @ts-ignore
-		this.isDirectory = "function" === typeof isDirectory ? isDirectory.bind(input)() : isDirectory
-		// @ts-ignore
-		this.isFile = "function" === typeof isFile ? isFile.bind(input)() : isFile
-		// @ts-ignore
-		this.isFIFO = "function" === typeof isFIFO ? isFIFO.bind(input)() : isFIFO
-		// @ts-ignore
-		this.isSocket = "function" === typeof isSocket ? isSocket.bind(input)() : isSocket
-		// @ts-ignore
-		this.isSymbolicLink = "function" === typeof isSymbolicLink ? isSymbolicLink.bind(input)() : isSymbolicLink
+		const realType = Enum('F', 'D', '')(type)
+		const isFile = 'F' === realType || isFileInit
+		const isDirectory = 'D' === realType || isDirectoryInit
+		this.isBlockDevice = resolveValue(isBlockDevice, input)
+		this.isDirectory = resolveValue(isDirectory, input)
+		this.isFile = resolveValue(isFile, input)
+		this.isFIFO = resolveValue(isFIFO, input)
+		this.isSocket = resolveValue(isSocket, input)
+		this.isSymbolicLink = resolveValue(isSymbolicLink, input)
 		this.error = error
 	}
 
@@ -178,7 +180,7 @@ class DocumentStat {
 	 * @returns {string}
 	 */
 	get type() {
-		return this.isDirectory ? "D" : this.isFile ? "F" : "?"
+		return this.isDirectory ? 'D' : this.isFile ? 'F' : '?'
 	}
 
 	/**

@@ -24,28 +24,28 @@ export default class Directory {
 	 * Used for inheritance (e.g., _.json in each dir).
 	 * @type {string}
 	 */
-	static FILE = "_"
+	static FILE = '_'
 
 	/**
 	 * The path prefix for global variables available to all nested documents.
 	 * Globals are loaded from _/ subdirectories up the hierarchy.
 	 * @type {string}
 	 */
-	static GLOBALS = "_/"
+	static GLOBALS = '_/'
 
 	/**
 	 * The default index name for directories.
 	 * Used for listing immediate children (e.g., index.txt).
 	 * @type {string}
 	 */
-	static INDEX = "index"
+	static INDEX = 'index'
 
 	/**
 	 * Supported data file extensions for loading documents.
 	 * Determines if a file is treated as structured data.
 	 * @type {string[]}
 	 */
-	static DATA_EXTNAMES = [".json", ".yaml", ".yml", ".nano", ".csv", ".md"]
+	static DATA_EXTNAMES = ['.json', '.yaml', '.yml', '.nano', '.csv', '.md']
 
 	/**
 	 * Checks if a given path is a global variable path.
@@ -65,7 +65,7 @@ export default class Directory {
 	 * @returns {boolean} True if root.
 	 */
 	static isRoot(path) {
-		return [".", "/", "./", ""].includes(path)
+		return ['.', '/', './', ''].includes(path)
 	}
 
 	/**
@@ -73,8 +73,8 @@ export default class Directory {
 	 * @returns {boolean}
 	 */
 	static isData(path) {
-		let [name, ext = ""] = path.split("/").pop()?.split(".") ?? []
-		if (ext) ext = "." + ext
+		let [name, ext = ''] = path.split('/').pop()?.split('.') ?? []
+		if (ext) ext = '.' + ext
 		return this.DATA_EXTNAMES.includes(ext)
 	}
 
@@ -85,16 +85,16 @@ export default class Directory {
 	 * @returns {string}
 	 */
 	static getGlobalName(path) {
-		if (!this.isGlobal(path)) return ""
-		const base = String(path).split("/").pop()
-		if (!base) return ""
-		const arr = base.split(".")
+		if (!this.isGlobal(path)) return ''
+		const base = String(path).split('/').pop()
+		if (!base) return ''
+		const arr = base.split('.')
 		if (arr.length > 1) {
-			const ext = "." + arr.pop()
+			const ext = '.' + arr.pop()
 			if (this.DATA_EXTNAMES.includes(ext)) {
-				return arr.join(".")
+				return arr.join('.')
 			}
-			return ""
+			return ''
 		}
 		return arr[0]
 	}
@@ -106,7 +106,7 @@ export default class Directory {
 	 * @returns {boolean} True if the path is a directory.
 	 */
 	static isDirectory(path) {
-		return String(path).endsWith("/")
+		return String(path).endsWith('/')
 	}
 
 	/**
@@ -124,6 +124,6 @@ export default class Directory {
 	 * @returns {Function} A function that returns an empty array.
 	 */
 	get entriesFn() {
-		return (() => [])
+		return () => []
 	}
 }

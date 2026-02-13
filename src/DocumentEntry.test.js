@@ -24,7 +24,7 @@ describe('DocumentEntry', () => {
 			depth: 1,
 			path: '/path/to/test.txt',
 			parent: '/path/to',
-			fulfilled: true
+			fulfilled: true,
 		})
 
 		assert.strictEqual(entry.name, 'test.txt')

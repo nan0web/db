@@ -9,6 +9,7 @@ Initial version of agnostic database with its basic useful functionality.
 Agnostic document loading with support for multiple data formats.
 
 #### AC
+
 - Should load documents as text, buffer[], objects.
 - Should handle different file extensions (.json, .yaml, .yml, .nano, .html, .xml).
 - Should return default value when document is not found.
@@ -20,6 +21,7 @@ Agnostic document loading with support for multiple data formats.
 Universal document saving interface with metadata management.
 
 #### AC
+
 - Should save document data to storage.
 - Should update metadata (mtime, size) after save.
 - Should support platform-specific saving implementations.
@@ -31,6 +33,7 @@ Universal document saving interface with metadata management.
 Secure document deletion with access control verification.
 
 #### AC
+
 - Should verify delete access permissions.
 - Should remove document from storage.
 - Should clear cached data and metadata.
@@ -42,6 +45,7 @@ Secure document deletion with access control verification.
 Atomic document relocation with full metadata preservation.
 
 #### AC
+
 - Should verify read access for source document.
 - Should verify write access for destination.
 - Should load document from source location.
@@ -53,6 +57,7 @@ Atomic document relocation with full metadata preservation.
 Retrieve comprehensive metadata for any document or directory.
 
 #### AC
+
 - Should return DocumentStat instance with all metadata fields.
 - Should handle missing documents gracefully.
 - Should cache statistics for performance.
@@ -64,8 +69,9 @@ Retrieve comprehensive metadata for any document or directory.
 Intelligent document loading with inheritance, globals and references processing.
 
 #### AC
+
 - Should merge parent directory data with document data.
-- Should include global variables from _/ directories.
+- Should include global variables from \_/ directories.
 - Should resolve internal and external document references.
 - Should handle missing parent or reference documents.
 - Should return complete merged document structure.
@@ -77,6 +83,7 @@ Intelligent document loading with inheritance, globals and references processing
 Convert nested objects into flat path-value pairs and vice versa.
 
 #### AC
+
 - Should flatten nested objects into path-value pairs.
 - Should unflatten path-value pairs into nested objects.
 - Should handle arrays correctly during flattening/unflattening.
@@ -88,6 +95,7 @@ Convert nested objects into flat path-value pairs and vice versa.
 Recursively merge objects with array replacement support.
 
 #### AC
+
 - Should deep merge nested objects.
 - Should replace arrays instead of merging them.
 - Should handle empty objects correctly.
@@ -99,6 +107,7 @@ Recursively merge objects with array replacement support.
 Retrieve values from nested objects using path strings.
 
 #### AC
+
 - Should find values by path in nested objects.
 - Should return undefined for missing paths.
 - Should handle array indices in paths.
@@ -110,6 +119,7 @@ Retrieve values from nested objects using path strings.
 Combine flat path-value arrays with reference handling.
 
 #### AC
+
 - Should merge flat data arrays while preserving order.
 - Should handle $ref objects by expanding properties.
 - Should support custom reference key configuration.
@@ -121,6 +131,7 @@ Combine flat path-value arrays with reference handling.
 Retrieve related entries at the same hierarchy level.
 
 #### AC
+
 - Should return flat sibling entries for a given key.
 - Should exclude the key itself from siblings.
 - Should handle top-level and nested keys correctly.
@@ -134,6 +145,7 @@ Retrieve related entries at the same hierarchy level.
 Traverse directory hierarchies with configurable depth and filtering.
 
 #### AC
+
 - Should read directory contents as async generator.
 - Should respect depth limits during traversal.
 - Should apply filters to exclude unwanted entries.
@@ -146,6 +158,7 @@ Traverse directory hierarchies with configurable depth and filtering.
 Store and manage directory listings in multiple formats.
 
 #### AC
+
 - Should encode directory entries as arrays, rows, or text.
 - Should decode directory entries back to original format.
 - Should support different column formats (name, mtime, size).
@@ -158,6 +171,7 @@ Store and manage directory listings in multiple formats.
 Create isolated database instances from directory branches.
 
 #### AC
+
 - Should create new DB instance with subset data.
 - Should maintain relative paths within extracted branch.
 - Should preserve document metadata in extraction.
@@ -169,6 +183,7 @@ Create isolated database instances from directory branches.
 Connect external databases as hierarchical branches.
 
 #### AC
+
 - Should attach DB instances as branches.
 - Should verify attached instance is of DB type.
 - Should provide bidirectional access to attached branches.
@@ -180,6 +195,7 @@ Connect external databases as hierarchical branches.
 Progress-aware directory traversal with filtering and sorting.
 
 #### AC
+
 - Should yield StreamEntry instances with progress tracking.
 - Should support filtering by patterns or custom functions.
 - Should handle limit constraints on returned entries.
@@ -192,6 +208,7 @@ Progress-aware directory traversal with filtering and sorting.
 Convert relative paths to absolute paths with proper normalization.
 
 #### AC
+
 - Should resolve relative paths to absolute database paths.
 - Should normalize path segments (handle .. and . correctly).
 - Should join multiple path segments properly.
@@ -203,6 +220,7 @@ Convert relative paths to absolute paths with proper normalization.
 Verify access rights for database operations with granular control.
 
 #### AC
+
 - Should validate access levels (read, write, delete).
 - Should check permissions for specific document URIs.
 - Should throw descriptive errors for invalid access requests.
@@ -214,6 +232,7 @@ Verify access rights for database operations with granular control.
 Maintain consistency between memory cache and persistent storage.
 
 #### AC
+
 - Should compare modification times to detect changes.
 - Should save modified documents to persistent storage.
 - Should return list of synchronized URIs.

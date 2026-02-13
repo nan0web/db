@@ -1,4 +1,4 @@
-import DocumentEntry from "./DocumentEntry.js"
+import DocumentEntry from './DocumentEntry.js'
 
 /**
  * Represents a stream entry with progress information
@@ -57,11 +57,11 @@ class StreamEntry {
 			top = new Map(),
 			errors = new Map(),
 			progress = 0,
-			totalSize = { dirs: 0, files: 0 }
+			totalSize = { dirs: 0, files: 0 },
 		} = input
 
 		this.file = DocumentEntry.from(file)
-		this.files = files.map(f => DocumentEntry.from(f))
+		this.files = files.map((f) => DocumentEntry.from(f))
 		this.dirs = new Map(dirs)
 		this.top = new Map(top)
 		this.errors = new Map(errors)

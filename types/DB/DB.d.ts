@@ -209,12 +209,12 @@ export default class DB {
      */
     extract(uri: string): DB;
     /**
-         * Extracts file extension with leading dot from URI
-         * @param {string} uri
-         * @returns {string} Extension (e.g., ".txt") or empty string
-         * @example
-         * db.extname("file.TXT") // => .txt
-         */
+     * Extracts file extension with leading dot from URI
+     * @param {string} uri
+     * @returns {string} Extension (e.g., ".txt") or empty string
+     * @example
+     * db.extname("file.TXT") // => .txt
+     */
     extname(uri: string): string;
     /**
      * Relative path resolver for file systems.
@@ -603,14 +603,14 @@ export default class DB {
     loadIndex(dirUri?: string | undefined): Promise<DirectoryIndex>;
     #private;
 }
-import DBDriverProtocol from "./DriverProtocol.js";
-import DocumentStat from "../DocumentStat.js";
-import AuthContext from "./AuthContext.js";
-import { NoConsole } from "@nan0web/log";
-import Data from "../Data.js";
-import Directory from "../Directory.js";
-import DirectoryIndex from "../DirectoryIndex.js";
-import GetOptions from "./GetOptions.js";
-import DocumentEntry from "../DocumentEntry.js";
-import StreamEntry from "../StreamEntry.js";
-import FetchOptions from "./FetchOptions.js";
+import DBDriverProtocol from './DriverProtocol.js';
+import DocumentStat from '../DocumentStat.js';
+import AuthContext from './AuthContext.js';
+import { NoConsole } from '@nan0web/log';
+import Data from '../Data.js';
+import Directory from '../Directory.js';
+import DirectoryIndex from '../DirectoryIndex.js';
+import GetOptions from './GetOptions.js';
+import DocumentEntry from '../DocumentEntry.js';
+import StreamEntry from '../StreamEntry.js';
+import FetchOptions from './FetchOptions.js';

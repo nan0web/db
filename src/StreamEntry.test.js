@@ -31,7 +31,7 @@ describe('StreamEntry', () => {
 			top,
 			errors,
 			progress: 0.5,
-			totalSize: { dirs: 100, files: 200 }
+			totalSize: { dirs: 100, files: 200 },
 		})
 
 		assert.strictEqual(entry.file.name, 'test.txt')
@@ -46,7 +46,7 @@ describe('StreamEntry', () => {
 	it('should convert plain objects to DocumentEntry', () => {
 		const entry = new StreamEntry({
 			file: { name: 'test.txt' },
-			files: [{ name: 'test1.txt' }]
+			files: [{ name: 'test1.txt' }],
 		})
 
 		assert.ok(entry.file instanceof DocumentEntry)

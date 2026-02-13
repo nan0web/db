@@ -1,12 +1,12 @@
-import { describe, it } from "node:test"
-import assert from "node:assert"
-import ExtendedDB from "./ExtendedDB.js"
+import { describe, it } from 'node:test'
+import assert from 'node:assert'
+import ExtendedDB from './ExtendedDB.js'
 
-describe("ExtendedDB", () => {
-	it("ExtendedDB inherits DB console", () => {
+describe('ExtendedDB', () => {
+	it('ExtendedDB inherits DB console', () => {
 		const db = new ExtendedDB({
-			cwd: "https://example.com",
-			root: "api",
+			cwd: 'https://example.com',
+			root: 'api',
 		})
 
 		db.connect()

@@ -1,6 +1,6 @@
-import { FilterString } from "@nan0web/types"
-import DocumentStat from "./DocumentStat.js"
-import Directory from "./Directory.js"
+import { FilterString } from '@nan0web/types'
+import DocumentStat from './DocumentStat.js'
+import Directory from './Directory.js'
 
 /**
  * DirectoryIndex manages encoding/decoding of directory listings for efficient traversal.
@@ -25,11 +25,11 @@ import Directory from "./Directory.js"
  */
 export default class DirectoryIndex {
 	/** @type {string[]} Default columns for encoding: name, mtimeMs.36, size.36 */
-	static COLUMNS = ["name", "mtimeMs.36", "size.36"]
+	static COLUMNS = ['name', 'mtimeMs.36', 'size.36']
 	/** @type {string} Full hierarchical index filename */
-	static FULL_INDEX = "index.txtl"
+	static FULL_INDEX = 'index.txtl'
 	/** @type {string} Immediate children index filename */
-	static INDEX = "index.txt"
+	static INDEX = 'index.txt'
 	/** @type {typeof Directory} */
 	static Directory = Directory
 
@@ -45,10 +45,7 @@ export default class DirectoryIndex {
 	 * @param {string[]} [input.columns=DirectoryIndex.COLUMNS]
 	 */
 	constructor(input = {}) {
-		const {
-			entries = this.entries,
-			columns = this.columns,
-		} = input
+		const { entries = this.entries, columns = this.columns } = input
 		this.entries = entries
 		this.columns = columns
 	}
@@ -66,8 +63,8 @@ export default class DirectoryIndex {
 	 * @returns {string[]} Array of encoded rows.
 	 */
 	static encodeRows(entries, columns = this.COLUMNS, inc = false) {
-		const isBool = key => key.startsWith("is")
-		const isNumber = key => !isBool(key) && "error" !== key
+		const isBool = (key) => key.startsWith('is')
+		const isNumber = (key) => !isBool(key) && 'error' !== key
 		const sorted = entries.slice()
 		sorted.sort((a, b) => a[0].localeCompare(b[0]))
 		const rows = []
@@ -76,29 +73,26 @@ export default class DirectoryIndex {
 			for (const col of columns) {
 				let key = col
 				let radix = 10
-				if (col.includes(".")) {
-					const parts = col.split(".")
+				if (col.includes('.')) {
+					const parts = col.split('.')
 					key = parts[0]
 					radix = parseInt(parts[1], 10)
 				}
-				if (key === "name") {
+				if (key === 'name') {
 					if (stat.isDirectory) {
-						cols.push(name.endsWith("/") ? name : name + "/")
+						cols.push(name.endsWith('/') ? name : name + '/')
 					} else {
-						cols.push(inc ? name.split("/").pop() : name)
+						cols.push(inc ? name.split('/').pop() : name)
 					}
-				}
-				else if (isNumber(key)) {
+				} else if (isNumber(key)) {
 					cols.push(stat[key].toString(radix))
-				}
-				else if (isBool(key)) {
+				} else if (isBool(key)) {
 					cols.push(stat[key] ? 1 : 0)
-				}
-				else {
-					cols.push(stat[key] || "")
+				} else {
+					cols.push(stat[key] || '')
 				}
 			}
-			rows.push(cols.join(" ").trim())
+			rows.push(cols.join(' ').trim())
 		}
 		return rows
 	}
@@ -114,27 +108,27 @@ export default class DirectoryIndex {
 	 * @param {boolean} [input.inc=false] - If TRUE, uses incremental path format (no duplicate dir prefixes)
 	 * @returns {string} Encoded entries as a string
 	 */
-	encode({ entries = this.entries, dir = ".", long = false, inc = false } = {}) {
+	encode({ entries = this.entries, dir = '.', long = false, inc = false } = {}) {
 		const lines = []
-		if (!dir.endsWith("/")) dir += "/"
+		if (!dir.endsWith('/')) dir += '/'
 
 		const filtered = entries.filter(([uri]) => {
-			if ([".", "./", "/"].includes(dir)) return true
+			if (['.', './', '/'].includes(dir)) return true
 			return uri.startsWith(dir)
 		})
 
 		// Add header if custom columns or long format
 		if (this.columns !== DirectoryIndex.COLUMNS || long || inc) {
 			if (this.columns !== DirectoryIndex.COLUMNS) {
-				lines.push(`columns: ${this.columns.join(", ")}`)
+				lines.push(`columns: ${this.columns.join(', ')}`)
 			}
 			if (long) {
-				lines.push("long")
+				lines.push('long')
 			}
 			if (inc) {
-				lines.push("inc")
+				lines.push('inc')
 			}
-			lines.push("---")
+			lines.push('---')
 		}
 
 		if (long || inc) {
@@ -152,13 +146,13 @@ export default class DirectoryIndex {
 
 			// Sort directories by their path to ensure correct hierarchical order
 			const sortedDirs = Array.from(entriesByDir.keys()).sort((a, b) => {
-				if (a === ".") return -1
-				if (b === ".") return 1
+				if (a === '.') return -1
+				if (b === '.') return 1
 				return a.localeCompare(b)
 			})
 
 			// Track current context for incremental mode
-			let currentContext = "."
+			let currentContext = '.'
 
 			// Encode entries with context
 			for (const directory of sortedDirs) {
@@ -166,23 +160,21 @@ export default class DirectoryIndex {
 
 				// In full path mode, directory context lines use full paths
 				// In incremental mode, directory context lines are relative to current context
-				if (directory !== ".") {
+				if (directory !== '.') {
 					if (inc) {
 						// In incremental mode, only show relative part
 						if (this.Directory.isRoot(currentContext)) {
-							lines.push(directory + "/")
-						}
-						else {
-							if (directory.startsWith(currentContext + "/")) {
-								lines.push(directory.slice(currentContext.length + 1) + "/")
-							}
-							else {
-								lines.push("/" + directory + "/")
+							lines.push(directory + '/')
+						} else {
+							if (directory.startsWith(currentContext + '/')) {
+								lines.push(directory.slice(currentContext.length + 1) + '/')
+							} else {
+								lines.push('/' + directory + '/')
 							}
 						}
 					} else {
 						// In full path mode, show full directory path
-						lines.push(directory + "/")
+						lines.push(directory + '/')
 					}
 				}
 
@@ -197,10 +189,10 @@ export default class DirectoryIndex {
 			}
 		} else {
 			// Simple flat format - just encode each entry
-			return DirectoryIndex.encodeRows(filtered, this.columns, inc).join("\n")
+			return DirectoryIndex.encodeRows(filtered, this.columns, inc).join('\n')
 		}
 
-		return lines.join("\n")
+		return lines.join('\n')
 	}
 
 	/**
@@ -235,13 +227,13 @@ export default class DirectoryIndex {
 		let currentDir = db.dirname(uri)
 
 		// Add index file for the directory containing the changed document
-		if ("." === currentDir) {
+		if ('.' === currentDir) {
 			indexes.push(this.FULL_INDEX)
 		}
 		indexes.push(currentDir === '.' ? this.INDEX : `${currentDir}/${this.INDEX}`)
 
 		// Traverse up the directory tree and add index files for each parent
-		while (![".", "./", "/", ""].includes(currentDir)) {
+		while (!['.', './', '/', ''].includes(currentDir)) {
 			currentDir = db.dirname(currentDir)
 			if (currentDir !== '.' && currentDir !== '') {
 				indexes.push(`${currentDir}/${this.INDEX}`)
@@ -268,17 +260,18 @@ export default class DirectoryIndex {
 
 		const readDirStream = db.readDir(dirPath, { includeDirs: true, depth: 0 })
 		for await (const entry of readDirStream) {
-			if (this.isFullIndex(entry.name) || this.isIndex(entry.name) || files.has(entry.path)) continue
+			if (this.isFullIndex(entry.name) || this.isIndex(entry.name) || files.has(entry.path))
+				continue
 
 			// Normalize the path to ensure it's relative to the directory
-			let relativePath = new FilterString(entry.path).trimEnd("/")
-			if (entry.stat.isDirectory) relativePath += "/"
+			let relativePath = new FilterString(entry.path).trimEnd('/')
+			if (entry.stat.isDirectory) relativePath += '/'
 			if (dirPath !== '.' && relativePath.startsWith(dirPath + '/')) {
 				relativePath = relativePath.substring(dirPath.length + 1)
 			}
 			if (relativePath) {
-				const arr = relativePath.split("/")
-				if (1 === arr.length || 2 === arr.length && "" === arr[1]) {
+				const arr = relativePath.split('/')
+				if (1 === arr.length || (2 === arr.length && '' === arr[1])) {
 					entries.push([relativePath, entry.stat])
 				}
 			}
@@ -295,14 +288,14 @@ export default class DirectoryIndex {
 	 * @param {string} dirPath
 	 * @returns {AsyncGenerator<[string, DirectoryIndex], void, unknown>}
 	 */
-	static async* generateAllIndexes(db, dirPath = '.') {
+	static async *generateAllIndexes(db, dirPath = '.') {
 		// Generate TXT indexes for each directory (immediate children)
 		const directories = new Set()
 		const readDirStream = db.readDir(dirPath, { includeDirs: true })
 
 		for await (const entry of readDirStream) {
 			const dir = entry.isDirectory ? entry.path : entry.parent
-			if (!["", ".", "./", "/"].includes(dir)) {
+			if (!['', '.', './', '/'].includes(dir)) {
 				directories.add(dir)
 			}
 		}
@@ -320,16 +313,18 @@ export default class DirectoryIndex {
 			const entries = await this.getDirectoryEntries(db, directory)
 
 			// Yield TXT index for the directory
-			const indexUri = directory === '.' ? this.INDEX : `${directory}/${this.INDEX}`.replace(/\/{2,}/, "/")
+			const indexUri =
+				directory === '.' ? this.INDEX : `${directory}/${this.INDEX}`.replace(/\/{2,}/, '/')
 			yield [indexUri, new DirectoryIndex({ entries })]
 		}
 
-		if ("." === dirPath) {
+		if ('.' === dirPath) {
 			// Generate one TXTL full index at the root level
-			const allEntries = db.loaded ?
-				Array.from(db.meta.entries()).filter(
-					([path, stat]) => stat.isFile && !this.isFullIndex(path) && !this.isIndex(path)
-				) : await this._getAllEntriesFallback(db, dirPath)
+			const allEntries = db.loaded
+				? Array.from(db.meta.entries()).filter(
+						([path, stat]) => stat.isFile && !this.isFullIndex(path) && !this.isIndex(path),
+					)
+				: await this._getAllEntriesFallback(db, dirPath)
 
 			// Yield full TXTL index at the root level
 			yield [this.FULL_INDEX, new DirectoryIndex({ entries: allEntries })]
@@ -351,7 +346,7 @@ export default class DirectoryIndex {
 		for await (const entry of readDirStream) {
 			if (!this.isFullIndex(entry.name) && !this.isIndex(entry.name)) {
 				let entryName = entry.path
-				if (entry.stat.isDirectory && !entryName.endsWith("/")) entryName += "/"
+				if (entry.stat.isDirectory && !entryName.endsWith('/')) entryName += '/'
 				allEntries.push([entryName, entry.stat])
 			}
 		}
@@ -374,8 +369,8 @@ export default class DirectoryIndex {
 			return source
 		}
 
-		const lines = source.split("\n").filter(line => line.trim() !== "")
-		const head = lines.findIndex((str) => "---" === str)
+		const lines = source.split('\n').filter((line) => line.trim() !== '')
+		const head = lines.findIndex((str) => '---' === str)
 		const config = {
 			columns: DirectoryIndex.COLUMNS,
 			long: false,
@@ -384,12 +379,12 @@ export default class DirectoryIndex {
 		let rows = lines
 		if (head >= 0) {
 			for (const row of lines.slice(0, head)) {
-				if (row.includes(": ")) {
-					const [key, ...value] = row.split(": ")
-					if ("columns" === key) {
-						config[key] = value.join(": ").split(", ")
+				if (row.includes(': ')) {
+					const [key, ...value] = row.split(': ')
+					if ('columns' === key) {
+						config[key] = value.join(': ').split(', ')
 					} else {
-						config[key] = value.join(": ")
+						config[key] = value.join(': ')
 					}
 				} else {
 					config[row] = true
@@ -401,25 +396,25 @@ export default class DirectoryIndex {
 		const entries = []
 		let currentContext = '.'
 		for (const line of rows) {
-			const cols = line.split(" ").filter(Boolean)
+			const cols = line.split(' ').filter(Boolean)
 			const item = {
-				path: "",
-				name: "",
+				path: '',
+				name: '',
 				mtimeMs: -1,
 				size: -1,
 			}
 			for (let i = 0; i < config.columns.length; i++) {
 				let name = config.columns[i]
 				let radix = 10
-				if (name.includes(".")) {
-					const [key, no] = name.split(".")
+				if (name.includes('.')) {
+					const [key, no] = name.split('.')
 					name = key
 					radix = parseInt(no)
 				}
-				if ("number" === typeof item[name]) {
-					item[name] = parseInt(cols[i] || "", radix)
+				if ('number' === typeof item[name]) {
+					item[name] = parseInt(cols[i] || '', radix)
 				} else {
-					item[name] = cols[i] || ""
+					item[name] = cols[i] || ''
 				}
 			}
 
@@ -428,8 +423,8 @@ export default class DirectoryIndex {
 				if (config.inc) {
 					// Incremental path handling - append to current context
 					let relativeDir = item.name.slice(0, -1) // Remove trailing slash
-					if (relativeDir.startsWith("/")) {
-						currentContext = "."
+					if (relativeDir.startsWith('/')) {
+						currentContext = '.'
 						relativeDir = relativeDir.slice(1)
 					}
 					currentContext = currentContext === '.' ? relativeDir : `${currentContext}/${relativeDir}`
@@ -442,7 +437,7 @@ export default class DirectoryIndex {
 
 			// Entry under current context
 			let uri = currentContext !== '.' ? `${currentContext}/${item.name}` : item.name
-			if (uri.startsWith("./")) uri = uri.slice(2)
+			if (uri.startsWith('./')) uri = uri.slice(2)
 			const isDirectory = uri.endsWith('/')
 
 			entries.push([
@@ -451,13 +446,12 @@ export default class DirectoryIndex {
 					isFile: !isDirectory,
 					isDirectory: isDirectory,
 					mtimeMs: item.mtimeMs || 0,
-					size: item.size || 0
-				})
+					size: item.size || 0,
+				}),
 			])
 		}
 		return new DirectoryIndex({ entries })
 	}
-
 
 	/**
 	 * Creates DirectoryIndex instance from input
@@ -467,7 +461,7 @@ export default class DirectoryIndex {
 	 */
 	static from(input) {
 		if (input instanceof DirectoryIndex) return input
-		if ("string" === typeof input) {
+		if ('string' === typeof input) {
 			return this.decode(input)
 		}
 		return new DirectoryIndex(input)
@@ -480,6 +474,6 @@ export default class DirectoryIndex {
 	 * @returns {string}
 	 */
 	static dirname(path) {
-		return path.includes("/") ? path.substring(0, path.lastIndexOf("/")) : "."
+		return path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.'
 	}
 }
