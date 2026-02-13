@@ -18,9 +18,7 @@ export default class GetOptions {
 	 * @param {any} [input.defaultValue=undefined]
 	 */
 	constructor(input = {}) {
-		const {
-			defaultValue = this.defaultValue,
-		} = input
+		const { defaultValue = this.defaultValue } = input
 		this.defaultValue = defaultValue
 	}
 	/**

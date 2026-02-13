@@ -8,7 +8,14 @@ suite('Directory', () => {
 			assert.strictEqual(Directory.FILE, '_')
 			assert.strictEqual(Directory.GLOBALS, '_/')
 			assert.strictEqual(Directory.INDEX, 'index')
-			assert.deepStrictEqual(Directory.DATA_EXTNAMES, [".json", ".yaml", ".yml", ".nano", ".csv", ".md"])
+			assert.deepStrictEqual(Directory.DATA_EXTNAMES, [
+				'.json',
+				'.yaml',
+				'.yml',
+				'.nano',
+				'.csv',
+				'.md',
+			])
 		})
 	})
 

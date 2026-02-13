@@ -8,10 +8,10 @@ describe('AuthContext', () => {
 		assert.ok(context instanceof AuthContext)
 	})
 
-	it("should add fail error messages", () => {
+	it('should add fail error messages', () => {
 		const context = new AuthContext()
-		context.fail(new Error("No access"))
-		context.fail(new Error("Access denied"))
+		context.fail(new Error('No access'))
+		context.fail(new Error('Access denied'))
 		assert.equal(context.fails.length, 2)
 	})
 })

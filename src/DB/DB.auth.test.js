@@ -33,7 +33,7 @@ class TestAuthDriver extends DBDriverProtocol {
 
 		if (this.permissions[role] && this.permissions[role][level]) {
 			const allowed = this.permissions[role][level]
-			const isAllowed = allowed.some(pattern => matches(uri, pattern))
+			const isAllowed = allowed.some((pattern) => matches(uri, pattern))
 			if (allowed.length === 0 || !isAllowed) {
 				return false
 			}
@@ -49,13 +49,13 @@ describe('DB Authorization', () => {
 			user: {
 				r: ['*'],
 				w: ['*'],
-				d: ['*']
-			}
+				d: ['*'],
+			},
 		}
 
 		const db = new DB({
 			driver: new TestAuthDriver(permissions),
-			predefined: [['test.json', { data: 'test' }]]
+			predefined: [['test.json', { data: 'test' }]],
 		})
 
 		await db.connect()
@@ -70,13 +70,13 @@ describe('DB Authorization', () => {
 			user: {
 				r: ['public/*'],
 				w: ['users/*/profile.json'],
-				d: []
-			}
+				d: [],
+			},
 		}
 
 		const db = new DB({
 			driver: new TestAuthDriver(permissions),
-			predefined: [['secret/data.json', { password: 'secret123' }]]
+			predefined: [['secret/data.json', { password: 'secret123' }]],
 		})
 
 		await db.connect()
@@ -88,8 +88,8 @@ describe('DB Authorization', () => {
 				await db.get('secret/data.json', {}, context)
 			},
 			{
-				message: 'Access denied to secret/data.json { level: r }'
-			}
+				message: 'Access denied to secret/data.json { level: r }',
+			},
 		)
 	})
 
@@ -98,12 +98,12 @@ describe('DB Authorization', () => {
 			user: {
 				r: ['public/*', 'users/*/profile.json'],
 				w: ['users/*/profile.json'],
-				d: []
-			}
+				d: [],
+			},
 		}
 
 		const db = new DB({
-			driver: new TestAuthDriver(permissions)
+			driver: new TestAuthDriver(permissions),
 		})
 
 		await db.connect()
@@ -123,12 +123,12 @@ describe('DB Authorization', () => {
 			user: {
 				r: ['public/*'],
 				w: ['users/*/profile.json'],
-				d: []
-			}
+				d: [],
+			},
 		}
 
 		const db = new DB({
-			driver: new TestAuthDriver(permissions)
+			driver: new TestAuthDriver(permissions),
 		})
 
 		await db.connect()
@@ -140,8 +140,8 @@ describe('DB Authorization', () => {
 				await db.set('public/info.txt', 'Public info', context)
 			},
 			{
-				message: 'Access denied to public/info.txt { level: w }'
-			}
+				message: 'Access denied to public/info.txt { level: w }',
+			},
 		)
 	})
 
@@ -155,12 +155,12 @@ describe('DB Authorization', () => {
 			admin: {
 				r: ['*'],
 				w: ['*'],
-				d: ['*']
-			}
+				d: ['*'],
+			},
 		}
 
 		const db = new DB({
-			driver: new TestAuthDriver(permissions)
+			driver: new TestAuthDriver(permissions),
 		})
 
 		await db.connect()
@@ -177,12 +177,12 @@ describe('DB Authorization', () => {
 			guest: {
 				r: ['public/*'],
 				w: ['public/*'],
-				d: []
-			}
+				d: [],
+			},
 		}
 
 		const db = new DB({
-			driver: new TestAuthDriver(permissions)
+			driver: new TestAuthDriver(permissions),
 		})
 
 		await db.connect()
@@ -200,8 +200,8 @@ describe('DB Authorization', () => {
 				await db.set('private/data.txt', 'Private data', context)
 			},
 			{
-				message: 'Access denied to private/data.txt { level: w }'
-			}
+				message: 'Access denied to private/data.txt { level: w }',
+			},
 		)
 	})
 })

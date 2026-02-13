@@ -1,4 +1,4 @@
-import DocumentStat from "./DocumentStat.js"
+import DocumentStat from './DocumentStat.js'
 
 /**
  * Represents a document entry in the filesystem or database.
@@ -43,12 +43,12 @@ class DocumentEntry {
 	 */
 	constructor(input = {}) {
 		const {
-			name = "",
+			name = '',
 			stat = {},
 			depth = 0,
-			path = "",
-			parent = "",
-			fulfilled: fulfilledInit = undefined
+			path = '',
+			parent = '',
+			fulfilled: fulfilledInit = undefined,
 		} = input
 
 		this.name = String(name)
@@ -58,16 +58,16 @@ class DocumentEntry {
 		this.parent = String(parent)
 
 		if (!this.name && this.path) {
-			this.name = String(this.path.split("/").pop() ?? "")
+			this.name = String(this.path.split('/').pop() ?? '')
 		}
-		if (!this.parent && this.path.includes("/")) {
-			const arr = this.path.split("/")
+		if (!this.parent && this.path.includes('/')) {
+			const arr = this.path.split('/')
 			if (!this.depth) this.depth = arr.length
 			arr.pop()
-			this.parent = arr.join("/")
+			this.parent = arr.join('/')
 		}
 		this.fulfilled = Boolean(
-			undefined === fulfilledInit ? this.path && this.stat.exists : fulfilledInit
+			undefined === fulfilledInit ? this.path && this.stat.exists : fulfilledInit,
 		)
 	}
 
@@ -105,12 +105,11 @@ class DocumentEntry {
 	 */
 	toString() {
 		return [
-			this.isDirectory ? "D"
-				: this.isFile ? "F"
-					: this.isSymbolicLink ? "L"
-						: "?",
-			this.path || this.name
-		].filter(Boolean).join(" ")
+			this.isDirectory ? 'D' : this.isFile ? 'F' : this.isSymbolicLink ? 'L' : '?',
+			this.path || this.name,
+		]
+			.filter(Boolean)
+			.join(' ')
 	}
 
 	/**

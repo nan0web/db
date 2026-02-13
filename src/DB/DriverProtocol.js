@@ -1,6 +1,6 @@
-import Directory from "../Directory.js"
-import DocumentStat from "../DocumentStat.js"
-import AuthContext from "./AuthContext.js"
+import Directory from '../Directory.js'
+import DocumentStat from '../DocumentStat.js'
+import AuthContext from './AuthContext.js'
 
 /**
  * @typedef {Object} DriverConfig
@@ -21,20 +21,20 @@ import AuthContext from "./AuthContext.js"
 export default class DBDriverProtocol {
 	static Formats = {
 		loaders: [
-			(str, ext) => ".json".includes(ext) ? JSON.parse(str) : false,
+			(str, ext) => ('.json'.includes(ext) ? JSON.parse(str) : false),
 			// (str, ext) => [".yaml", ".yml", ".nano"].includes(ext) ? YAML.parse(str) : false,
 			(str) => str, // raw fallback
 		],
 		savers: [
-			(doc, ext) => ".json".includes(ext) ? JSON.stringify(doc) : false,
+			(doc, ext) => ('.json'.includes(ext) ? JSON.stringify(doc) : false),
 			(doc) => String(doc),
 			// (doc, ext) => [".yaml", ".yml", ".nano"].includes(ext) ? YAML.stringify(doc) : false,
 		],
 	}
 	/** @type {string} */
-	cwd = "."
+	cwd = '.'
 	/** @type {string} */
-	root = "."
+	root = '.'
 	/** @type {typeof Directory} */
 	Directory = Directory
 	/** @type {DBDriverProtocol | undefined} */
@@ -43,12 +43,7 @@ export default class DBDriverProtocol {
 	 * @param {DriverConfig} config
 	 */
 	constructor(config = {}) {
-		const {
-			cwd = this.cwd,
-			root = this.root,
-			Directory = this.Directory,
-			driver,
-		} = config
+		const { cwd = this.cwd, root = this.root, Directory = this.Directory, driver } = config
 		this.cwd = String(cwd)
 		this.root = String(root)
 		this.Directory = Directory

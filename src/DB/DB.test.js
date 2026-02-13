@@ -2,18 +2,18 @@ import { suite, describe, it, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { NoConsole } from '@nan0web/log'
 import BaseDB, { DocumentEntry, DocumentStat, StreamEntry } from '../index.js'
-import { GetOptions, FetchOptions, DBDriverProtocol } from "./index.js"
+import { GetOptions, FetchOptions, DBDriverProtocol } from './index.js'
 import AuthContext from './AuthContext.js'
 
 const defaultStructure = [
-	["_", { global: 'value' }],
-	["dir1/_", { a: 1 }],
-	["dir1/dir2/_", { b: 2 }],
-	["test.json", { value: "test" }],
-	["parent.json", { parent: "value" }],
-	["child.json", { $ref: 'parent.json', child: 'value' }],
-	["ref.json", { prop: { subprop: 'resolved' } }],
-	["data.json", { key: '$ref:ref.json#prop/subprop' }],
+	['_', { global: 'value' }],
+	['dir1/_', { a: 1 }],
+	['dir1/dir2/_', { b: 2 }],
+	['test.json', { value: 'test' }],
+	['parent.json', { parent: 'value' }],
+	['child.json', { $ref: 'parent.json', child: 'value' }],
+	['ref.json', { prop: { subprop: 'resolved' } }],
+	['data.json', { key: '$ref:ref.json#prop/subprop' }],
 ]
 
 class DB extends BaseDB {
@@ -21,18 +21,15 @@ class DB extends BaseDB {
 	async ensureAccess(uri, level = 'r') {
 		this.accessLevels.push({ uri, level })
 		if (!['r', 'w', 'd'].includes(level)) {
-			throw new TypeError([
-				"Access level must be one of [r, w, d]",
-				"r = read",
-				"w = write",
-				"d = delete",
-			].join("\n"))
+			throw new TypeError(
+				['Access level must be one of [r, w, d]', 'r = read', 'w = write', 'd = delete'].join('\n'),
+			)
 		}
 		return true
 	}
 }
 
-suite("DB", () => {
+suite('DB', () => {
 	/** @type {DB} */
 	let db
 
@@ -49,7 +46,7 @@ suite("DB", () => {
 			assert.ok(db.data instanceof Map)
 			assert.ok(db.meta instanceof Map)
 			assert.deepStrictEqual(db.dbs, [])
-			assert.deepStrictEqual(db.options, { root: ".", cwd: "." })
+			assert.deepStrictEqual(db.options, { root: '.', cwd: '.' })
 		})
 
 		it('should initialize from input object', () => {
@@ -63,7 +60,7 @@ suite("DB", () => {
 				connected: true,
 				data,
 				meta,
-				dbs
+				dbs,
 			})
 
 			assert.strictEqual(dbInstance.root, '/root')
@@ -161,7 +158,7 @@ suite("DB", () => {
 		it('should yield specific URI if found', async () => {
 			const dbInstance = new DB({ predefined: new Map([['test.txt', 'content']]) })
 			await dbInstance.connect()
-			dbInstance.meta.set("?loaded", new DocumentStat({ mtimeMs: 1_000 }))
+			dbInstance.meta.set('?loaded', new DocumentStat({ mtimeMs: 1_000 }))
 
 			const results = []
 			for await (const uri of dbInstance.find('test.txt')) {
@@ -173,25 +170,23 @@ suite("DB", () => {
 
 		it('should load without connect', async () => {
 			const db = new DB({
-				predefined: [
-					["test.txt", "content"]
-				]
+				predefined: [['test.txt', 'content']],
 			})
 
 			const uris = []
-			for await (const uri of db.find("test.txt")) uris.push(uri)
-			assert.deepEqual(uris, ["test.txt"])
+			for await (const uri of db.find('test.txt')) uris.push(uri)
+			assert.deepEqual(uris, ['test.txt'])
 		})
 
 		it('should yield URIs matching function (loaded version)', async () => {
 			const mockData = new Map([
 				['file1.txt', 'content1'],
 				['file2.md', 'content2'],
-				['file3.txt', 'content3']
+				['file3.txt', 'content3'],
 			])
 			const dbInstance = new DB({ predefined: mockData })
 			await dbInstance.connect()
-			dbInstance.meta.set("?loaded", new DocumentStat({ mtimeMs: 1_000 }))
+			dbInstance.meta.set('?loaded', new DocumentStat({ mtimeMs: 1_000 }))
 
 			const results = []
 			for await (const entry of dbInstance.find((key) => key.endsWith('.txt'))) {
@@ -212,7 +207,7 @@ suite("DB", () => {
 		it('should load document if not in cache', async () => {
 			const db = new DB()
 			await db.connect()
-			db.loadDocument = async () => "content"
+			db.loadDocument = async () => 'content'
 
 			const result = await db.get('test.txt')
 			assert.strictEqual(result, 'content')
@@ -220,9 +215,7 @@ suite("DB", () => {
 
 		it('should load document from a cache', async () => {
 			const db = new DB({
-				predefined: [
-					["test.txt", "content"]
-				]
+				predefined: [['test.txt', 'content']],
 			})
 			await db.connect()
 
@@ -263,29 +256,27 @@ suite("DB", () => {
 	describe('loadDocument', () => {
 		it('should return default value if document not found', async () => {
 			const uri = 'doc.txt'
-			const result = await db.loadDocument(uri, "")
-			assert.strictEqual(result, "")
+			const result = await db.loadDocument(uri, '')
+			assert.strictEqual(result, '')
 		})
 
 		it('should return document if found', async () => {
 			const db = new DB({
 				predefined: [
-					["doc.txt", "document content"],
-					["doc.json", { title: "Document" }]
-				]
+					['doc.txt', 'document content'],
+					['doc.json', { title: 'Document' }],
+				],
 			})
 			await db.connect()
-			const r1 = await db.loadDocument("doc.txt")
-			assert.strictEqual(r1, "document content")
-			const r2 = await db.loadDocument("doc")
-			assert.deepStrictEqual(r2, { title: "Document" })
+			const r1 = await db.loadDocument('doc.txt')
+			assert.strictEqual(r1, 'document content')
+			const r2 = await db.loadDocument('doc')
+			assert.deepStrictEqual(r2, { title: 'Document' })
 		})
 
 		it('should try extensions when none provided', async () => {
 			const db = new DB({
-				predefined: [
-					['file.json', { value: 'found' }]
-				]
+				predefined: [['file.json', { value: 'found' }]],
 			})
 			await db.connect()
 
@@ -308,14 +299,12 @@ suite("DB", () => {
 			const stat = await baseDb.statDocument('path')
 			assert.ok(!stat.exists)
 		})
-		it("should not stat document without extension", async () => {
+		it('should not stat document without extension', async () => {
 			const db = new DB({
-				predefined: [
-					["index.json", {}],
-				]
+				predefined: [['index.json', {}]],
 			})
 			await db.connect()
-			const stat = await db.statDocument("index")
+			const stat = await db.statDocument('index')
 			assert.equal(stat.exists, false)
 		})
 	})
@@ -332,11 +321,11 @@ suite("DB", () => {
 		it.todo('should call ensureAccess with d and throws an error', async () => {
 			// @todo fix the access() issue - not getting into DB.enscureAccess / driver.access()
 			class AuthDriver extends DBDriverProtocol {
-				async access(absoluteURI, level = "r", context = new AuthContext()) {
-					if (context.hasRole("root")) {
+				async access(absoluteURI, level = 'r', context = new AuthContext()) {
+					if (context.hasRole('root')) {
 						return true
 					}
-					return "r" === level
+					return 'r' === level
 				}
 				static from(input) {
 					if (input instanceof AuthDriver) return input
@@ -353,7 +342,7 @@ suite("DB", () => {
 			// await assert.rejects(() => db.dropDocument(uri))
 			const result = await db.dropDocument(uri)
 			assert.equal(result, false)
-			const rights = await db.dropDocument(uri, { role: "root" })
+			const rights = await db.dropDocument(uri, { role: 'root' })
 			assert.equal(rights, true)
 		})
 	})
@@ -361,17 +350,15 @@ suite("DB", () => {
 	describe('moveDocument', () => {
 		it('should move document to another location', async () => {
 			const db = new DB({
-				predefined: [
-					["from.txt", "Some information here"]
-				]
+				predefined: [['from.txt', 'Some information here']],
 			})
 			await db.connect()
-			assert.equal(db.data.get("from.txt"), "Some information here")
-			assert.equal(db.data.get("to/another/location.txt"), undefined)
-			const result = await db.moveDocument("from.txt", "to/another/location.txt")
+			assert.equal(db.data.get('from.txt'), 'Some information here')
+			assert.equal(db.data.get('to/another/location.txt'), undefined)
+			const result = await db.moveDocument('from.txt', 'to/another/location.txt')
 			assert.strictEqual(result, true)
-			assert.equal(db.data.get("to/another/location.txt"), "Some information here")
-			assert.equal(db.data.get("from.txt"), undefined)
+			assert.equal(db.data.get('to/another/location.txt'), 'Some information here')
+			assert.equal(db.data.get('from.txt'), undefined)
 		})
 	})
 
@@ -384,37 +371,40 @@ suite("DB", () => {
 
 		it('should throw error for invalid level', async () => {
 			const db = new BaseDB()
-			await assert.rejects(() => db.ensureAccess('uri', 'x'), /Access level must be one of \[r, w, d\]/)
+			await assert.rejects(
+				() => db.ensureAccess('uri', 'x'),
+				/Access level must be one of \[r, w, d\]/,
+			)
 		})
 
-		it("should allow access without driver (open access)", async () => {
+		it('should allow access without driver (open access)', async () => {
 			const db = new DB()
-			await db.ensureAccess("file.txt", "r")
-			await db.ensureAccess("file.txt", "w")
-			await db.ensureAccess("file.txt", "d")
+			await db.ensureAccess('file.txt', 'r')
+			await db.ensureAccess('file.txt', 'w')
+			await db.ensureAccess('file.txt', 'd')
 		})
 
-		it("should throw on unauthorized ensureAccess", async () => {
+		it('should throw on unauthorized ensureAccess', async () => {
 			const db = new BaseDB()
 			db.driver = {
 				async access() {
 					return false
-				}
+				},
 			}
 
-			await assert.rejects(() => db.ensureAccess("file.txt", "r"), /Access denied/)
+			await assert.rejects(() => db.ensureAccess('file.txt', 'r'), /Access denied/)
 		})
 
-		it("should allow access via driver", async () => {
+		it('should allow access via driver', async () => {
 			const db = new DB({
 				driver: {
 					async ensure(uri, level, context) {
 						return { granted: true }
-					}
-				}
+					},
+				},
 			})
 
-			await db.ensureAccess("file.txt", "r")
+			await db.ensureAccess('file.txt', 'r')
 		})
 	})
 
@@ -422,7 +412,7 @@ suite("DB", () => {
 		it('should call ensureAccess for all documents', async () => {
 			const mockData = new Map([
 				['file1.txt', 'content1'],
-				['file2.txt', 'content2']
+				['file2.txt', 'content2'],
 			])
 			const mockMeta = new Map([
 				['file1.txt', new DocumentStat({ mtimeMs: 1_000 })],
@@ -432,8 +422,8 @@ suite("DB", () => {
 
 			await dbInstance.push()
 
-			assert.ok(dbInstance.accessLevels.find(a => a.uri === 'file1.txt' && a.level === 'w'))
-			assert.ok(dbInstance.accessLevels.find(a => a.uri === 'file2.txt' && a.level === 'w'))
+			assert.ok(dbInstance.accessLevels.find((a) => a.uri === 'file1.txt' && a.level === 'w'))
+			assert.ok(dbInstance.accessLevels.find((a) => a.uri === 'file2.txt' && a.level === 'w'))
 		})
 
 		it('should call ensureAccess for specific document', async () => {
@@ -441,7 +431,7 @@ suite("DB", () => {
 			await db.connect()
 			await db.push('specific.txt')
 
-			assert.ok(db.accessLevels.find(a => a.uri === 'specific.txt' && a.level === 'w'))
+			assert.ok(db.accessLevels.find((a) => a.uri === 'specific.txt' && a.level === 'w'))
 		})
 	})
 
@@ -456,9 +446,7 @@ suite("DB", () => {
 	describe('findStream', () => {
 		it('should yield StreamEntry objects', async () => {
 			const db = new DB({
-				predefined: [
-					['test.txt', 'content']
-				]
+				predefined: [['test.txt', 'content']],
 			})
 			await db.connect()
 
@@ -478,9 +466,9 @@ suite("DB", () => {
 					['subdir/', null],
 					['subdir/file3.txt', 'content3'],
 					['subdir/nested/', null],
-					['subdir/nested/file4.txt', 'content4']
+					['subdir/nested/file4.txt', 'content4'],
 				],
-				console: new NoConsole()
+				console: new NoConsole(),
 			})
 			await db.connect()
 
@@ -503,9 +491,9 @@ suite("DB", () => {
 			const db = new DB({
 				predefined: [
 					['subdir/', null],
-					['subdir/file.json', '$ref:subdir/file.json#something']
+					['subdir/file.json', '$ref:subdir/file.json#something'],
 				],
-				console: new NoConsole()
+				console: new NoConsole(),
 			})
 			await db.connect()
 
@@ -544,7 +532,7 @@ suite("DB", () => {
 					['_.json', { global: 'value' }],
 					['dir1/_.json', { a: 1 }],
 					['dir1/dir2/_', { b: 2 }],
-				]
+				],
 			})
 			await db.connect()
 
@@ -556,17 +544,17 @@ suite("DB", () => {
 			const db = new DB({
 				predefined: [
 					['_', { global: 'value' }],
-					["dir1/_", { a: 1 }],
-					["dir1/dir2/_", { b: 2 }],
-					["docs.json", { title: "docs" }]
-				]
+					['dir1/_', { a: 1 }],
+					['dir1/dir2/_', { b: 2 }],
+					['docs.json', { title: 'docs' }],
+				],
 			})
 			await db.connect()
 
 			const r1 = await db.getInheritance('dir1/dir2/file')
 			assert.deepEqual(r1, { global: 'value', a: 1, b: 2 })
-			const r2 = await db.fetch("docs.json")
-			assert.deepStrictEqual(r2, { global: "value", title: "docs" })
+			const r2 = await db.fetch('docs.json')
+			assert.deepStrictEqual(r2, { global: 'value', title: 'docs' })
 		})
 
 		it('should cache inheritance data', async () => {
@@ -574,7 +562,7 @@ suite("DB", () => {
 				predefined: [
 					['_', { global: 'value' }],
 					['dir1/_', { a: 1 }],
-				]
+				],
 			})
 			await db.connect()
 
@@ -605,21 +593,21 @@ suite("DB", () => {
 		it('should handle _ directory being file', async () => {
 			const db = new DB({
 				predefined: [
-					['_/currencies', ["BTC"]],
-					['dir1/_/currencies', ["BTC", "UAH"]],
-					['dir1/dir2/_/currencies', ["USD"]],
+					['_/currencies', ['BTC']],
+					['dir1/_/currencies', ['BTC', 'UAH']],
+					['dir1/dir2/_/currencies', ['USD']],
 				],
-				console: new NoConsole()
+				console: new NoConsole(),
 			})
 			await db.connect()
 			const r1 = await db.getGlobals('dir1/dir2/some-file.txt')
-			assert.deepEqual(r1, { currencies: ["USD"] })
+			assert.deepEqual(r1, { currencies: ['USD'] })
 			const r2 = await db.getGlobals('dir1/some-file.txt')
-			assert.deepEqual(r2, { currencies: ["BTC", "UAH"] })
+			assert.deepEqual(r2, { currencies: ['BTC', 'UAH'] })
 			const r3 = await db.getGlobals('some-file.txt')
-			assert.deepEqual(r3, { currencies: ["BTC"] })
+			assert.deepEqual(r3, { currencies: ['BTC'] })
 			const r4 = await db.getGlobals('another/some-file.txt')
-			assert.deepEqual(r4, { currencies: ["BTC"] })
+			assert.deepEqual(r4, { currencies: ['BTC'] })
 		})
 
 		it('should return empty object when no globals found', async () => {
@@ -628,24 +616,30 @@ suite("DB", () => {
 			assert.deepEqual(result, {})
 		})
 
-		it("should properly load t.json", async () => {
+		it('should properly load t.json', async () => {
 			const db = new DB({
 				predefined: [
-					["uk/_/t.json", {
-						"Translation": "Pereklad",
-					}],
-					["uk/index.json", {
-						title: "Holovna"
-					}]
-				]
+					[
+						'uk/_/t.json',
+						{
+							Translation: 'Pereklad',
+						},
+					],
+					[
+						'uk/index.json',
+						{
+							title: 'Holovna',
+						},
+					],
+				],
 			})
 			await db.connect()
-			const data = await db.fetch("uk/index")
+			const data = await db.fetch('uk/index')
 			assert.deepEqual(data, {
-				title: "Holovna",
+				title: 'Holovna',
 				t: {
-					"Translation": "Pereklad"
-				}
+					Translation: 'Pereklad',
+				},
 			})
 		})
 	})
@@ -656,7 +650,7 @@ suite("DB", () => {
 				predefined: [
 					['_', { global: 'value' }],
 					['test.json', { value: 'test' }],
-				]
+				],
 			})
 			await db.connect()
 			const opts = new FetchOptions()
@@ -670,7 +664,7 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					['parent.json', { parent: 'value' }],
 					['child.json', { $ref: 'parent.json', child: 'value' }],
-				]
+				],
 			})
 			await db.connect()
 			const opts = new FetchOptions()
@@ -684,7 +678,7 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					['ref.json', { prop: { subprop: 'resolved' } }],
 					['data.json', { key: '$ref:ref.json#prop/subprop' }],
-				]
+				],
 			})
 			await db.connect()
 			const opts = new FetchOptions()
@@ -701,9 +695,7 @@ suite("DB", () => {
 
 		it('should handle directory access when allowDirs is true (default)', async () => {
 			const db = new DB({
-				predefined: [
-					['dir/index.json', { title: 'Directory Index' }]
-				]
+				predefined: [['dir/index.json', { title: 'Directory Index' }]],
 			})
 			await db.connect()
 			const result = await db.fetch('dir/')
@@ -716,75 +708,81 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					['_/langs', ['en', 'uk']],
 					['test.json', { value: 'test' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('test.json')
 			assert.deepEqual(result, { global: 'value', value: 'test', langs: ['en', 'uk'] })
 		})
 
-		it("should not go into infinite loop", async () => {
+		it('should not go into infinite loop', async () => {
 			const db = new DB({
 				predefined: [
-					["_", { "nav": [{ href: "index.html", title: "Home" }] }],
-					["typography.json", { "$content": [{ h1: "Typography" }] }],
-				]
+					['_', { nav: [{ href: 'index.html', title: 'Home' }] }],
+					['typography.json', { $content: [{ h1: 'Typography' }] }],
+				],
 			})
 			await db.connect()
-			const result = await db.fetch("typography.json")
+			const result = await db.fetch('typography.json')
 			assert.deepEqual(result, {
-				nav: [{ href: "index.html", title: "Home" }],
-				$content: [{ h1: "Typography" }]
+				nav: [{ href: 'index.html', title: 'Home' }],
+				$content: [{ h1: 'Typography' }],
 			})
 		})
 
-		it("should handle circular references without infinite loop", async () => {
+		it('should handle circular references without infinite loop', async () => {
 			const db = new DB({
 				predefined: [
-					["_", {
-						nav: [
-							{ href: "/playground/index.html", title: "Home" },
-							{ href: "/playground/avatars.html", title: "Avatar" },
-							{ href: "/playground/buttons.html", title: "Button" },
-							{ href: "/playground/typography.html", title: "Typography" }
-						]
-					}],
-					["playground/index.json", {
-						$content: [
-							{ h1: "NaN•Web UI React Playground" },
-							{
-								ul: [
-									{ a: "Avatar", $href: "/playground/avatars.json" },
-									{ a: "Button", $href: "/playground/buttons.json" },
-									{ a: "Typography", $href: "/playground/typography.json" }
-								]
-							}
-						]
-					}]
-				]
+					[
+						'_',
+						{
+							nav: [
+								{ href: '/playground/index.html', title: 'Home' },
+								{ href: '/playground/avatars.html', title: 'Avatar' },
+								{ href: '/playground/buttons.html', title: 'Button' },
+								{ href: '/playground/typography.html', title: 'Typography' },
+							],
+						},
+					],
+					[
+						'playground/index.json',
+						{
+							$content: [
+								{ h1: 'NaN•Web UI React Playground' },
+								{
+									ul: [
+										{ a: 'Avatar', $href: '/playground/avatars.json' },
+										{ a: 'Button', $href: '/playground/buttons.json' },
+										{ a: 'Typography', $href: '/playground/typography.json' },
+									],
+								},
+							],
+						},
+					],
+				],
 			})
 			await db.connect()
-			const result = await db.fetch("playground/index.json")
+			const result = await db.fetch('playground/index.json')
 			assert.ok(result.nav)
 			assert.ok(result.$content)
 			assert.equal(result.$content.length, 2)
 			assert.equal(result.nav.length, 4)
 		})
 
-		it("should not resolve to same path for inheritance", async () => {
+		it('should not resolve to same path for inheritance', async () => {
 			const db = new DB({
 				predefined: [
-					["playground/_", { theme: "light" }],
-					["playground/index.json", { title: "Playground" }]
-				]
+					['playground/_', { theme: 'light' }],
+					['playground/index.json', { title: 'Playground' }],
+				],
 			})
 			await db.connect()
 
 			// This should not cause infinite loop
-			const result = await db.fetch("playground/index.json")
+			const result = await db.fetch('playground/index.json')
 			assert.ok(result)
-			assert.equal(result.title, "Playground")
-			assert.equal(result.theme, "light")
+			assert.equal(result.title, 'Playground')
+			assert.equal(result.theme, 'light')
 		})
 	})
 
@@ -794,7 +792,7 @@ suite("DB", () => {
 				predefined: [
 					['_', { global: 'value' }],
 					['test.json', { value: 'test' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('test.json')
@@ -807,7 +805,7 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					['parent.json', { parent: 'value' }],
 					['child.json', { $ref: 'parent.json', child: 'value' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('child.json', { inherit: true })
@@ -820,7 +818,7 @@ suite("DB", () => {
 					['_', { global: 'value' }],
 					['ref.json', { prop: { subprop: 'resolved' } }],
 					['data.json', { key: '$ref:ref.json#prop/subprop' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('data.json', { refs: true })
@@ -831,9 +829,9 @@ suite("DB", () => {
 			const db = new DB({
 				predefined: [
 					['_', { global: 'value' }],
-					["_/langs", ["en", "uk"]],
+					['_/langs', ['en', 'uk']],
 					['test.json', { value: 'test' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('test.json', { globals: false })
@@ -844,13 +842,13 @@ suite("DB", () => {
 			const db = new DB({
 				predefined: [
 					['_', { global: 'value' }],
-					["_/langs", ["en", "uk"]],
+					['_/langs', ['en', 'uk']],
 					['test.json', { value: 'test' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('test.json')
-			assert.deepEqual(result, { global: "value", value: 'test', langs: ["en", "uk"] })
+			assert.deepEqual(result, { global: 'value', value: 'test', langs: ['en', 'uk'] })
 		})
 
 		it('should skip extension processing when refs option is false', async () => {
@@ -858,7 +856,7 @@ suite("DB", () => {
 				predefined: [
 					['parent.json', { parent: 'value' }],
 					['child.json', { $ref: 'parent.json', child: 'value' }],
-				]
+				],
 			})
 			await db.connect()
 			const result = await db.fetch('child.json', { refs: false })
@@ -870,35 +868,33 @@ suite("DB", () => {
 				predefined: [
 					['ref.json', { prop: { subprop: 'resolved' } }],
 					['data.json', { key: '$ref:ref:ref.json#prop/subprop' }],
-				]
+				],
 			})
 			await db.connect()
-			const result = await db.fetch("data.json", { refs: false })
+			const result = await db.fetch('data.json', { refs: false })
 			assert.deepEqual(result, { key: '$ref:ref:ref.json#prop/subprop' })
 		})
 
-		it("should prevent circular inheritance", async () => {
+		it('should prevent circular inheritance', async () => {
 			const db = new DB({
 				predefined: [
-					["playground/_", { theme: "light" }],
-					["playground/index.json", { title: "Playground" }]
-				]
+					['playground/_', { theme: 'light' }],
+					['playground/index.json', { title: 'Playground' }],
+				],
 			})
 			await db.connect()
 			// Mock the fetchMerged implementation to test circular inheritance handling
-			const result = await db.fetch("playground/index")
+			const result = await db.fetch('playground/index')
 			assert.ok(result)
-			assert.equal(result.title, "Playground")
-			assert.equal(result.theme, "light")
+			assert.equal(result.title, 'Playground')
+			assert.equal(result.theme, 'light')
 		})
 	})
 
 	describe('resolveReferences', () => {
 		it('should resolve simple references', async () => {
 			const db = new DB({
-				predefined: [
-					['ref.json', 'referenced value']
-				]
+				predefined: [['ref.json', 'referenced value']],
 			})
 			await db.connect()
 
@@ -908,9 +904,7 @@ suite("DB", () => {
 
 		it('should resolve fragment references', async () => {
 			const db = new DB({
-				predefined: [
-					['ref.json', { prop: { subprop: 'resolved' } }]
-				]
+				predefined: [['ref.json', { prop: { subprop: 'resolved' } }]],
 			})
 			await db.connect()
 			const data = { key: '$ref:ref.json#prop/subprop' }
@@ -928,9 +922,7 @@ suite("DB", () => {
 
 		it('should resolve nested references', async () => {
 			const db = new DB({
-				predefined: [
-					['ref.txt', 'referenced value']
-				]
+				predefined: [['ref.txt', 'referenced value']],
 			})
 			await db.connect()
 			const data = { nested: { key: '$ref:ref.txt' } }
@@ -941,9 +933,7 @@ suite("DB", () => {
 
 		it('should resolve nested references (property version)', async () => {
 			const db = new DB({
-				predefined: [
-					['ref.json', 'referenced value']
-				]
+				predefined: [['ref.json', 'referenced value']],
 			})
 			await db.connect()
 			const data = { nested: { key: { $ref: 'ref.json' } } }
@@ -954,39 +944,33 @@ suite("DB", () => {
 
 		it('should resolve nested references (property version) with siblings', async () => {
 			const db = new DB({
-				predefined: [
-					['ref.json', 'referenced value']
-				]
+				predefined: [['ref.json', 'referenced value']],
 			})
 			await db.connect()
-			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
+			const data = { nested: { key: { $ref: 'ref.json', color: 'blue' } } }
 
 			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, {
-				nested: { key: { value: 'referenced value', color: "blue" } }
+				nested: { key: { value: 'referenced value', color: 'blue' } },
 			})
 		})
 
 		it('should resolve nested references (property version) with siblings and object', async () => {
 			const db = new DB({
-				predefined: [
-					["ref.json", { color: "red", size: "xl" }]
-				],
+				predefined: [['ref.json', { color: 'red', size: 'xl' }]],
 			})
 			await db.connect()
-			const data = { nested: { key: { $ref: 'ref.json', color: "blue" } } }
+			const data = { nested: { key: { $ref: 'ref.json', color: 'blue' } } }
 
 			const result = await db.resolveReferences(data)
 			assert.deepEqual(result, {
-				nested: { key: { size: "xl", color: "blue" } }
+				nested: { key: { size: 'xl', color: 'blue' } },
 			})
 		})
 
 		it('should not process self-referencing documents', async () => {
 			const db = new DB({
-				predefined: [
-					['data.json', { key: '$ref:data.json#something' }]
-				]
+				predefined: [['data.json', { key: '$ref:data.json#something' }]],
 			})
 			await db.connect()
 
@@ -1001,14 +985,12 @@ suite("DB", () => {
 	describe('processExtensions', () => {
 		it('should process extension with $ref', async () => {
 			const db = new DB({
-				predefined: [
-					['parent.json', { parent: 'value' }]
-				]
+				predefined: [['parent.json', { parent: 'value' }]],
 			})
 			await db.connect()
 			const data = { [db.Data.REFERENCE_KEY]: 'parent.json', child: 'value' }
 
-			const result = await db.resolveReferences(data, "index.json")
+			const result = await db.resolveReferences(data, 'index.json')
 			assert.deepEqual(result, { parent: 'value', child: 'value' })
 		})
 
@@ -1027,10 +1009,10 @@ suite("DB", () => {
 		})
 	})
 
-	describe("GetOptions", () => {
-		it("should extension provide its values", async () => {
+	describe('GetOptions', () => {
+		it('should extension provide its values', async () => {
 			class GetOptionsExtended extends GetOptions {
-				defaultValue = ""
+				defaultValue = ''
 			}
 			class DBExtended extends DB {
 				static GetOptions = GetOptionsExtended
@@ -1040,46 +1022,44 @@ suite("DB", () => {
 				}
 			}
 			const db = new DBExtended()
-			const result = await db.get("anything")
-			assert.deepEqual(result, ["", "anything"])
+			const result = await db.get('anything')
+			assert.deepEqual(result, ['', 'anything'])
 		})
 	})
 
-	describe("Circular Reference Handling", () => {
-		it("should handle self-referencing documents without infinite loop", async () => {
+	describe('Circular Reference Handling', () => {
+		it('should handle self-referencing documents without infinite loop', async () => {
 			const db = new DB({
 				console: new NoConsole(),
-				predefined: [
-					["self-ref.json", { $ref: "self-ref.json", value: "test" }]
-				]
+				predefined: [['self-ref.json', { $ref: 'self-ref.json', value: 'test' }]],
 			})
 			await db.connect()
 
-			const result = await db.fetch("self-ref.json")
+			const result = await db.fetch('self-ref.json')
 			assert.ok(result)
-			assert.deepEqual(result, { $ref: "self-ref.json", value: "test" })
-			assert.equal(result.value, "test")
+			assert.deepEqual(result, { $ref: 'self-ref.json', value: 'test' })
+			assert.equal(result.value, 'test')
 		})
 
-		it("should handle mutual circular references (extensions) without infinite loop", async () => {
+		it('should handle mutual circular references (extensions) without infinite loop', async () => {
 			const db = new DB({
 				console: new NoConsole(),
 				predefined: [
-					["doc-a.json", { $ref: "doc-b.json", a: true }],
-					["doc-b.json", { $ref: "doc-a.json", b: true }]
-				]
+					['doc-a.json', { $ref: 'doc-b.json', a: true }],
+					['doc-b.json', { $ref: 'doc-a.json', b: true }],
+				],
 			})
 			await db.connect()
 
-			const resultA = await db.fetch("doc-a.json")
-			const resultB = await db.fetch("doc-b.json")
+			const resultA = await db.fetch('doc-a.json')
+			const resultB = await db.fetch('doc-b.json')
 
-			assert.deepEqual(resultA, { $ref: "doc-a.json", a: true, b: true })
-			assert.deepEqual(resultB, { $ref: "doc-b.json", b: true, a: true })
+			assert.deepEqual(resultA, { $ref: 'doc-a.json', a: true, b: true })
+			assert.deepEqual(resultB, { $ref: 'doc-b.json', b: true, a: true })
 		})
 	})
 
-	describe("isData", () => {
+	describe('isData', () => {
 		it('should correctly determine data files', () => {
 			const db = new DB()
 			assert.strictEqual(db.isData('test.json'), true)
@@ -1093,8 +1073,8 @@ suite("DB", () => {
 		})
 	})
 
-	describe("isRoot", () => {
+	describe('isRoot', () => {
 		const db = new DB()
-		assert.ok(db.isRoot("/"))
+		assert.ok(db.isRoot('/'))
 	})
 })

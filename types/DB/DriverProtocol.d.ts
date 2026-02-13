@@ -128,6 +128,6 @@ export type DriverConfig = {
      */
     driver?: DBDriverProtocol | undefined;
 };
-import Directory from "../Directory.js";
-import AuthContext from "./AuthContext.js";
-import DocumentStat from "../DocumentStat.js";
+import Directory from '../Directory.js';
+import AuthContext from './AuthContext.js';
+import DocumentStat from '../DocumentStat.js';

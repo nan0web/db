@@ -19,9 +19,7 @@ function _norm(...args) {
 		// strip leading slashes – we never want them inside the segment list
 		const cleaned = raw.replace(/^\/+/, '')
 
-		const parts = cleaned
-			.split('/')
-			.filter(seg => seg !== '' && seg !== '.')
+		const parts = cleaned.split('/').filter((seg) => seg !== '' && seg !== '.')
 
 		for (const part of parts) {
 			if (part === '..') {
@@ -37,11 +35,7 @@ function _norm(...args) {
 	}
 
 	let result = segments.join('/')
-	if (
-		args.length &&
-		args[args.length - 1].endsWith('/') &&
-		result !== ''
-	) {
+	if (args.length && args[args.length - 1].endsWith('/') && result !== '') {
 		result += '/'
 	}
 	return result
@@ -88,15 +82,15 @@ export function resolveSync(cwd, root, ...args) {
 	// 	// Absolute root overrides cwd.
 	// 	base = _norm(root)
 	// } else {
-		base = _norm(cwd, root)
+	base = _norm(cwd, root)
 	// }
 
 	/* --------------------------------------------------------------
 	   Build the final path, respecting absolute segments that may appear
 	   later in the argument list (they reset the accumulation).
 	   -------------------------------------------------------------- */
-	let curPath = ""
-	let leadingSlash = false          // true when we have to keep a leading '/'
+	let curPath = ''
+	let leadingSlash = false // true when we have to keep a leading '/'
 	let hadRelativeBeforeAbsolute = false
 
 	for (const seg of args) {
@@ -138,7 +132,7 @@ export function resolveSync(cwd, root, ...args) {
 	// Handle special case when cwd="." and root is absolute
 	// In this case we want to return the path segments after the root, not including root itself
 	if (cwd === '.' && root.startsWith('/') && !leadingSlash) {
-		return _norm(...args) || "."
+		return _norm(...args) || '.'
 	}
 
 	// Handle the case where cwd="." and root="."
@@ -149,7 +143,7 @@ export function resolveSync(cwd, root, ...args) {
 				return _norm(...args.slice(i))
 			}
 		}
-		return curPath || "."
+		return curPath || '.'
 	}
 
 	// Handle general case of root boundary restriction
@@ -170,7 +164,7 @@ export function resolveSync(cwd, root, ...args) {
 		return '/' + curPath
 	}
 	// When there is no relative relationship, return the leaf name.
-	return curPath || "."
+	return curPath || '.'
 }
 
 /**
@@ -207,16 +201,18 @@ export function basename(uri, removeSuffix = '') {
  */
 export function dirname(uri) {
 	const parts = uri.split('/')
-	const fromRoot = uri.startsWith("/")
+	const fromRoot = uri.startsWith('/')
 	if (uri.endsWith('/')) {
 		return parts.length > 1
 			? parts.slice(0, parts.length - 2).join('/') + '/'
-			: fromRoot ? '/' : "."
+			: fromRoot
+				? '/'
+				: '.'
 	}
 	if (parts.length > 1) {
 		return parts.slice(0, -1).join('/') + '/'
 	}
-	return fromRoot ? '/' : "."
+	return fromRoot ? '/' : '.'
 }
 
 /**
@@ -321,9 +317,8 @@ export function absolute(cwd, root, ...args) {
 	}
 
 	// If root is absolute it overrides cwd, otherwise prepend cwd.
-	const path = root && root.startsWith('/')
-		? _norm(root, ...resolvedArgs)
-		: _norm(cwd, root, ...resolvedArgs)
+	const path =
+		root && root.startsWith('/') ? _norm(root, ...resolvedArgs) : _norm(cwd, root, ...resolvedArgs)
 
 	return path.startsWith('/') ? path : '/' + path
 }

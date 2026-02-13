@@ -63,4 +63,4 @@ declare class StreamEntry {
         files: number;
     };
 }
-import DocumentEntry from "./DocumentEntry.js";
+import DocumentEntry from './DocumentEntry.js';

@@ -79,4 +79,4 @@ declare class DocumentEntry {
      */
     toString(): string;
 }
-import DocumentStat from "./DocumentStat.js";
+import DocumentStat from './DocumentStat.js';

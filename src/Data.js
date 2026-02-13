@@ -31,7 +31,7 @@ class Data {
 	/** @type {number} */
 	static MAX_DEEP_UNFLATTEN = 99
 	/** @type {string} */
-	static REFERENCE_KEY = "$ref"
+	static REFERENCE_KEY = '$ref'
 
 	/**
 	 * Resets the array wrapper to default value.
@@ -80,12 +80,15 @@ class Data {
 		for (let key in obj) {
 			if (Object.hasOwn(obj, key)) {
 				const corrKey = Array.isArray(obj)
-					? `${Data.ARRAY_WRAPPER[0]}${key}${Data.ARRAY_WRAPPER[1]}` : key
+					? `${Data.ARRAY_WRAPPER[0]}${key}${Data.ARRAY_WRAPPER[1]}`
+					: key
 				const propName = parent ? `${parent}${Data.OBJECT_DIVIDER}${corrKey}` : corrKey
 				if (typeof obj[key] === 'object' && null !== obj[key]) {
 					// Check if it's an empty object or array
-					if ((Array.isArray(obj[key]) && obj[key].length === 0) ||
-						(!Array.isArray(obj[key]) && Object.keys(obj[key]).length === 0)) {
+					if (
+						(Array.isArray(obj[key]) && obj[key].length === 0) ||
+						(!Array.isArray(obj[key]) && Object.keys(obj[key]).length === 0)
+					) {
 						res[propName] = obj[key]
 					} else {
 						Data.flatten(obj[key], propName, res)
@@ -115,7 +118,9 @@ class Data {
 			++i
 			if (acc === undefined || acc === null) return undefined
 			if (typeof key?.match === 'function') {
-				const arrayMatch = key.match(new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`))
+				const arrayMatch = key.match(
+					new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`),
+				)
 				if (arrayMatch) {
 					key = String(parseInt(arrayMatch[1], 10))
 				}
@@ -171,7 +176,9 @@ class Data {
 	 */
 	static unflatten(data) {
 		const result = {}
-		const noRegExp = new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`)
+		const noRegExp = new RegExp(
+			`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`,
+		)
 
 		// Sort keys to ensure we create objects before assigning properties to them
 		const sortedKeys = Object.keys(data).sort()
@@ -190,8 +197,7 @@ class Data {
 				}
 				if (null !== next && next.match && next.match(noRegExp)) {
 					if (!Array.isArray(parent[curr])) parent[curr] = []
-				}
-				else if ('object' === typeof parent && null !== parent) {
+				} else if ('object' === typeof parent && null !== parent) {
 					if (null === parent[curr] || 'object' !== typeof parent[curr]) parent[curr] = {}
 				}
 				// @todo cover with a test
@@ -202,7 +208,7 @@ class Data {
 			}
 			const { value } = Data.findValue(path, result)
 
-			const key = String(keys.pop() ?? "")
+			const key = String(keys.pop() ?? '')
 			if (Array.isArray(value)) {
 				const match = key.match(noRegExp)
 				if (match) {
@@ -226,7 +232,9 @@ class Data {
 					if (typeof parentValue === 'object' && parentValue !== null) {
 						parentValue[pathKey] = data[flatKey]
 					} else {
-						throw new TypeError(`Cannot set property '${pathKey}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`)
+						throw new TypeError(
+							`Cannot set property '${pathKey}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`,
+						)
 					}
 				} else {
 					const parentValue = Data.find(path, result)
@@ -365,10 +373,10 @@ class Data {
 	 */
 	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
 		if (!Array.isArray(flat)) flat = Object.entries(Data.flatten(flat))
-		const path = "" === parentKey ? "" : parentKey + Data.OBJECT_DIVIDER
+		const path = '' === parentKey ? '' : parentKey + Data.OBJECT_DIVIDER
 		const level = key.split(Data.OBJECT_DIVIDER).length
 		return flat.filter(
-			([k]) => k.startsWith(path) && k !== key && k.split(Data.OBJECT_DIVIDER).length >= level
+			([k]) => k.startsWith(path) && k !== key && k.split(Data.OBJECT_DIVIDER).length >= level,
 		)
 	}
 
@@ -381,7 +389,7 @@ class Data {
 	 * @param {boolean} [avoidRoot=false] - Whether to exclude the root path.
 	 * @returns {string[]} Array of parent paths.
 	 */
-	static getPathParents(path, suffix = "", avoidRoot = false) {
+	static getPathParents(path, suffix = '', avoidRoot = false) {
 		const segments = path.split('/').filter(Boolean)
 		if (segments.length === 0) {
 			return [suffix]
@@ -393,7 +401,7 @@ class Data {
 			 * @param {number} index
 			 * @returns {string}
 			 */
-			(_, index) => segments.slice(0, index + 1).join('/') + suffix
+			(_, index) => segments.slice(0, index + 1).join('/') + suffix,
 		)
 
 		if (avoidRoot) {

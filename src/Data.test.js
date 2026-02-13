@@ -1,13 +1,6 @@
 import { suite, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import Data, {
-	flatten,
-	unflatten,
-	merge,
-	find,
-	mergeFlat,
-	flatSiblings
-} from './Data.js'
+import Data, { flatten, unflatten, merge, find, mergeFlat, flatSiblings } from './Data.js'
 
 suite('Data', () => {
 	describe('Static Properties', () => {
@@ -47,7 +40,7 @@ suite('Data', () => {
 			assert.deepEqual(Data.flatten(obj), {
 				'a/[0]': 1,
 				'a/[1]': 2,
-				'a/[2]': 3
+				'a/[2]': 3,
 			})
 		})
 
@@ -55,34 +48,34 @@ suite('Data', () => {
 			const obj = {
 				level1: {
 					level2: {
-						level3: 'deep'
+						level3: 'deep',
 					},
-					array: [1, 2]
-				}
+					array: [1, 2],
+				},
 			}
 			assert.deepEqual(Data.flatten(obj), {
 				'level1/level2/level3': 'deep',
 				'level1/array/[0]': 1,
-				'level1/array/[1]': 2
+				'level1/array/[1]': 2,
 			})
 		})
 
 		it('should store empty objects', () => {
-			const obj = { code: "UAH", rates: {} }
+			const obj = { code: 'UAH', rates: {} }
 			assert.deepEqual(Data.flatten(obj), {
-				"code": "UAH",
-				"rates": {}
+				code: 'UAH',
+				rates: {},
 			})
 		})
 
 		it('should handle non-object values correctly during flattening', () => {
-			const obj = { a: null, b: undefined, c: 0, d: false, e: "" }
+			const obj = { a: null, b: undefined, c: 0, d: false, e: '' }
 			assert.deepEqual(Data.flatten(obj), {
-				"a": null,
-				"b": undefined,
-				"c": 0,
-				"d": false,
-				"e": ""
+				a: null,
+				b: undefined,
+				c: 0,
+				d: false,
+				e: '',
 			})
 		})
 	})
@@ -97,7 +90,7 @@ suite('Data', () => {
 		it('should handle arrays', () => {
 			const flat = {
 				'a/[0]': 1,
-				'a/[1]': 2
+				'a/[1]': 2,
 			}
 			assert.deepEqual(Data.unflatten(flat), { a: [1, 2] })
 		})
@@ -106,11 +99,11 @@ suite('Data', () => {
 			const flat = {
 				'a/b/[0]/c': 1,
 				'a/b/[1]/d': 2,
-				'x/y': 'value'
+				'x/y': 'value',
 			}
 			assert.deepEqual(Data.unflatten(flat), {
 				a: { b: [{ c: 1 }, { d: 2 }] },
-				x: { y: 'value' }
+				x: { y: 'value' },
 			})
 		})
 
@@ -129,21 +122,18 @@ suite('Data', () => {
 		it('should overwrite the value with object if it is a child', () => {
 			const flat = {
 				'a/b': 'string_value',
-				'a/b/c': 'another_value'
+				'a/b/c': 'another_value',
 			}
-			assert.deepEqual(Data.unflatten(flat), { a: { b: { c: "another_value" } } })
+			assert.deepEqual(Data.unflatten(flat), { a: { b: { c: 'another_value' } } })
 		})
 
 		it('should handle array indices correctly during unflattening', () => {
 			const flat = {
 				'items/[0]/name': 'first',
-				'items/[1]/name': 'second'
+				'items/[1]/name': 'second',
 			}
 			const expected = {
-				items: [
-					{ name: 'first' },
-					{ name: 'second' }
-				]
+				items: [{ name: 'first' }, { name: 'second' }],
 			}
 			assert.deepEqual(Data.unflatten(flat), expected)
 		})
@@ -153,30 +143,30 @@ suite('Data', () => {
 				'users/[0]/profile/name': 'John',
 				'users/[0]/profile/age': 30,
 				'users/[1]/profile/name': 'Jane',
-				'users/[1]/profile/age': 25
+				'users/[1]/profile/age': 25,
 			}
 			const expected = {
 				users: [
 					{
 						profile: {
 							name: 'John',
-							age: 30
-						}
+							age: 30,
+						},
 					},
 					{
 						profile: {
 							name: 'Jane',
-							age: 25
-						}
-					}
-				]
+							age: 25,
+						},
+					},
+				],
 			}
 			assert.deepEqual(Data.unflatten(flat), expected)
 		})
 
 		it('should handle empty arrays', () => {
 			const flat = {
-				'items': []
+				items: [],
 			}
 			assert.deepEqual(Data.unflatten(flat), { items: [] })
 		})
@@ -198,7 +188,7 @@ suite('Data', () => {
 			assert.strictEqual(Data.find('a/[1]', obj), 2)
 		})
 
-		it("should find array items", () => {
+		it('should find array items', () => {
 			const obj = { a: [1, 2, 3] }
 			assert.strictEqual(Data.find(['a', '[0]'], obj), 1)
 			assert.strictEqual(Data.find('a/0', obj), 1)
@@ -223,8 +213,8 @@ suite('Data', () => {
 			const obj = {
 				users: [
 					{ id: 1, name: 'John' },
-					{ id: 2, name: 'Jane' }
-				]
+					{ id: 2, name: 'Jane' },
+				],
 			}
 			assert.strictEqual(Data.find('users/[0]/name', obj), 'John')
 			assert.strictEqual(Data.find('users/[1]/id', obj), 2)
@@ -292,21 +282,21 @@ suite('Data', () => {
 			const target = {
 				a: {
 					b: [1, 2],
-					c: { d: 'value' }
-				}
+					c: { d: 'value' },
+				},
 			}
 			const source = {
 				a: {
 					b: [3, 4],
-					e: 'new value'
-				}
+					e: 'new value',
+				},
 			}
 			assert.deepEqual(Data.merge(target, source), {
 				a: {
 					b: [3, 4],
 					c: { d: 'value' },
-					e: 'new value'
-				}
+					e: 'new value',
+				},
 			})
 		})
 
@@ -344,17 +334,17 @@ suite('Data', () => {
 				user: {
 					name: 'John',
 					settings: {
-						theme: 'light'
-					}
-				}
+						theme: 'light',
+					},
+				},
 			}
 			const source = {
 				user: {
 					age: 30,
 					settings: {
-						language: 'en'
-					}
-				}
+						language: 'en',
+					},
+				},
 			}
 			const expected = {
 				user: {
@@ -362,9 +352,9 @@ suite('Data', () => {
 					age: 30,
 					settings: {
 						theme: 'light',
-						language: 'en'
-					}
-				}
+						language: 'en',
+					},
+				},
 			}
 			assert.deepEqual(Data.merge(target, source), expected)
 		})
@@ -380,7 +370,7 @@ suite('Data', () => {
 			const b = [
 				['my/key/b', 9],
 				['my/key/c', 12],
-				['nested/key/value', 'exists']
+				['nested/key/value', 'exists'],
 			]
 
 			const expected = [
@@ -418,12 +408,9 @@ suite('Data', () => {
 			const source = [['key/value', 2]]
 			const expected = [
 				['key/a', 1],
-				['key/value', 2]
+				['key/value', 2],
 			]
-			assert.deepEqual(
-				Data.mergeFlat(source, target, { referenceKey: 'customRef' }),
-				expected
-			)
+			assert.deepEqual(Data.mergeFlat(source, target, { referenceKey: 'customRef' }), expected)
 		})
 
 		it('should handle empty arrays', () => {
@@ -435,7 +422,7 @@ suite('Data', () => {
 			const source = [['a/key', 2]]
 			const expected = [
 				['a/key', 2],
-				['z/key', 1]
+				['z/key', 1],
 			]
 			assert.deepEqual(Data.mergeFlat(target, source), expected)
 		})
@@ -443,16 +430,16 @@ suite('Data', () => {
 		it('should handle references that point to primitive values', () => {
 			const target = [
 				['refKey/$ref', 'primitiveValue'],
-				['otherKey', 42]
+				['otherKey', 42],
 			]
 			const source = [
 				['refKey', 1],
-				['anotherKey', 'test']
+				['anotherKey', 'test'],
 			]
 			const expected = [
 				['anotherKey', 'test'],
 				['otherKey', 42],
-				['refKey', 1]
+				['refKey', 1],
 			]
 			assert.deepEqual(Data.mergeFlat(target, source), expected)
 		})
@@ -460,15 +447,13 @@ suite('Data', () => {
 		it('should merge entries when source contains objects', () => {
 			const target = [
 				['config/database/host', 'localhost'],
-				['config/database/port', 5432]
+				['config/database/port', 5432],
 			]
-			const source = [
-				['config/database', { host: 'remotehost', user: 'admin' }]
-			]
+			const source = [['config/database', { host: 'remotehost', user: 'admin' }]]
 			const expected = [
 				['config/database/host', 'remotehost'],
 				['config/database/port', 5432],
-				['config/database/user', 'admin']
+				['config/database/user', 'admin'],
 			]
 			assert.deepEqual(Data.mergeFlat(target, source), expected)
 		})
@@ -476,16 +461,16 @@ suite('Data', () => {
 		it('should properly handle overrides in mergeFlat', () => {
 			const target = [
 				['key1', 'value1'],
-				['key2', 'value2']
+				['key2', 'value2'],
 			]
 			const source = [
 				['key1', 'new_value1'],
-				['key3', 'value3']
+				['key3', 'value3'],
 			]
 			const expected = [
 				['key1', 'new_value1'],
 				['key2', 'value2'],
-				['key3', 'value3']
+				['key3', 'value3'],
 			]
 			assert.deepEqual(Data.mergeFlat(target, source), expected)
 		})
@@ -509,7 +494,7 @@ suite('Data', () => {
 				['$ref', 'index#top'],
 				['nested/key/$ref', 'somewhere'],
 				['nested/key/color', 'green'],
-				['top', 'level']
+				['top', 'level'],
 			]
 			assert.deepEqual(Data.flatSiblings(flat, '$ref'), flat.slice(1))
 			assert.deepEqual(flatSiblings(flat, '$ref'), flat.slice(1))
@@ -521,23 +506,13 @@ suite('Data', () => {
 				'nested/key/color': 'green',
 				'nested/value': 9,
 			}
-			const expected = [
-				['nested/key/color', 'green']
-			]
-			assert.deepEqual(
-				Data.flatSiblings(obj, 'nested/key/$ref'),
-				expected
-			)
+			const expected = [['nested/key/color', 'green']]
+			assert.deepEqual(Data.flatSiblings(obj, 'nested/key/$ref'), expected)
 		})
 
 		it('should return empty array when no siblings exist', () => {
-			const flat = [
-				['only/key', 'value']
-			]
-			assert.deepEqual(
-				Data.flatSiblings(flat, 'only/key'),
-				[]
-			)
+			const flat = [['only/key', 'value']]
+			assert.deepEqual(Data.flatSiblings(flat, 'only/key'), [])
 		})
 
 		it('should correctly identify siblings in complex nested structures', () => {
@@ -545,7 +520,7 @@ suite('Data', () => {
 				['parent/child1/grandchild1', 'value1'],
 				['parent/child1/grandchild2', 'value2'],
 				['parent/child2', 'value3'],
-				['parent/child1', 'direct_value']
+				['parent/child1', 'direct_value'],
 			]
 			const r1 = Data.flatSiblings(flat, 'parent/child1')
 			assert.deepEqual(r1, flat.slice(0, -1))
