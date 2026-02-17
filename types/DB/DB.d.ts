@@ -38,6 +38,14 @@ export default class DB {
     static FetchOptions: typeof FetchOptions;
     static DATA_EXTNAMES: string[];
     /**
+     * Duck-typing check for DB instances.
+     * Works across package boundaries where instanceof may fail
+     * due to duplicate module copies (npm + workspace:*).
+     * @param {any} obj
+     * @returns {boolean}
+     */
+    static isDB(obj: any): boolean;
+    /**
      * Creates a new DB instance from properties if object provided
      * @param {object|DB} input - Properties or DB instance
      * @returns {DB}
@@ -65,6 +73,8 @@ export default class DB {
      * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
      * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
      * @param {DB[]} [input.dbs=[]] - Attached sub-databases
+     * @param {Function | Map<string, Function>} [input.models] - Model class(es) for hydration
+     * @param {Function} [input.Model] - Shorthand: single Model class for all URIs
      * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
      */
     constructor(input?: {
@@ -78,6 +88,8 @@ export default class DB {
         context?: AuthContext | object;
         predefined?: Map<string, any> | (readonly [string, any])[] | undefined;
         dbs?: DB[] | undefined;
+        models?: Function | Map<string, Function> | undefined;
+        Model?: Function | undefined;
         console?: Console | NoConsole | undefined;
     });
     /** @type {DBDriverProtocol} */
@@ -100,6 +112,10 @@ export default class DB {
     cwd: string;
     /** @type {DB[]} */
     dbs: DB[];
+    /** @type {Map<string, DB>} Sorted by prefix length descending for longest-match routing */
+    mounts: Map<string, DB>;
+    /** @type {Map<string, Function>} URI-prefix → Model class for hydration */
+    models: Map<string, Function>;
     /** @type {Map} */
     predefined: Map<any, any>;
     /** @type {Map<string, any>} */
@@ -120,6 +136,41 @@ export default class DB {
     get options(): Record<string, any>;
     /** @returns {Console | NoConsole} */
     get console(): Console | NoConsole;
+    /**
+     * Subscribes to an event (e.g. 'fallback').
+     * @param {string} event
+     * @param {Function} fn
+     * @returns {void}
+     */
+    on(event: string, fn: Function): void;
+    /**
+     * Emits an event to all registered listeners.
+     * @param {string} event
+     * @param {any} data
+     * @returns {void}
+     */
+    emit(event: string, data: any): void;
+    /**
+     * Registers a Model class for a URI prefix.
+     * When fetch() returns data, it will be hydrated through the Model.
+     * @param {string} prefix - URI prefix (e.g. 'users', 'config')
+     * @param {Function} ModelClass - Class with `from(data)` or constructor(data)
+     */
+    model(prefix: string, ModelClass: Function): void;
+    /**
+     * Finds the registered Model for a given URI using longest-prefix matching.
+     * @param {string} uri
+     * @returns {Function | null}
+     */
+    _findModel(uri: string): Function | null;
+    /**
+     * Hydrates raw data through the registered Model.
+     * Tries Model.from(data) first, then new Model(data).
+     * @param {any} data
+     * @param {any} ModelClass
+     * @returns {any}
+     */
+    _hydrate(data: any, ModelClass: any): any;
     /**
      * Returns Data helper class that is assigned to DB or its extension.
      * Define your own Data provider to extend its logic, no need to extend getter.
@@ -179,8 +230,32 @@ export default class DB {
     _statFromMeta(abs: string): DocumentStat;
     isRoot(dir: any): boolean;
     /**
-     * Attaches another DB instance to this database for federated access.
-     * Allows routing operations across multiple databases.
+     * Mounts a database instance to a path prefix.
+     * All requests to URIs starting with this prefix will be routed to the mounted DB.
+     * @param {string} path - The virtual path prefix (e.g. '/cache')
+     * @param {DB} db - The database instance to mount
+     * @throws {TypeError} If non-DB instance is provided
+     */
+    mount(path: string, db: DB): void;
+    /**
+     * Unmounts a database from a path.
+     * @param {string} path
+     * @returns {boolean} TRUE if mount existed and was removed
+     */
+    unmount(path: string): boolean;
+    /**
+     * Finds the mounted DB for a given URI.
+     * Uses longest-prefix matching (most specific mount wins).
+     * @param {string} uri
+     * @returns {{ db: DB, subUri: string } | null}
+     */
+    _findMount(uri: string): {
+        db: DB;
+        subUri: string;
+    } | null;
+    /**
+     * Attaches another DB instance to this database for fallback access.
+     * When primary fetch fails, attached databases are tried in order.
      * @param {DB} db - Database to attach
      * @returns {void}
      * @throws {TypeError} If non-DB instance is provided
@@ -560,6 +635,14 @@ export default class DB {
      * @returns {Promise<any>}
      */
     fetch(uri: string, input?: object | FetchOptions, context?: AuthContext | object): Promise<any>;
+    /**
+     * Primary fetch logic — extracted for fallback chain support.
+     * @param {string} uri
+     * @param {object | FetchOptions} [input]
+     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @returns {Promise<any>}
+     */
+    _fetchPrimary(uri: string, input?: object | FetchOptions, context?: AuthContext | object): Promise<any>;
     /**
      * Merges data from multiple sources following nano-db-fetch patterns.
      * Handles inheritance, globals, and references with circular protection.

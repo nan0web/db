@@ -57,12 +57,25 @@ function testRender() {
 	 * > Every data becomes a database.
 	 *
 	 * Based on real use-cases, supports:
+	 * - **VFS Routing** — `mount()` composes multiple storage backends into one tree
+	 * - **Fallback Chain** — `attach()` provides failover with transparent notifications
+	 * - **Model Hydration** — automatic transformation of plain objects into typed models
 	 * - object flattening/unflattening
 	 * - deep merging with reference handling
 	 * - async directory listing (for fs & fetch layers)
 	 * - stream-based progress during traversal
 	 *
 	 * See how it works in [playground](#playground).
+	 *
+	 * ## Architecture
+	 *
+	 * `DB` is a VFS Router. Mount different storage backends, attach fallbacks, hydrate models:
+	 *
+	 * ```
+	 * [App] → db.fetch('/media/logo.png')  → [S3 Driver]
+	 *         db.fetch('/cache/user_1')    → [Redis Driver]
+	 *         db.fetch('/play/demo-app')   → [FS Driver] → Document instance
+	 * ```
 	 *
 	 * ## Installation
 	 */

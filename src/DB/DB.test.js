@@ -318,8 +318,7 @@ suite('DB', () => {
 	})
 
 	describe('dropDocument', () => {
-		it.todo('should call ensureAccess with d and throws an error', async () => {
-			// @todo fix the access() issue - not getting into DB.enscureAccess / driver.access()
+		it('should call ensureAccess with d and throws an error', async () => {
 			class AuthDriver extends DBDriverProtocol {
 				async access(absoluteURI, level = 'r', context = new AuthContext()) {
 					if (context.hasRole('root')) {
@@ -332,17 +331,16 @@ suite('DB', () => {
 					return new AuthDriver(input)
 				}
 			}
-			class AuthDB extends DB {
+			class AuthDB extends BaseDB {
 				static Driver = AuthDriver
 			}
 			const db = new AuthDB({ predefined: defaultStructure, console: new NoConsole() })
 			await db.connect()
 
 			const uri = 'data.json'
-			// await assert.rejects(() => db.dropDocument(uri))
 			const result = await db.dropDocument(uri)
 			assert.equal(result, false)
-			const rights = await db.dropDocument(uri, { role: 'root' })
+			const rights = await db.dropDocument(uri, AuthContext.from({ roles: ['root'] }))
 			assert.equal(rights, true)
 		})
 	})

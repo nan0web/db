@@ -94,6 +94,23 @@ export default class DB {
 	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
 	static DATA_EXTNAMES = ['.json', '.yaml', '.yml', '.nano', '.html', '.xml', '.md']
+
+	/**
+	 * Duck-typing check for DB instances.
+	 * Works across package boundaries where instanceof may fail
+	 * due to duplicate module copies (npm + workspace:*).
+	 * @param {any} obj
+	 * @returns {boolean}
+	 */
+	static isDB(obj) {
+		return (
+			obj &&
+			typeof obj.fetch === 'function' &&
+			typeof obj.set === 'function' &&
+			typeof obj.stat === 'function'
+		)
+	}
+
 	/** @type {DBDriverProtocol} */
 	driver
 	/** @type {string} */
@@ -114,10 +131,16 @@ export default class DB {
 	cwd = '.'
 	/** @type {DB[]} */
 	dbs = []
+	/** @type {Map<string, DB>} Sorted by prefix length descending for longest-match routing */
+	mounts = new Map()
+	/** @type {Map<string, Function>} URI-prefix → Model class for hydration */
+	models = new Map()
 	/** @type {Map} */
 	predefined = new Map()
 	/** @type {Console | NoConsole} */
 	#console
+	/** @type {Map<string, Function[]>} */
+	#listeners = new Map()
 	/** @type {Map<string, any>} */
 	_inheritanceCache = new Map()
 
@@ -143,6 +166,8 @@ export default class DB {
 	 * @param {AuthContext | object} [input.context=new AuthContext()] - Authentication/authorization context
 	 * @param {Map<string, any> | Array<readonly [string, any]>} [input.predefined=new Map()] - Data for memory operations.
 	 * @param {DB[]} [input.dbs=[]] - Attached sub-databases
+	 * @param {Function | Map<string, Function>} [input.models] - Model class(es) for hydration
+	 * @param {Function} [input.Model] - Shorthand: single Model class for all URIs
 	 * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
 	 */
 	constructor(input = {}) {
@@ -157,6 +182,8 @@ export default class DB {
 			dbs = this.dbs,
 			predefined = this.predefined,
 			ttl = this.ttl,
+			models,
+			Model,
 			console: consoleInput = new NoConsole({ silent: true }),
 		} = input
 		this.root = root
@@ -180,6 +207,10 @@ export default class DB {
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map((from) => DB.from(from))
 		this.predefined = predefined instanceof Map ? predefined : new Map(predefined)
+		// Model hydration: normalize to Map<prefix, ModelClass>
+		if (models instanceof Map) this.models = models
+		else if (typeof models === 'function') this.models = new Map([['/', models]])
+		else if (typeof Model === 'function') this.models = new Map([['/', Model]])
 		this.console.info('DB instance created', String(this))
 	}
 
@@ -209,6 +240,69 @@ export default class DB {
 	/** @returns {Console | NoConsole} */
 	get console() {
 		return this.#console
+	}
+
+	/**
+	 * Subscribes to an event (e.g. 'fallback').
+	 * @param {string} event
+	 * @param {Function} fn
+	 * @returns {void}
+	 */
+	on(event, fn) {
+		const list = this.#listeners.get(event) || []
+		list.push(fn)
+		this.#listeners.set(event, list)
+	}
+
+	/**
+	 * Emits an event to all registered listeners.
+	 * @param {string} event
+	 * @param {any} data
+	 * @returns {void}
+	 */
+	emit(event, data) {
+		const list = this.#listeners.get(event) || []
+		for (const fn of list) fn(data)
+	}
+
+	/**
+	 * Registers a Model class for a URI prefix.
+	 * When fetch() returns data, it will be hydrated through the Model.
+	 * @param {string} prefix - URI prefix (e.g. 'users', 'config')
+	 * @param {Function} ModelClass - Class with `from(data)` or constructor(data)
+	 */
+	model(prefix, ModelClass) {
+		const normalized = this.normalize(prefix).replace(/\/$/, '') || '/'
+		this.models.set(normalized, ModelClass)
+		this.models = new Map([...this.models.entries()].sort((a, b) => b[0].length - a[0].length))
+	}
+
+	/**
+	 * Finds the registered Model for a given URI using longest-prefix matching.
+	 * @param {string} uri
+	 * @returns {Function | null}
+	 */
+	_findModel(uri) {
+		const normalized = this.normalize(uri)
+		for (const [prefix, ModelClass] of this.models) {
+			if (prefix === '/' || normalized === prefix || normalized.startsWith(prefix + '/')) {
+				return ModelClass
+			}
+		}
+		return null
+	}
+
+	/**
+	 * Hydrates raw data through the registered Model.
+	 * Tries Model.from(data) first, then new Model(data).
+	 * @param {any} data
+	 * @param {any} ModelClass
+	 * @returns {any}
+	 */
+	_hydrate(data, ModelClass) {
+		if (data == null || typeof data !== 'object') return data
+		if (typeof ModelClass.from === 'function') return ModelClass.from(data)
+		return new ModelClass(data)
 	}
 
 	/**
@@ -288,14 +382,59 @@ export default class DB {
 		return ['/', '.', './', ''].includes(dir)
 	}
 	/**
-	 * Attaches another DB instance to this database for federated access.
-	 * Allows routing operations across multiple databases.
+	 * Mounts a database instance to a path prefix.
+	 * All requests to URIs starting with this prefix will be routed to the mounted DB.
+	 * @param {string} path - The virtual path prefix (e.g. '/cache')
+	 * @param {DB} db - The database instance to mount
+	 * @throws {TypeError} If non-DB instance is provided
+	 */
+	mount(path, db) {
+		if (!DB.isDB(db)) {
+			throw new TypeError('Mounted instance must be a DB')
+		}
+		const normalized = this.normalize(path).replace(/\/$/, '')
+		this.mounts.set(normalized, db)
+		this.console.info(`Mounted DB at ${normalized}`, { root: db.root })
+		// Sort mounts by length descending to match most specific prefix first
+		this.mounts = new Map([...this.mounts.entries()].sort((a, b) => b[0].length - a[0].length))
+	}
+
+	/**
+	 * Unmounts a database from a path.
+	 * @param {string} path
+	 * @returns {boolean} TRUE if mount existed and was removed
+	 */
+	unmount(path) {
+		const normalized = this.normalize(path).replace(/\/$/, '')
+		return this.mounts.delete(normalized)
+	}
+
+	/**
+	 * Finds the mounted DB for a given URI.
+	 * Uses longest-prefix matching (most specific mount wins).
+	 * @param {string} uri
+	 * @returns {{ db: DB, subUri: string } | null}
+	 */
+	_findMount(uri) {
+		const normalized = this.normalize(uri)
+		for (const [prefix, db] of this.mounts) {
+			if (normalized === prefix || normalized.startsWith(prefix + '/')) {
+				const subUri = normalized.slice(prefix.length) || '/'
+				return { db, subUri: subUri.startsWith('/') ? subUri : '/' + subUri }
+			}
+		}
+		return null
+	}
+
+	/**
+	 * Attaches another DB instance to this database for fallback access.
+	 * When primary fetch fails, attached databases are tried in order.
 	 * @param {DB} db - Database to attach
 	 * @returns {void}
 	 * @throws {TypeError} If non-DB instance is provided
 	 */
 	attach(db) {
-		if (!(db instanceof DB)) {
+		if (!DB.isDB(db)) {
 			this.console.error('Attempted to attach a non-DB instance')
 			throw new TypeError('It is possible to attach only DB or extended databases')
 		}
@@ -714,6 +853,8 @@ export default class DB {
 	 * @returns {Promise<any>} Document content
 	 */
 	async get(uri, input = {}, context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.get(mount.subUri, input, context)
 		let opts
 		if (context !== undefined) {
 			opts = this.GetOptions.from(input)
@@ -744,6 +885,8 @@ export default class DB {
 	 * @returns {Promise<any>} The set data
 	 */
 	async set(uri, data, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.set(mount.subUri, data, context)
 		const authContext = AuthContext.from(context)
 		this.console.debug('set()', uri, { data })
 		await this.ensureAccess(uri, 'w', authContext)
@@ -761,6 +904,8 @@ export default class DB {
 	 * @returns {Promise<DocumentStat | undefined>}
 	 */
 	async stat(uri, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.stat(mount.subUri, context)
 		const authContext = AuthContext.from(context)
 		this.console.debug('stat()', uri)
 		await this.ensureAccess(uri, 'r', authContext)
@@ -914,6 +1059,8 @@ export default class DB {
 	 * @returns {Promise<boolean>}
 	 */
 	async saveDocument(uri, document, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.saveDocument(mount.subUri, document, context)
 		this.console.debug('saveDocument()', uri, { document })
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, 'w', authContext)
@@ -1017,6 +1164,8 @@ export default class DB {
 	 * @returns {Promise<boolean>}
 	 */
 	async dropDocument(uri, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.dropDocument(mount.subUri, context)
 		this.console.debug('dropDocument()', uri)
 		const authContext = AuthContext.from(context)
 		try {
@@ -1383,6 +1532,46 @@ export default class DB {
 	 * @returns {Promise<any>}
 	 */
 	async fetch(uri, input = {}, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.fetch(mount.subUri, input, context)
+
+		let result = await this._fetchPrimary(uri, input, context)
+
+		// Fallback chain: if primary returned nothing and we have attached DBs
+		if (result == null && this.dbs.length > 0) {
+			for (const fallbackDB of this.dbs) {
+				try {
+					const fallbackResult = await fallbackDB.fetch(uri, input, context)
+					if (fallbackResult != null) {
+						this.emit('fallback', { uri, from: this, to: fallbackDB })
+						result = fallbackResult
+						break
+					}
+				} catch (e) {
+					continue
+				}
+			}
+		}
+
+		// Model hydration: transform raw data into Model instances
+		if (result != null && this.models.size > 0) {
+			const ModelClass = this._findModel(uri)
+			if (ModelClass) {
+				result = this._hydrate(result, ModelClass)
+			}
+		}
+
+		return result
+	}
+
+	/**
+	 * Primary fetch logic — extracted for fallback chain support.
+	 * @param {string} uri
+	 * @param {object | FetchOptions} [input]
+	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @returns {Promise<any>}
+	 */
+	async _fetchPrimary(uri, input = {}, context = this.context) {
 		let opts
 		if (context !== undefined) {
 			opts = FetchOptions.from(input)
