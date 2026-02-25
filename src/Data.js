@@ -266,7 +266,18 @@ class Data {
 			if (!Object.hasOwn(source, key)) continue
 			if (source[key] && typeof source[key] === 'object') {
 				if (Array.isArray(source[key])) {
-					newTarget[key] = source[key].slice()
+					if (
+						source[key].length > 0 &&
+						typeof source[key][0] === 'object' &&
+						source[key][0] !== null &&
+						source[key][0].$clear
+					) {
+						newTarget[key] = source[key].filter(
+							(v) => !(v !== null && typeof v === 'object' && v.$clear),
+						)
+					} else {
+						newTarget[key] = source[key].slice()
+					}
 				} else {
 					newTarget[key] = newTarget[key] || {}
 					newTarget[key] = Data.merge(newTarget[key], source[key])

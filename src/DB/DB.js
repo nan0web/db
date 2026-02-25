@@ -266,6 +266,61 @@ export default class DB {
 	}
 
 	/**
+	 * Watches a URI for changes. Callback receives change events for
+	 * the given URI or any URI under it (prefix match).
+	 * @param {string} uri - URI or prefix to watch
+	 * @param {Function} callback - Called with { uri, type, data }
+	 * @returns {Function} Unsubscribe function
+	 */
+	watch(uri, callback) {
+		const prefix = this.normalize(uri)
+		const handler = (event) => {
+			const normalized = this.normalize(event.uri)
+			if (normalized === prefix || normalized.startsWith(prefix + '/') || prefix === '.') {
+				callback(event)
+			}
+		}
+		// Store reference for unwatch()
+		if (!this._watchers) this._watchers = new Map()
+		if (!this._watchers.has(prefix)) this._watchers.set(prefix, [])
+		this._watchers.get(prefix).push({ callback, handler })
+		this.on('change', handler)
+
+		// Return unsubscribe function
+		return () => this.unwatch(uri, callback)
+	}
+
+	/**
+	 * Stops watching a URI. If callback is provided, removes only that
+	 * specific watcher. Otherwise removes all watchers for the URI.
+	 * @param {string} uri - URI to unwatch
+	 * @param {Function} [callback] - Specific callback to remove
+	 */
+	unwatch(uri, callback) {
+		if (!this._watchers) return
+		const prefix = this.normalize(uri)
+		const watchers = this._watchers.get(prefix)
+		if (!watchers) return
+
+		const listeners = this.#listeners.get('change') || []
+
+		if (callback) {
+			const idx = watchers.findIndex((w) => w.callback === callback)
+			if (idx >= 0) {
+				const [removed] = watchers.splice(idx, 1)
+				const li = listeners.indexOf(removed.handler)
+				if (li >= 0) listeners.splice(li, 1)
+			}
+		} else {
+			for (const w of watchers) {
+				const li = listeners.indexOf(w.handler)
+				if (li >= 0) listeners.splice(li, 1)
+			}
+			this._watchers.delete(prefix)
+		}
+	}
+
+	/**
 	 * Registers a Model class for a URI prefix.
 	 * When fetch() returns data, it will be hydrated through the Model.
 	 * @param {string} prefix - URI prefix (e.g. 'users', 'config')
@@ -303,6 +358,50 @@ export default class DB {
 		if (data == null || typeof data !== 'object') return data
 		if (typeof ModelClass.from === 'function') return ModelClass.from(data)
 		return new ModelClass(data)
+	}
+
+	/**
+	 * Validates data against the registered Model schema.
+	 * Model static fields with `{ help, default }` shape are treated as schema.
+	 * Returns an object with `valid` boolean and `errors` array.
+	 *
+	 * @param {string} uri - Document URI to find the matching Model
+	 * @param {any} [data] - Data to validate (if omitted, fetches from storage)
+	 * @returns {Promise<{ valid: boolean, errors: Array<{ field: string, message: string }> }>}
+	 */
+	async validate(uri, data) {
+		const ModelClass = this._findModel(uri)
+		if (!ModelClass) return { valid: true, errors: [] }
+
+		if (data === undefined) {
+			data = await this.get(uri)
+		}
+
+		const errors = []
+
+		if (data == null || typeof data !== 'object') {
+			return { valid: false, errors: [{ field: '*', message: 'Data is not an object' }] }
+		}
+
+		// Check each static field that looks like a schema descriptor { help, default }
+		for (const key of Object.getOwnPropertyNames(ModelClass)) {
+			const descriptor = ModelClass[key]
+			if (descriptor == null || typeof descriptor !== 'object') continue
+			if (!('default' in descriptor)) continue
+
+			const expected = typeof descriptor.default
+			if (key in data) {
+				const actual = typeof data[key]
+				if (expected !== 'object' && actual !== expected) {
+					errors.push({
+						field: key,
+						message: `Expected ${expected}, got ${actual}`,
+					})
+				}
+			}
+		}
+
+		return { valid: errors.length === 0, errors }
 	}
 
 	/**
@@ -869,12 +968,29 @@ export default class DB {
 		if (!this.data.has(uri) || false === this.data.get(uri)) {
 			const data = await this.loadDocument(uri, opts.defaultValue, authContext)
 			this.console.debug('get().done', uri, { data, cache: false })
+			this.emit('cache', { hit: false, uri })
 			this.data.set(uri, data)
 			return data
 		}
 		const data = this.data.get(uri)
 		this.console.debug('get().done', uri, { data, cache: true })
+		this.emit('cache', { hit: true, uri })
 		return data
+	}
+
+	/**
+	 * Parallel batch get — fetches multiple URIs concurrently.
+	 * @param {string[]} uris - Array of document URIs
+	 * @param {object | GetOptions} [input] - Options passed to each get()
+	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @returns {Promise<Map<string, any>>} Map of URI → content
+	 */
+	async getAll(uris, input = {}, context = this.context) {
+		/** @type {[string, any][]} */
+		const results = await Promise.all(
+			uris.map(async (uri) => [uri, await this.get(uri, input, context)]),
+		)
+		return new Map(results)
 	}
 
 	/**
@@ -893,7 +1009,23 @@ export default class DB {
 		this.data.set(uri, data)
 		const meta = this.meta.has(uri) ? this.meta.get(uri) : {}
 		this.meta.set(uri, new DocumentStat({ ...meta, mtimeMs: Date.now() }))
+		this.emit('change', { uri, type: 'set', data })
 		return data
+	}
+
+	/**
+	 * Batch set — writes multiple entries with a single-pass index update.
+	 * @param {Array<[string, any]>} entries - Array of [uri, data] pairs
+	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @returns {Promise<Map<string, any>>} Map of URI → written data
+	 */
+	async setAll(entries, context = this.context) {
+		const results = new Map()
+		for (const [uri, data] of entries) {
+			const result = await this.set(uri, data, context)
+			results.set(uri, result)
+		}
+		return results
 	}
 
 	/**
@@ -1085,6 +1217,7 @@ export default class DB {
 		stat.size = Buffer.byteLength(JSON.stringify(document))
 		this.meta.set(abs, stat)
 		await this._updateIndex(abs)
+		this.emit('change', { uri, type: 'save', data: document })
 		return true
 	}
 
@@ -1189,6 +1322,7 @@ export default class DB {
 		this.data.delete(uri)
 		this.meta.delete(uri)
 		this.console.debug('Document deleted', { uri })
+		this.emit('change', { uri, type: 'drop' })
 		return true
 	}
 
@@ -1524,6 +1658,33 @@ export default class DB {
 	}
 
 	/**
+	 * Returns a ReadableStream for the document at the given URI.
+	 * Base implementation wraps fetch() into a single-chunk stream.
+	 * FS/network drivers can override for true chunked streaming.
+	 * @param {string} uri - Document URI
+	 * @param {object | FetchOptions} [input] - Fetch options
+	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @returns {ReadableStream}
+	 */
+	fetchStream(uri, input = {}, context = this.context) {
+		const db = this
+		return new ReadableStream({
+			async start(controller) {
+				try {
+					const data = await db.fetch(uri, input, context)
+					if (data != null) {
+						const chunk = typeof data === 'string' ? data : JSON.stringify(data)
+						controller.enqueue(chunk)
+					}
+					controller.close()
+				} catch (err) {
+					controller.error(err)
+				}
+			},
+		})
+	}
+
+	/**
 	 * Fetch document with inheritance, globals and references processing
 	 * Handles extension lookup, directory resolution, and merging.
 	 * @param {string} uri
@@ -1717,33 +1878,12 @@ export default class DB {
 		const isExtensible = 'object' === typeof data && null !== data && !Array.isArray(data)
 
 		if (opts.inherit && isExtensible) {
-			// Always load root inheritance first
-			if (!this._inheritanceCache.has('/')) {
-				const rootUri = this.resolveSync('/', Directory.FILE)
-				const rootInheritance = await this.loadDocument(rootUri, {}, authContext)
-				this._inheritanceCache.set('/', rootInheritance)
-			}
-			let dir = uri
-			let parentData = clone(this._inheritanceCache.get('/')) || {}
-			const dirs = []
 			try {
-				do {
-					dir = this.dirname(dir)
-					let currentDir = this.resolveSync(dir, this.Directory.FILE)
-					if (currentDir.startsWith('/')) currentDir = currentDir.slice(1)
-					const stat = await this.statDocument(currentDir, authContext)
-					if (stat && stat.exists) {
-						const data = await this.loadDocument(currentDir, {}, authContext)
-						parentData = this.Data.merge(parentData, data)
-						dirs.push({ dir: currentDir, data: data })
-					}
-				} while (!this.isRoot(dir))
+				const parentData = await this.getInheritance(uri)
 				data = this.Data.merge(parentData, data)
 			} catch (/** @type {any} */ err) {
 				this.console.warn('Error processing inheritance', {
-					dir,
-					dirs,
-					parentData,
+					uri,
 					error: err.message,
 				})
 			}

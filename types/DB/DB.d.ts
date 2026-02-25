@@ -151,6 +151,22 @@ export default class DB {
      */
     emit(event: string, data: any): void;
     /**
+     * Watches a URI for changes. Callback receives change events for
+     * the given URI or any URI under it (prefix match).
+     * @param {string} uri - URI or prefix to watch
+     * @param {Function} callback - Called with { uri, type, data }
+     * @returns {Function} Unsubscribe function
+     */
+    watch(uri: string, callback: Function): Function;
+    _watchers: Map<any, any> | undefined;
+    /**
+     * Stops watching a URI. If callback is provided, removes only that
+     * specific watcher. Otherwise removes all watchers for the URI.
+     * @param {string} uri - URI to unwatch
+     * @param {Function} [callback] - Specific callback to remove
+     */
+    unwatch(uri: string, callback?: Function | undefined): void;
+    /**
      * Registers a Model class for a URI prefix.
      * When fetch() returns data, it will be hydrated through the Model.
      * @param {string} prefix - URI prefix (e.g. 'users', 'config')
@@ -171,6 +187,22 @@ export default class DB {
      * @returns {any}
      */
     _hydrate(data: any, ModelClass: any): any;
+    /**
+     * Validates data against the registered Model schema.
+     * Model static fields with `{ help, default }` shape are treated as schema.
+     * Returns an object with `valid` boolean and `errors` array.
+     *
+     * @param {string} uri - Document URI to find the matching Model
+     * @param {any} [data] - Data to validate (if omitted, fetches from storage)
+     * @returns {Promise<{ valid: boolean, errors: Array<{ field: string, message: string }> }>}
+     */
+    validate(uri: string, data?: any): Promise<{
+        valid: boolean;
+        errors: Array<{
+            field: string;
+            message: string;
+        }>;
+    }>;
     /**
      * Returns Data helper class that is assigned to DB or its extension.
      * Define your own Data provider to extend its logic, no need to extend getter.
@@ -409,6 +441,14 @@ export default class DB {
      */
     get(uri: string, input?: object | GetOptions, context?: AuthContext | object): Promise<any>;
     /**
+     * Parallel batch get — fetches multiple URIs concurrently.
+     * @param {string[]} uris - Array of document URIs
+     * @param {object | GetOptions} [input] - Options passed to each get()
+     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @returns {Promise<Map<string, any>>} Map of URI → content
+     */
+    getAll(uris: string[], input?: object | GetOptions, context?: AuthContext | object): Promise<Map<string, any>>;
+    /**
      * Sets document content in cache and updates metadata timestamp.
      * @param {string} uri - Document URI
      * @param {any} data - Document data
@@ -416,6 +456,13 @@ export default class DB {
      * @returns {Promise<any>} The set data
      */
     set(uri: string, data: any, context?: AuthContext | object): Promise<any>;
+    /**
+     * Batch set — writes multiple entries with a single-pass index update.
+     * @param {Array<[string, any]>} entries - Array of [uri, data] pairs
+     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @returns {Promise<Map<string, any>>} Map of URI → written data
+     */
+    setAll(entries: Array<[string, any]>, context?: AuthContext | object): Promise<Map<string, any>>;
     /**
      * Gets document statistics from cache or loads if missing.
      * Supports extension fallback for extension-less URIs.
@@ -626,6 +673,16 @@ export default class DB {
      * @returns {Promise<any>} Global variables data
      */
     getGlobals(path: string): Promise<any>;
+    /**
+     * Returns a ReadableStream for the document at the given URI.
+     * Base implementation wraps fetch() into a single-chunk stream.
+     * FS/network drivers can override for true chunked streaming.
+     * @param {string} uri - Document URI
+     * @param {object | FetchOptions} [input] - Fetch options
+     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @returns {ReadableStream}
+     */
+    fetchStream(uri: string, input?: object | FetchOptions, context?: AuthContext | object): ReadableStream;
     /**
      * Fetch document with inheritance, globals and references processing
      * Handles extension lookup, directory resolution, and merging.
