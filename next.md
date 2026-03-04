@@ -15,6 +15,7 @@
 - ~~**Streaming fetch**~~: `fetchStream(uri)` returns ReadableStream, overridable by drivers
 - ~~**DBDriverProtocol tests**~~: Full test suite — 26 tests covering all protocol methods + delegation
 - ~~**Knip + Audit**~~: `knip --production` and `pnpm audit --prod` in test:all pipeline
+- ~~**Logging cleanup**~~: Fixed `[object Object]` in logs (attachment, mounting, detachment) using string templates.
 
 ## Next
 

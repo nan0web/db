@@ -56,7 +56,7 @@ export default class DBDriverProtocol {
      * @param {AuthContext} [context=new AuthContext()]
      * @returns {Promise<boolean | void>} - TRUE if allowed, FALSE if denied, undefined if not realized.
      */
-    access(absoluteURI: string, level: 'r' | 'w' | 'd', context?: AuthContext | undefined): Promise<boolean | void>;
+    access(absoluteURI: string, level: "r" | "w" | "d", context?: AuthContext): Promise<boolean | void>;
     /**
      * Loads a document
      * Reads content from storage.

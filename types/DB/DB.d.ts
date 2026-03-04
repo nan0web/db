@@ -165,7 +165,7 @@ export default class DB {
      * @param {string} uri - URI to unwatch
      * @param {Function} [callback] - Specific callback to remove
      */
-    unwatch(uri: string, callback?: Function | undefined): void;
+    unwatch(uri: string, callback?: Function): void;
     /**
      * Registers a Model class for a URI prefix.
      * When fetch() returns data, it will be hydrated through the Model.
@@ -330,7 +330,7 @@ export default class DB {
      * @param {string} [to=this.root] Target directory path
      * @returns {string} Relative path
      */
-    relative(from: string, to?: string | undefined): string;
+    relative(from: string, to?: string): string;
     /**
      * Get string representation of the database
      * @returns {string} Formatted string like "DB /root [utf-8]"
@@ -352,7 +352,7 @@ export default class DB {
             current: any;
             total: any;
         }) => void) | undefined;
-    } | undefined): Promise<{
+    }): Promise<{
         total: number;
         processed: number;
         ignored: number;
@@ -372,7 +372,7 @@ export default class DB {
      * @param {number} [depth=0] The depth level.
      * @returns
      */
-    _buildRecursiveDirectoryTree(dirPath: string, entries?: [string, DocumentStat][] | undefined, depth?: number | undefined): Promise<[string, DocumentStat][]>;
+    _buildRecursiveDirectoryTree(dirPath: string, entries?: Array<[string, DocumentStat]>, depth?: number): Promise<[string, DocumentStat][]>;
     /**
      * Reads the content of a directory at the specified URI.
      * For FetchDB it loads index.txt or manifest.json.
@@ -402,14 +402,14 @@ export default class DB {
         skipSymbolicLink?: boolean | undefined;
         skipIndex?: boolean | undefined;
         filter?: Function | undefined;
-    } | undefined): AsyncGenerator<DocumentEntry, void, unknown>;
+    }): AsyncGenerator<DocumentEntry, void, unknown>;
     /**
      * Reads a specific branch at given depth
      * @param {string} uri - URI for the branch
      * @param {number} [depth=-1] - Depth of read
      * @returns {Promise<AsyncGenerator<DocumentEntry, void, unknown>>}
      */
-    readBranch(uri: string, depth?: number | undefined): Promise<AsyncGenerator<DocumentEntry, void, unknown>>;
+    readBranch(uri: string, depth?: number): Promise<AsyncGenerator<DocumentEntry, void, unknown>>;
     /**
      * Ensures DB is connected. Throws if connection fails.
      * @returns {Promise<void>}
@@ -423,7 +423,7 @@ export default class DB {
      * @yields {string} Full URI path of found documents
      * @returns {AsyncGenerator<string, void, unknown>}
      */
-    find(uri: string | ((path: string) => boolean), depth?: number | undefined): AsyncGenerator<string, void, unknown>;
+    find(uri: string | ((path: string) => boolean), depth?: number): AsyncGenerator<string, void, unknown>;
     /**
      * Connects to the database. This method should be overridden by subclasses.
      * Initializes in-memory data from predefined and builds directory metadata.
@@ -511,7 +511,7 @@ export default class DB {
      * @param {string | true} [removeSuffix] - Suffix to remove or true for extension
      * @returns {string}
      */
-    basename(uri: string, removeSuffix?: string | true | undefined): string;
+    basename(uri: string, removeSuffix?: string | true): string;
     /**
      * Returns directory name of URI
      * @param {string} uri
@@ -591,7 +591,7 @@ export default class DB {
      * @returns {Promise<void>}
      * @throws {Error} - Access denied
      */
-    ensureAccess(uri: string, level?: "r" | "w" | "d" | undefined, context?: AuthContext | object): Promise<void>;
+    ensureAccess(uri: string, level?: "r" | "w" | "d", context?: AuthContext | object): Promise<void>;
     /**
      * Synchronize data with persistent storage
      * Saves changed documents where local mtime > remote stat mtime.
@@ -650,7 +650,7 @@ export default class DB {
         skipStat?: boolean | undefined;
         skipSymbolicLink?: boolean | undefined;
         load?: boolean | undefined;
-    } | undefined): AsyncGenerator<StreamEntry, void, unknown>;
+    }): AsyncGenerator<StreamEntry, void, unknown>;
     /**
      * Returns TRUE if uri is a data file.
      * Checks against supported DATA_EXTNAMES.
@@ -709,7 +709,7 @@ export default class DB {
      * @param {Set<string>} [visited=new Set()] - For internal circular reference protection
      * @returns {Promise<any>} Merged data object
      */
-    fetchMerged(uri: string, opts?: FetchOptions | undefined, contextOrVisited?: AuthContext | Set<string> | undefined, visited?: Set<string> | undefined): Promise<any>;
+    fetchMerged(uri: string, opts?: FetchOptions, contextOrVisited?: AuthContext | Set<string>, visited?: Set<string>): Promise<any>;
     _findReferenceKeys(flat: any): any;
     _getParentReferenceKey(key: any): any;
     /**
@@ -721,7 +721,7 @@ export default class DB {
      * @param {Set<string>} [visited] - Set of visited URIs to prevent circular references
      * @returns {Promise<object>} Data with resolved references
      */
-    resolveReferences(data: object, basePath?: string | undefined, opts?: object | FetchOptions, visited?: Set<string> | undefined): Promise<object>;
+    resolveReferences(data: object, basePath?: string, opts?: object | FetchOptions, visited?: Set<string>): Promise<object>;
     /**
      * Auto-updates index.jsonl and index.txt after document save for all parent directories
      * @param {string} uri - URI of saved document
@@ -734,13 +734,13 @@ export default class DB {
      * @param {Array<[string, DocumentStat]>} [entries] Document entries with their paths, if not provided this.meta is used.
      * @returns {Promise<void>}
      */
-    saveIndex(dirUri: string, entries?: [string, DocumentStat][] | undefined): Promise<void>;
+    saveIndex(dirUri: string, entries?: Array<[string, DocumentStat]>): Promise<void>;
     /**
      * Loads index data from either index.jsonl or index.txt file
      * @param {string} [dirUri] Directory URI where index file is located
      * @returns {Promise<DirectoryIndex>} Index data.
      */
-    loadIndex(dirUri?: string | undefined): Promise<DirectoryIndex>;
+    loadIndex(dirUri?: string): Promise<DirectoryIndex>;
     #private;
 }
 import DBDriverProtocol from './DriverProtocol.js';

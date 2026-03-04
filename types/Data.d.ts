@@ -7,7 +7,7 @@
  * @param {Object} [res={}] - Result object (used recursively).
  * @returns {Object} Flattened object with path keys.
  */
-export function flatten(obj: any, parent?: string | undefined, res?: any): any;
+export function flatten(obj: any, parent?: string, res?: any, visited?: Set<any>): any;
 /**
  * Unflattens an object with path-like keys into a nested structure.
  * Handles array indices and ensures objects are created before assignment.
@@ -26,7 +26,7 @@ export function unflatten(data: any): any;
  * @param {Object} source - The source object to merge from.
  * @returns {Object} The merged object.
  */
-export function merge(target: any, source: any): any;
+export function merge(target: any, source: any, visited?: Map<any, any>): any;
 /**
  * Finds a value in an object by path.
  * Supports array indices via wrapper (e.g., '[0]').
@@ -60,7 +60,7 @@ export function mergeFlat(target: Array<Array<string, any>>, source: Array<Array
  * @param {string} [parentKey] - Optional parent key to avoid recomputation.
  * @returns {Array<Array<string, any>>} Flat sibling entries.
  */
-export function flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string | undefined): Array<Array<string, any>>;
+export function flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string): Array<Array<string, any>>;
 export default Data;
 /**
  * Data manipulation utilities for flattening/unflattening objects and deep merging.
@@ -127,7 +127,7 @@ declare class Data {
      * @param {Object} [res={}] - Result object (used recursively).
      * @returns {Object} Flattened object with path keys.
      */
-    static flatten(obj: any, parent?: string | undefined, res?: any): any;
+    static flatten(obj: any, parent?: string, res?: any, visited?: Set<any>): any;
     /**
      * Finds a value in an object by path.
      * Supports array indices via wrapper (e.g., '[0]').
@@ -147,7 +147,7 @@ declare class Data {
      * @param {boolean} [skipScalar=false] - Whether to skip scalar values.
      * @returns {{value: any, path: string[]}} Object with found value and path.
      */
-    static findValue(path: string[], obj: any, skipScalar?: boolean | undefined): {
+    static findValue(path: string[], obj: any, skipScalar?: boolean): {
         value: any;
         path: string[];
     };
@@ -169,7 +169,7 @@ declare class Data {
      * @param {Object} source - The source object to merge from.
      * @returns {Object} The merged object.
      */
-    static merge(target: any, source: any): any;
+    static merge(target: any, source: any, visited?: Map<any, any>): any;
     /**
      * Merges two flat [path, value] arrays into one flat array.
      * Handles $ref objects by expanding their properties into the path.
@@ -201,7 +201,7 @@ declare class Data {
      * @param {string} [parentKey] - Optional parent key to avoid recomputation.
      * @returns {Array<Array<string, any>>} Flat sibling entries.
      */
-    static flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string | undefined): Array<Array<string, any>>;
+    static flatSiblings(flat: Array<Array<string, any>> | any, key: string, parentKey?: string): Array<Array<string, any>>;
     /**
      * Gets all parent paths of a given path.
      * Includes root if not avoided; appends suffix to each.
@@ -211,5 +211,5 @@ declare class Data {
      * @param {boolean} [avoidRoot=false] - Whether to exclude the root path.
      * @returns {string[]} Array of parent paths.
      */
-    static getPathParents(path: string, suffix?: string | undefined, avoidRoot?: boolean | undefined): string[];
+    static getPathParents(path: string, suffix?: string, avoidRoot?: boolean): string[];
 }

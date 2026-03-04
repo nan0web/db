@@ -550,7 +550,8 @@ function testRender() {
 	 */
 	it('How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)', async () => {
 		/** @docs */
-		const text = await fs.loadDocument('CONTRIBUTING.md')
+		let text = await fs.loadDocument('CONTRIBUTING.md')
+		if (text && typeof text === 'object' && text.content) text = text.content
 		assert.ok(String(text).includes('# Contributing'))
 	})
 
@@ -577,8 +578,9 @@ describe('Rendering README.md', async () => {
 	await fs.saveDocument('.datasets/README.dataset.jsonl', dataset)
 
 	it(`Document is rendered in README.md [${format(Buffer.byteLength(text))} bytes]`, async () => {
-		const text = await fs.loadDocument('README.md')
-		assert.ok(text.includes('# @nan0web/db'))
-		assert.ok(text.includes('## License'))
+		let text = await fs.loadDocument('README.md')
+		if (text && typeof text === 'object' && text.content) text = text.content
+		assert.ok(String(text).includes('# @nan0web/db'))
+		assert.ok(String(text).includes('## License'))
 	})
 })

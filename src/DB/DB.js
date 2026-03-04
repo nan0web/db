@@ -25,10 +25,16 @@ import {
 class TTLMap extends Map {
 	/**
 	 * @param {number} ttl - Cache life time in miliseconds.
+	 * @param {Iterable<[any, any]>} [entries] - Initial entries.
 	 */
-	constructor(ttl) {
+	constructor(ttl, entries) {
 		super()
 		this.ttl = ttl
+		if (entries) {
+			for (const [k, v] of entries) {
+				this.set(k, v)
+			}
+		}
 	}
 	/**
 	 * @param {any} key
@@ -190,10 +196,8 @@ export default class DB {
 		this.cwd = cwd
 		this.driver = this.Driver.from(driver ?? { cwd, root })
 		this.ttl = Number(ttl || 0)
-		this.data = new TTLMap(this.ttl)
-		this.meta = new TTLMap(this.ttl)
-		this.data = data instanceof Map ? data : new Map(data)
-		this.meta = meta instanceof Map ? meta : new Map(meta)
+		this.data = data instanceof Map ? data : new TTLMap(this.ttl, data)
+		this.meta = meta instanceof Map ? meta : new TTLMap(this.ttl, meta)
 		this.context = AuthContext.from(context)
 		this.#console = consoleInput
 		this.connected = connected
@@ -383,12 +387,32 @@ export default class DB {
 			return { valid: false, errors: [{ field: '*', message: 'Data is not an object' }] }
 		}
 
-		// Check each static field that looks like a schema descriptor { help, default }
-		for (const key of Object.getOwnPropertyNames(ModelClass)) {
-			const descriptor = ModelClass[key]
-			if (descriptor == null || typeof descriptor !== 'object') continue
-			if (!('default' in descriptor)) continue
+		// Collect all field descriptors from the prototype chain
+		const schema = new Map()
+		let current = ModelClass
+		const restricted = new Set(['arguments', 'caller', 'callee', 'prototype'])
+		while (current && current !== Object) {
+			for (const key of Object.getOwnPropertyNames(current)) {
+				if (restricted.has(key)) continue
+				try {
+					const descriptor = current[key]
+					if (
+						descriptor &&
+						typeof descriptor === 'object' &&
+						'default' in descriptor &&
+						!schema.has(key)
+					) {
+						schema.set(key, descriptor)
+					}
+				} catch {
+					// Skip properties that cannot be accessed
+				}
+			}
+			current = Object.getPrototypeOf(current)
+		}
 
+		// Check each field against the collected schema
+		for (const [key, descriptor] of schema) {
 			const expected = typeof descriptor.default
 			if (key in data) {
 				const actual = typeof data[key]
@@ -493,7 +517,7 @@ export default class DB {
 		}
 		const normalized = this.normalize(path).replace(/\/$/, '')
 		this.mounts.set(normalized, db)
-		this.console.info(`Mounted DB at ${normalized}`, { root: db.root })
+		this.console.info(`Mounted DB at ${normalized} (root: ${db.root})`)
 		// Sort mounts by length descending to match most specific prefix first
 		this.mounts = new Map([...this.mounts.entries()].sort((a, b) => b[0].length - a[0].length))
 	}
@@ -538,7 +562,7 @@ export default class DB {
 			throw new TypeError('It is possible to attach only DB or extended databases')
 		}
 		this.dbs.push(db)
-		this.console.info('Database attached', { root: db.root, cwd: db.cwd })
+		this.console.info(`Database attached: ${db}`)
 	}
 
 	/**
@@ -549,11 +573,11 @@ export default class DB {
 	detach(db) {
 		const index = this.dbs.findIndex((d) => d.root === db.root && d.cwd === db.cwd)
 		if (index < 0) {
-			this.console.warn('Database not found for detachment', { root: db.root, cwd: db.cwd })
+			this.console.warn(`Database not found for detachment: ${db}`)
 			return false
 		}
 		const detached = this.dbs.splice(index, 1)
-		this.console.info('Database detached', { root: db.root, cwd: db.cwd })
+		this.console.info(`Database detached: ${db}`)
 		return detached
 	}
 
@@ -629,7 +653,7 @@ export default class DB {
 	 * @returns {string} Formatted string like "DB /root [utf-8]"
 	 */
 	toString() {
-		return this.constructor.name + ' ' + this.root + ' [' + this.encoding + ']'
+		return this.constructor.name + ' ' + this.cwd + '#' + this.root + ' [' + this.encoding + ']'
 	}
 
 	/**

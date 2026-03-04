@@ -36,7 +36,7 @@ export default class DirectoryIndex {
      * @param {boolean} [inc=false] - Is path incremental or full
      * @returns {string[]} Array of encoded rows.
      */
-    static encodeRows(entries: Array<[string, DocumentStat]>, columns?: string[] | undefined, inc?: boolean | undefined): string[];
+    static encodeRows(entries: Array<[string, DocumentStat]>, columns?: string[], inc?: boolean): string[];
     /**
      * Checks if a given path represents an index.
      * Matches index.txt or dir/index.txt.
@@ -134,7 +134,7 @@ export default class DirectoryIndex {
         dir?: string | undefined;
         long?: boolean | undefined;
         inc?: boolean | undefined;
-    } | undefined): string;
+    }): string;
 }
 import DocumentStat from './DocumentStat.js';
 import Directory from './Directory.js';

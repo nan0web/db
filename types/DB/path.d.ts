@@ -25,7 +25,7 @@ export function resolveSync(cwd: string, root: string, ...args: string[]): strin
  * @param {string|true} [removeSuffix] - Suffix to remove or true for extension
  * @returns {string}
  */
-export function basename(uri: string, removeSuffix?: string | true | undefined): string;
+export function basename(uri: string, removeSuffix?: string | true): string;
 /**
  * Returns directory name of URI.
  *

@@ -31,7 +31,7 @@ export default class AuthContext {
         roles?: string[] | undefined;
         user?: any;
         fails?: any[] | undefined;
-    } | undefined);
+    });
     /** @type {string} */
     username: string;
     /** @type {string} */

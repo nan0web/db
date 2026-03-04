@@ -130,7 +130,7 @@ suite('DB', () => {
 	describe('toString', () => {
 		it('should return formatted string representation', () => {
 			const dbInstance = new DB({ root: '/test' })
-			assert.match(dbInstance.toString(), /^DB \/test \[utf-8\]$/)
+			assert.match(dbInstance.toString(), /^DB .#\/test \[utf-8\]$/)
 		})
 	})
 

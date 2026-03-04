@@ -76,7 +76,11 @@ class Data {
 	 * @param {Object} [res={}] - Result object (used recursively).
 	 * @returns {Object} Flattened object with path keys.
 	 */
-	static flatten(obj, parent = '', res = {}) {
+	static flatten(obj, parent = '', res = {}, visited = new Set()) {
+		if (obj && typeof obj === 'object' && null !== obj) {
+			if (visited.has(obj)) return res
+			visited.add(obj)
+		}
 		for (let key in obj) {
 			if (Object.hasOwn(obj, key)) {
 				const corrKey = Array.isArray(obj)
@@ -91,7 +95,7 @@ class Data {
 					) {
 						res[propName] = obj[key]
 					} else {
-						Data.flatten(obj[key], propName, res)
+						Data.flatten(obj[key], propName, res, visited)
 					}
 				} else {
 					res[propName] = obj[key]
@@ -259,34 +263,33 @@ class Data {
 	 * @param {Object} source - The source object to merge from.
 	 * @returns {Object} The merged object.
 	 */
-	static merge(target, source) {
-		let newTarget = JSON.parse(JSON.stringify(target))
+	static merge(target, source, visited = new Map()) {
+		if (source === null || typeof source !== 'object') return source
+		if (visited.has(source)) return visited.get(source)
+
+		// Arrays are replaced, not merged
+		if (Array.isArray(source)) {
+			if (
+				source.length > 0 &&
+				typeof source[0] === 'object' &&
+				source[0] !== null &&
+				source[0].$clear
+			) {
+				return source.filter((v) => !(v !== null && typeof v === 'object' && v.$clear))
+			}
+			return [...source]
+		}
+
+		// Merging object into target. Ensure result is an object.
+		const result =
+			target !== null && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {}
+		visited.set(source, result)
 
 		for (const key in source) {
 			if (!Object.hasOwn(source, key)) continue
-			if (source[key] && typeof source[key] === 'object') {
-				if (Array.isArray(source[key])) {
-					if (
-						source[key].length > 0 &&
-						typeof source[key][0] === 'object' &&
-						source[key][0] !== null &&
-						source[key][0].$clear
-					) {
-						newTarget[key] = source[key].filter(
-							(v) => !(v !== null && typeof v === 'object' && v.$clear),
-						)
-					} else {
-						newTarget[key] = source[key].slice()
-					}
-				} else {
-					newTarget[key] = newTarget[key] || {}
-					newTarget[key] = Data.merge(newTarget[key], source[key])
-				}
-			} else {
-				newTarget[key] = source[key]
-			}
+			result[key] = Data.merge(result[key], source[key], visited)
 		}
-		return newTarget
+		return result
 	}
 
 	/**
