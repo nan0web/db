@@ -1,6 +1,8 @@
 /.cache/
 /.datasets/
 /.coverage/
+/.agent
+.vscode/
 chat/
 node_modules/
 test-auth-data/
