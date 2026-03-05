@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-03-05
+
+### Fixed
+
+- **Cross-driver references**: resolved circular references and deep inheritance across mounted and attached instances. Enhanced `fetch()` with `visited` tracking to prevent infinite loops.
+
 ## [1.3.0] - 2026-02-25
 
 ### Added

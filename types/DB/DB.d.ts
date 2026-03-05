@@ -691,7 +691,7 @@ export default class DB {
      * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>}
      */
-    fetch(uri: string, input?: object | FetchOptions, context?: AuthContext | object): Promise<any>;
+    fetch(uri: string, input?: object | FetchOptions, contextOrVisited?: AuthContext, visited?: Set<any>): Promise<any>;
     /**
      * Primary fetch logic — extracted for fallback chain support.
      * @param {string} uri
@@ -699,7 +699,7 @@ export default class DB {
      * @param {AuthContext | object} [context=this.context] - Auth context
      * @returns {Promise<any>}
      */
-    _fetchPrimary(uri: string, input?: object | FetchOptions, context?: AuthContext | object): Promise<any>;
+    _fetchPrimary(uri: string, input?: object | FetchOptions, context?: AuthContext | object, visited?: Set<any>): Promise<any>;
     /**
      * Merges data from multiple sources following nano-db-fetch patterns.
      * Handles inheritance, globals, and references with circular protection.

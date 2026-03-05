@@ -1716,17 +1716,24 @@ export default class DB {
 	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>}
 	 */
-	async fetch(uri, input = {}, context = this.context) {
-		const mount = this._findMount(uri)
-		if (mount) return mount.db.fetch(mount.subUri, input, context)
+	async fetch(uri, input = {}, contextOrVisited = this.context, visited = new Set()) {
+		let context = contextOrVisited
+		let visitedSet = visited
+		if (contextOrVisited instanceof Set) {
+			visitedSet = contextOrVisited
+			context = this.context
+		}
 
-		let result = await this._fetchPrimary(uri, input, context)
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.fetch(mount.subUri, input, context, visitedSet)
+
+		let result = await this._fetchPrimary(uri, input, context, visitedSet)
 
 		// Fallback chain: if primary returned nothing and we have attached DBs
 		if (result == null && this.dbs.length > 0) {
 			for (const fallbackDB of this.dbs) {
 				try {
-					const fallbackResult = await fallbackDB.fetch(uri, input, context)
+					const fallbackResult = await fallbackDB.fetch(uri, input, context, visitedSet)
 					if (fallbackResult != null) {
 						this.emit('fallback', { uri, from: this, to: fallbackDB })
 						result = fallbackResult
@@ -1756,7 +1763,7 @@ export default class DB {
 	 * @param {AuthContext | object} [context=this.context] - Auth context
 	 * @returns {Promise<any>}
 	 */
-	async _fetchPrimary(uri, input = {}, context = this.context) {
+	async _fetchPrimary(uri, input = {}, context = this.context, visited = new Set()) {
 		let opts
 		if (context !== undefined) {
 			opts = FetchOptions.from(input)
@@ -1787,7 +1794,7 @@ export default class DB {
 						const path = this.resolveSync(uri, this.Directory.INDEX + extname)
 						const stat = await this.statDocument(path, authContext)
 						if (stat.exists) {
-							return await this.fetchMerged(path, opts, authContext)
+							return await this.fetchMerged(path, opts, authContext, visited)
 						}
 					} while (extname)
 				} catch (/** @type {any} */ err) {
@@ -1802,7 +1809,7 @@ export default class DB {
 				const fullUri = uri + extension
 				const stat = await this.statDocument(fullUri, authContext)
 				if (stat.exists) {
-					return await this.fetchMerged(fullUri, opts, authContext)
+					return await this.fetchMerged(fullUri, opts, authContext, visited)
 				}
 			}
 
@@ -1827,7 +1834,7 @@ export default class DB {
 
 		// Try to load as file with extension
 		try {
-			const result = await this.fetchMerged(uri, opts, authContext)
+			const result = await this.fetchMerged(uri, opts, authContext, visited)
 			return result
 		} catch (/** @type {any} */ err) {
 			// If it's a potential directory and directories are allowed, try as directory
@@ -1837,7 +1844,7 @@ export default class DB {
 					if (indexPath === uri) {
 						throw new Error('Impossible to have the same directory path as a request uri')
 					}
-					const result = await this.fetchMerged(indexPath, opts, authContext)
+					const result = await this.fetchMerged(indexPath, opts, authContext, visited)
 					return result
 				} catch (/** @type {any} */ indexErr) {
 					// If index file doesn't exist, return listing
@@ -1996,10 +2003,10 @@ export default class DB {
 
 				if (absPath.includes('#')) {
 					const [filePath, fragment] = absPath.split('#')
-					const targetData = await this.loadDocument(filePath)
+					const targetData = await this.fetch(filePath, { ...opts, references: false }, visited)
 					refValue = this.Data.find(fragment.split('/').filter(Boolean), targetData) ?? undefined
 				} else {
-					refValue = await this.fetchMerged(absPath, opts, visited)
+					refValue = await this.fetch(absPath, opts, visited)
 				}
 
 				if (refValue === undefined) {
