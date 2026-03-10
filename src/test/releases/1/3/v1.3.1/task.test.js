@@ -1,7 +1,7 @@
 import { it, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { DB, Data } from '../../../../src/index.js'
-import { DBFS } from '../../../../../db-fs/src/index.js'
+import { DB, Data } from '../../../../../index.js'
+import { DBFS } from '../../../../../../../db-fs/src/index.js'
 import { NoConsole } from '@nan0web/log'
 
 describe('Реліз v1.3.1: Контрактні тести', () => {

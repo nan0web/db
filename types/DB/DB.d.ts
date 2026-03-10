@@ -75,6 +75,7 @@ export default class DB {
      * @param {DB[]} [input.dbs=[]] - Attached sub-databases
      * @param {Function | Map<string, Function>} [input.models] - Model class(es) for hydration
      * @param {Function} [input.Model] - Shorthand: single Model class for all URIs
+     * @param {Record<string, string>} [input.aliases={}] - URI aliases for virtual projection
      * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
      */
     constructor(input?: {
@@ -90,6 +91,7 @@ export default class DB {
         dbs?: DB[] | undefined;
         models?: Function | Map<string, Function> | undefined;
         Model?: Function | undefined;
+        aliases?: Record<string, string> | undefined;
         console?: Console | NoConsole | undefined;
     });
     /** @type {DBDriverProtocol} */
@@ -118,8 +120,18 @@ export default class DB {
     models: Map<string, Function>;
     /** @type {Map} */
     predefined: Map<any, any>;
+    /** @type {Record<string, string>} URI aliases for virtual projection */
+    aliases: Record<string, string>;
     /** @type {Map<string, any>} */
     _inheritanceCache: Map<string, any>;
+    /**
+     * Resolves a URI alias. If the URI matches a registered alias,
+     * returns the real target URI. Otherwise returns the original URI unchanged.
+     * Used for virtual projection of files (e.g., docs/en/README.md → ./README.md).
+     * @param {string} uri - The URI to resolve
+     * @returns {string} The resolved URI (alias target or original)
+     */
+    resolveAlias(uri: string): string;
     /**
      * Returns whether the database directory has been loaded
      * @returns {boolean}
@@ -688,10 +700,11 @@ export default class DB {
      * Handles extension lookup, directory resolution, and merging.
      * @param {string} uri
      * @param {object | FetchOptions} [input]
-     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @param {AuthContext | object | Set<string>} [contextOrVisited=this.context] - Auth context or visited set
+     * @param {Set<string>} [visited] - Set of visited URIs for circular reference detection
      * @returns {Promise<any>}
      */
-    fetch(uri: string, input?: object | FetchOptions, contextOrVisited?: AuthContext, visited?: Set<any>): Promise<any>;
+    fetch(uri: string, input?: object | FetchOptions, contextOrVisited?: AuthContext | object | Set<string>, visited?: Set<string>): Promise<any>;
     /**
      * Primary fetch logic — extracted for fallback chain support.
      * @param {string} uri

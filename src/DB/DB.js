@@ -143,6 +143,8 @@ export default class DB {
 	models = new Map()
 	/** @type {Map} */
 	predefined = new Map()
+	/** @type {Record<string, string>} URI aliases for virtual projection */
+	aliases = {}
 	/** @type {Console | NoConsole} */
 	#console
 	/** @type {Map<string, Function[]>} */
@@ -174,6 +176,7 @@ export default class DB {
 	 * @param {DB[]} [input.dbs=[]] - Attached sub-databases
 	 * @param {Function | Map<string, Function>} [input.models] - Model class(es) for hydration
 	 * @param {Function} [input.Model] - Shorthand: single Model class for all URIs
+	 * @param {Record<string, string>} [input.aliases={}] - URI aliases for virtual projection
 	 * @param {Console | NoConsole} [input.console=new NoConsole()] - Logging console
 	 */
 	constructor(input = {}) {
@@ -188,6 +191,7 @@ export default class DB {
 			dbs = this.dbs,
 			predefined = this.predefined,
 			ttl = this.ttl,
+			aliases = this.aliases,
 			models,
 			Model,
 			console: consoleInput = new NoConsole({ silent: true }),
@@ -211,11 +215,23 @@ export default class DB {
 		// Then attach another DB instances, that will be initialized with the root
 		this.dbs = dbs.map((from) => DB.from(from))
 		this.predefined = predefined instanceof Map ? predefined : new Map(predefined)
+		this.aliases = aliases
 		// Model hydration: normalize to Map<prefix, ModelClass>
 		if (models instanceof Map) this.models = models
 		else if (typeof models === 'function') this.models = new Map([['/', models]])
 		else if (typeof Model === 'function') this.models = new Map([['/', Model]])
 		this.console.info('DB instance created', String(this))
+	}
+
+	/**
+	 * Resolves a URI alias. If the URI matches a registered alias,
+	 * returns the real target URI. Otherwise returns the original URI unchanged.
+	 * Used for virtual projection of files (e.g., docs/en/README.md → ./README.md).
+	 * @param {string} uri - The URI to resolve
+	 * @returns {string} The resolved URI (alias target or original)
+	 */
+	resolveAlias(uri) {
+		return this.aliases[uri] ?? uri
 	}
 
 	/**
@@ -1082,6 +1098,15 @@ export default class DB {
 	 * @returns {Promise<string>} Resolved absolute path
 	 */
 	async resolve(...args) {
+		if (args.length > 0) {
+			const aliased = this.resolveAlias(args[0])
+			if (aliased !== args[0]) {
+				this.console.debug('resolve() alias hit', { aliased })
+				// Return the raw alias directly, without virtual boundaries,
+				// so that it can point outside the root.
+				return Promise.resolve(aliased)
+			}
+		}
 		this.console.debug('resolve()', { args })
 		return Promise.resolve(this.resolveSync(...args))
 	}
@@ -1713,7 +1738,8 @@ export default class DB {
 	 * Handles extension lookup, directory resolution, and merging.
 	 * @param {string} uri
 	 * @param {object | FetchOptions} [input]
-	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @param {AuthContext | object | Set<string>} [contextOrVisited=this.context] - Auth context or visited set
+	 * @param {Set<string>} [visited] - Set of visited URIs for circular reference detection
 	 * @returns {Promise<any>}
 	 */
 	async fetch(uri, input = {}, contextOrVisited = this.context, visited = new Set()) {

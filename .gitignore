@@ -7,3 +7,7 @@ chat/
 node_modules/
 test-auth-data/
 me.md
+
+# Private agent under LICENSE
+.agent/
+reports/
