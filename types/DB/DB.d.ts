@@ -276,22 +276,39 @@ export default class DB {
     /**
      * Mounts a database instance to a path prefix.
      * All requests to URIs starting with this prefix will be routed to the mounted DB.
-     * @param {string} path - The virtual path prefix (e.g. '/cache')
+     * @param {string} path - The virtual path prefix (e.g. '~', '@public')
      * @param {DB} db - The database instance to mount
      * @throws {TypeError} If non-DB instance is provided
+     * @throws {Error} If mount registry has been sealed
      */
     mount(path: string, db: DB): void;
     /**
      * Unmounts a database from a path.
      * @param {string} path
      * @returns {boolean} TRUE if mount existed and was removed
+     * @throws {Error} If mount registry has been sealed
      */
     unmount(path: string): boolean;
     /**
+     * Seals the mount registry, preventing any further mount/unmount operations.
+     * Call after all databases are mounted during initialization.
+     * This prevents plugin or untrusted code from hijacking mount points.
+     * @returns {void}
+     */
+    seal(): void;
+    /**
+     * Returns whether the mount registry is sealed.
+     * @returns {boolean}
+     */
+    get sealed(): boolean;
+    /**
      * Finds the mounted DB for a given URI.
      * Uses longest-prefix matching (most specific mount wins).
+     * Throws a clear error if URI targets a reserved mount prefix
+     * (tilde or at-sign) that has not been mounted — prevents silent null returns.
      * @param {string} uri
      * @returns {{ db: DB, subUri: string } | null}
+     * @throws {Error} If URI targets an unmounted reserved prefix
      */
     _findMount(uri: string): {
         db: DB;

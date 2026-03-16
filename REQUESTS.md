@@ -64,3 +64,24 @@ resolveAlias(uri) {
 - [x] Інтегрувати `resolveAlias()` у `resolve()` для наскрізної роботи.
 - [x] Оновити JSDoc типи: `aliases?: Record<string, string>`.
 - [x] Тест: `task.spec.js` — 3 кейси (constructor, resolve hit, resolve miss + інтеграція resolve).
+
+## From @nan0web/ui-cli (i18n key parsing)
+
+### Request #2026-03-16-01: Slash in YAML keys parsed as nested path
+
+- **Priority:** 🟡 Medium
+- **Status:** 🔴 Open
+
+**Problem:**
+Translation files in `data/{locale}/*/t.yaml` or `index.yaml` have an issue with keys containing slashes (e.g. `Manage / Update Agent Workflows`). When parsing YAML documents, `@nan0web/db` splits keys containing slashes, transforming them into nested sub-objects (e.g., `{"Manage ": {" Update Agent Workflows": "..."}}`).
+
+This creates friction with `createT` from `@nan0web/i18n` because `t("Manage / Update Agent Workflows")` looks for an exact string match rather than a nested object derived from slashes.
+
+**Question:** Is this intentional path-like behavior for document keys, or an unexpected parsing artifact? We need either a formalized standard or a patch for `DBFS.fetch()` / YAML parsing to preserve literal string keys containing slashes.
+
+**Tasks:**
+
+- [ ] Investigate: `Data.unflatten()` — does `OBJECT_DIVIDER` trigger on `/`?
+- [ ] Decide: preserve literal keys vs. formalize path convention.
+- [ ] Fix or document the behavior.
+

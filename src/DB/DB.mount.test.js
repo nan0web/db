@@ -218,3 +218,95 @@ describe('DB.mount routing (get/set/stat/fetch)', () => {
 		assert.strictEqual(cache.data.has('local/data'), false)
 	})
 })
+
+// ─── seal() — Макіавеллі ───
+
+describe('DB.seal() — Sealed Mount Registry', () => {
+	it('seal() prevents further mount()', () => {
+		const root = new DB()
+		root.seal()
+		assert.throws(() => root.mount('cache', new DB()), {
+			message: /Mount registry is sealed/,
+		})
+	})
+
+	it('seal() prevents further unmount()', () => {
+		const root = new DB()
+		const cache = new DB()
+		root.mount('cache', cache)
+		root.seal()
+		assert.throws(() => root.unmount('cache'), {
+			message: /Mount registry is sealed/,
+		})
+	})
+
+	it('sealed getter returns correct state', () => {
+		const root = new DB()
+		assert.strictEqual(root.sealed, false)
+		root.seal()
+		assert.strictEqual(root.sealed, true)
+	})
+
+	it('mount() works normally before seal()', () => {
+		const root = new DB()
+		const home = new DB()
+		root.mount('~', home)
+		assert.strictEqual(root.mounts.size, 1)
+		root.seal()
+		assert.strictEqual(root.mounts.size, 1)
+	})
+
+	it('existing mounts remain functional after seal()', async () => {
+		const root = new DB()
+		const home = new DB()
+		await home.connect()
+		await home.set('zones', [{ name: 'Balcony' }])
+
+		root.mount('~', home)
+		root.seal()
+
+		// Routing still works
+		const data = await root.get('~/zones')
+		assert.deepStrictEqual(data, [{ name: 'Balcony' }])
+	})
+})
+
+// ─── Контракт помилок — Сократ + Джобс ───
+
+describe('DB._findMount() — Error Contract for ~ and @ prefixes', () => {
+	it('throws clear error for unmounted ~ prefix', () => {
+		const root = new DB()
+		assert.throws(() => root._findMount('~/zones'), {
+			message: /Mount point "~" not found.*Did you forget to call db\.mount/,
+		})
+	})
+
+	it('throws clear error for unmounted @private prefix', () => {
+		const root = new DB()
+		assert.throws(() => root._findMount('@private/wallet'), {
+			message: /Mount point "@private" not found.*Did you forget to call db\.mount/,
+		})
+	})
+
+	it('throws clear error for unmounted @public prefix', () => {
+		const root = new DB()
+		assert.throws(() => root._findMount('@public/images'), {
+			message: /Mount point "@public" not found.*Did you forget to call db\.mount/,
+		})
+	})
+
+	it('does NOT throw for regular unmounted paths (fallback to local)', () => {
+		const root = new DB()
+		const result = root._findMount('some/regular/path')
+		assert.strictEqual(result, null) // нормальна поведінка
+	})
+
+	it('does NOT throw for ~ when it IS mounted', () => {
+		const root = new DB()
+		const home = new DB()
+		root.mount('~', home)
+		const result = root._findMount('~/zones')
+		assert.ok(result)
+		assert.strictEqual(result.db, home)
+	})
+})

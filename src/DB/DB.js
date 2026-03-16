@@ -131,6 +131,8 @@ export default class DB {
 	context = new AuthContext()
 	/** @type {boolean} */
 	connected = false
+	/** @type {boolean} Mount registry sealed status */
+	#sealed = false
 	/** @type {string} */
 	root = '.'
 	/** @type {string} */
@@ -523,11 +525,15 @@ export default class DB {
 	/**
 	 * Mounts a database instance to a path prefix.
 	 * All requests to URIs starting with this prefix will be routed to the mounted DB.
-	 * @param {string} path - The virtual path prefix (e.g. '/cache')
+	 * @param {string} path - The virtual path prefix (e.g. '~', '@public')
 	 * @param {DB} db - The database instance to mount
 	 * @throws {TypeError} If non-DB instance is provided
+	 * @throws {Error} If mount registry has been sealed
 	 */
 	mount(path, db) {
+		if (this.#sealed) {
+			throw new Error(`Mount registry is sealed. Cannot mount '${path}' after seal().`)
+		}
 		if (!DB.isDB(db)) {
 			throw new TypeError('Mounted instance must be a DB')
 		}
@@ -542,17 +548,43 @@ export default class DB {
 	 * Unmounts a database from a path.
 	 * @param {string} path
 	 * @returns {boolean} TRUE if mount existed and was removed
+	 * @throws {Error} If mount registry has been sealed
 	 */
 	unmount(path) {
+		if (this.#sealed) {
+			throw new Error(`Mount registry is sealed. Cannot unmount '${path}' after seal().`)
+		}
 		const normalized = this.normalize(path).replace(/\/$/, '')
 		return this.mounts.delete(normalized)
 	}
 
 	/**
+	 * Seals the mount registry, preventing any further mount/unmount operations.
+	 * Call after all databases are mounted during initialization.
+	 * This prevents plugin or untrusted code from hijacking mount points.
+	 * @returns {void}
+	 */
+	seal() {
+		this.#sealed = true
+		this.console.info('Mount registry sealed')
+	}
+
+	/**
+	 * Returns whether the mount registry is sealed.
+	 * @returns {boolean}
+	 */
+	get sealed() {
+		return this.#sealed
+	}
+
+	/**
 	 * Finds the mounted DB for a given URI.
 	 * Uses longest-prefix matching (most specific mount wins).
+	 * Throws a clear error if URI targets a reserved mount prefix
+	 * (tilde or at-sign) that has not been mounted — prevents silent null returns.
 	 * @param {string} uri
 	 * @returns {{ db: DB, subUri: string } | null}
+	 * @throws {Error} If URI targets an unmounted reserved prefix
 	 */
 	_findMount(uri) {
 		const normalized = this.normalize(uri)
@@ -561,6 +593,14 @@ export default class DB {
 				const subUri = normalized.slice(prefix.length) || '/'
 				return { db, subUri: subUri.startsWith('/') ? subUri : '/' + subUri }
 			}
+		}
+		// Throw clear error for reserved prefixes that were not mounted
+		if (normalized.startsWith('~') || normalized.startsWith('@')) {
+			const prefix = normalized.split('/')[0]
+			throw new Error(
+				`Mount point "${prefix}" not found for URI "${uri}". ` +
+				`Did you forget to call db.mount('${prefix}', targetDb)?`
+			)
 		}
 		return null
 	}

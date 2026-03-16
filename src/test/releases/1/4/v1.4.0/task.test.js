@@ -1,6 +1,6 @@
 import { it, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { DB } from '../../../../src/index.js'
+import { DB } from '../../../../../index.js'
 import { NoConsole } from '@nan0web/log'
 
 describe('Реліз v1.4.0: Aliases Protocol та Стабілізація', () => {
@@ -87,7 +87,7 @@ describe('Реліз v1.4.0: Aliases Protocol та Стабілізація', ()
 
 			const regressionPath = resolve(
 				import.meta.dirname,
-				'../../../../src/test/releases/1/3/v1.3.1/task.test.js',
+				'../../../1/3/v1.3.1/task.test.js',
 			)
 
 			assert.ok(existsSync(regressionPath), `Регресійний тест має існувати: ${regressionPath}`)
