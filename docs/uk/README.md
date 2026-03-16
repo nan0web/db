@@ -1,8 +1,6 @@
 # @nan0web/db
 
-| [Статус](https://github.com/nan0web/monorepo/blob/main/system.md#написання-сценаріїв) | Документація                                                                                                                                        | Покриття тестами | Функції                            | Версія Npm |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------- | ---------- |
-| 🟢 `99.2%`                                                                            | 🧪 [English 🏴󠁧󠁢󠁥󠁮󠁧󠁿](https://github.com/nan0web/db/blob/main/README.md)<br />[Українською 🇺🇦](https://github.com/nan0web/db/blob/main/docs/uk/README.md) | 🟢 `96.3%`       | ✅ d.ts 📜 system.md 🕹️ playground | 1.1.1      |
+<!-- %PACKAGE_STATUS% -->
 
 Агностична документна база даних та утиліти для маніпуляції даними. Розроблена як
 гнучкий, мінімальний і потужний інструмент — що підтримує будь-який формат даних та
@@ -13,13 +11,25 @@
 > Кожні дані стають базою даних.
 
 Базується на реальних випадках використання, підтримує:
-
+- **VFS-маршрутизація** — `mount()` обʼєднує різні сховища в одне дерево
+- **Ланцюг fallback** — `attach()` забезпечує резервне копіювання з прозорими повідомленнями
+- **Гідрація моделей** — автоматичне перетворення простих обʼєктів у типізовані моделі
 - сплющування/розплющування об'єктів
 - глибоке злиття з обробкою посилань
 - асинхронне спискування каталогів (для fs & fetch шарів)
 - прогрес на основі потоку під час обходу
 
 Дивись як це працює в [пісочниці](#пісочниця).
+
+## Архітектура
+
+`DB` — це VFS-маршрутизатор. Монтуй різні сховища, приєднуй fallback, гідруй моделі:
+
+```
+[App] → db.fetch('/media/logo.png')  → [S3 Driver]
+        db.fetch('/cache/user_1')    → [Redis Driver]
+        db.fetch('/play/demo-app')   → [FS Driver] → Document instance
+```
 
 ## Встановлення
 
@@ -88,6 +98,7 @@ const db = new DB({
     ['data.json', { $ref: '_/index.json', key: 'val' }],
   ]),
 })
+await db.connect()
 const res = await db.fetch('data.json')
 console.info(res) // ← { global: "value", key: "val" }
 ```
@@ -137,7 +148,8 @@ console.info(result) // ← "hello"
 
 ```js
 import DB from '@nan0web/db'
-const db = new DB({ data: new Map([['file.json', { value: 'loaded' }]]) })
+const db = new DB({ predefined: [['file.json', { value: 'loaded' }]] })
+await db.connect()
 const result = await db.fetch('file')
 console.info(result) // ← { value: "loaded" }
 ```
@@ -154,20 +166,6 @@ const db = new DB()
 const res = await db.set('file.text', 'save me!')
 console.info(res) // ← "save me!"
 console.info(db.data.get('file.text')) // ← "save me!"
-```
-
-### `db.push(uri?)`
-
-Синхронізує зміни в пам'яті з зовнішніми файлами або службами.
-
-Як синхронізувати зі сховищем?
-
-```js
-import DB from '@nan0web/db'
-const db = new DB()
-await db.set('./app.json', { version: '1.0' })
-const changed = await db.push()
-console.info(changed) // ← ["./app.json"]
 ```
 
 ### `Data.flatten(data)`
@@ -202,7 +200,7 @@ console.info(nested) // ← { x: { y: { z: 7 } }, arr: [ { title: 'перший'
 
 Глибоке злиття двох об'єктів, обробляє конфлікти масивів шляхом заміни.
 
-Як зливати об’єкти глибоко?
+Як зливати об'єкти глибоко?
 
 ```js
 import { Data } from '@nan0web/db'
@@ -333,6 +331,10 @@ console.info(isAbsolute('/abs/path')) // ← true
 console.info(isAbsolute('./rel')) // ← false
 ```
 
+## Java•Script типи та автодоповнення
+
+Пакет повністю типізований за допомогою JSDoc та d.ts.
+
 ## Драйвери та розширення
 
 Драйвери розширюють DB бекендами сховищ. Наслідуйте `DBDriverProtocol` для власної логіки.
@@ -416,6 +418,38 @@ const ctx = new AuthContext()
 ctx.fail(new Error('Доступ заборонено'))
 console.info(ctx.fails) // ← [Error: Доступ заборонено]
 console.info(ctx.hasRole('admin')) // ← false
+```
+
+## Безпека VFS
+
+Після монтування всіх баз даних, `seal()` блокує реєстр монтувань.
+Будь-які подальші виклики `mount()` або `unmount()` кинуть помилку.
+Це запобігає перехопленню точок монтування ненадійними плагінами під час роботи.
+
+### Запечатування реєстру монтувань
+
+Як запечатати реєстр монтувань?
+
+```js
+import DB from '@nan0web/db'
+const db = new DB()
+const cache = new DB()
+db.mount('cache', cache)
+db.seal()
+console.info(db.sealed) // ← true
+```
+
+### Контракт помилок для зарезервованих префіксів
+
+URI, що починаються з `~` або `@`, зарезервовані для точок монтування.
+Якщо до них звертаються до монтування, DB кидає чітку помилку з підказкою:
+
+```js
+import DB from '@nan0web/db'
+const db = new DB()
+db._findMount('~/zones')
+// → Error: Mount point "~" not found for URI "~/zones".
+//   Did you forget to call db.mount('~', targetDb)?
 ```
 
 ## Допомога у розвитку

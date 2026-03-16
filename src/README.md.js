@@ -546,6 +546,46 @@ function testRender() {
 
 	/**
 	 * @docs
+	 * ## VFS Security
+	 *
+	 * After mounting all databases, `seal()` locks the mount registry.
+	 * Any further `mount()` or `unmount()` calls will throw an error.
+	 * This prevents untrusted plugins from hijacking mount points at runtime.
+	 *
+	 * ### Sealing the mount registry
+	 */
+	it('How to seal mount registry?', () => {
+		//import DB from '@nan0web/db'
+		const db = new DB()
+		const cache = new DB()
+		db.mount('cache', cache)
+		db.seal()
+		console.info(db.sealed) // ← true
+		assert.strictEqual(db.sealed, true)
+		assert.throws(() => db.mount('evil', new DB()), {
+			message: /Mount registry is sealed/,
+		})
+	})
+
+	/**
+	 * @docs
+	 * ### Reserved prefix error contract
+	 *
+	 * URIs starting with `~` or `@` are reserved for mount points.
+	 * If accessed before mounting, DB throws a clear error with a hint:
+	 */
+	it('How does DB handle unmounted reserved prefixes?', () => {
+		//import DB from '@nan0web/db'
+		const db = new DB()
+		assert.throws(() => db._findMount('~/zones'), {
+			message: /Mount point "~" not found.*Did you forget to call db\.mount/,
+		})
+		// Regular paths return null (normal fallback behavior)
+		assert.strictEqual(db._findMount('some/path'), null)
+	})
+
+	/**
+	 * @docs
 	 * ## Contributing
 	 */
 	it('How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)', async () => {

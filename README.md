@@ -354,6 +354,33 @@ ctx.fail(new Error('Access denied'))
 console.info(ctx.fails) // ← [Error: Access denied]
 console.info(ctx.hasRole('admin')) // ← false
 ```
+## VFS Security
+
+After mounting all databases, `seal()` locks the mount registry.
+Any further `mount()` or `unmount()` calls will throw an error.
+This prevents untrusted plugins from hijacking mount points at runtime.
+
+### Sealing the mount registry
+
+How to seal mount registry?
+```js
+import DB from '@nan0web/db'
+const db = new DB()
+const cache = new DB()
+db.mount('cache', cache)
+db.seal()
+console.info(db.sealed) // ← true
+```
+### Reserved prefix error contract
+
+URIs starting with `~` or `@` are reserved for mount points.
+If accessed before mounting, DB throws a clear error with a hint:
+
+How does DB handle unmounted reserved prefixes?
+```js
+import DB from '@nan0web/db'
+const db = new DB()
+```
 ## Contributing
 
 How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)
