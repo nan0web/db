@@ -1,5 +1,7 @@
 import { describe, it, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
+import fsNode from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { NoConsole } from '@nan0web/log'
 import FS from '@nan0web/db-fs'
 import { DocsParser, DatasetParser } from '@nan0web/test'
@@ -60,7 +62,7 @@ function testRender() {
 	 * - **VFS Routing** — `mount()` composes multiple storage backends into one tree
 	 * - **Fallback Chain** — `attach()` provides failover with transparent notifications
 	 * - **Model Hydration** — automatic transformation of plain objects into typed models
-	 * - object flattening/unflattening
+	 * - object flattening/unflattening (with literal slash preservation)
 	 * - deep merging with reference handling
 	 * - async directory listing (for fs & fetch layers)
 	 * - stream-based progress during traversal
@@ -286,6 +288,30 @@ function testRender() {
 
 	/**
 	 * @docs
+	 * ### Literal Slash Preservation
+	 *
+	 * Since `v1.4.2`, keys containing the `OBJECT_DIVIDER` (default `/`) are automatically
+	 * escaped during flattening and restored during unflattening. This ensures that
+	 * i18n keys like `"Manage / Update"` are not incorrectly split into nested objects.
+	 */
+	it('How to preserve literal slashes in keys?', () => {
+		//import { Data } from "@nan0web/db"
+		const obj = { 'Manage / Update': 'Керування' }
+		const flat = Data.flatten(obj)
+
+		// The slash is escaped to Unicode FRACTION SLASH '∕'
+		console.info(Object.keys(flat)[0]) // ← "Manage ∕ Update"
+
+		const unflat = Data.unflatten(flat)
+		console.info(unflat['Manage / Update']) // ← "Керування"
+
+		assert.equal(console.output()[0][1], 'Manage \u2215 Update')
+		assert.equal(console.output()[1][1], 'Керування')
+		assert.deepStrictEqual(unflat, obj)
+	})
+
+	/**
+	 * @docs
 	 * ### `Data.merge(a, b)`
 	 * Deep merges two objects, handling array conflicts by replacing.
 	 */
@@ -300,6 +326,21 @@ function testRender() {
 			y: 'two',
 			arr: [1],
 		})
+	})
+
+	/**
+	 * @docs
+	 * ### `Data.find(path, data)`
+	 *
+	 * Finds value by string path or array path. Use array path to access keys containing `/`.
+	 */
+	it('How to find value by path?', () => {
+		//import { Data } from "@nan0web/db"
+		const data = { 'I/O': 'value', nested: { item: 1 } }
+		console.info(Data.find('nested/item', data)) // ← 1
+		console.info(Data.find(['I/O'], data)) // ← "value"
+		assert.equal(console.output()[0][1], 1)
+		assert.equal(console.output()[1][1], 'value')
 	})
 
 	/**
@@ -612,7 +653,8 @@ describe('Rendering README.md', async () => {
 	let text = ''
 	const format = new Intl.NumberFormat('en-US').format
 	const parser = new DocsParser()
-	text = String(parser.decode(testRender))
+	const sourceCode = fsNode.readFileSync(fileURLToPath(import.meta.url), 'utf-8')
+	text = String(parser.decode(sourceCode))
 	await fs.saveDocument('README.md', text)
 	const dataset = DatasetParser.parse(text, pkg.name)
 	await fs.saveDocument('.datasets/README.dataset.jsonl', dataset)

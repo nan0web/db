@@ -13,7 +13,7 @@ Based on real use-cases, supports:
 - **VFS Routing** — `mount()` composes multiple storage backends into one tree
 - **Fallback Chain** — `attach()` provides failover with transparent notifications
 - **Model Hydration** — automatic transformation of plain objects into typed models
-- object flattening/unflattening
+- object flattening/unflattening (with literal slash preservation)
 - deep merging with reference handling
 - async directory listing (for fs & fetch layers)
 - stream-based progress during traversal
@@ -168,6 +168,22 @@ const nested = Data.unflatten({
 })
 console.info(nested) // ← { x: { y: { z: 7 } }, arr: [ { title: 'first' }, { title: 'second' } ] }
 ```
+### Literal Slash Preservation
+
+Since `v1.4.2`, keys containing the `OBJECT_DIVIDER` (default `/`) are automatically
+escaped during flattening and restored during unflattening. This ensures that
+i18n keys like `"Manage / Update"` are not incorrectly split into nested objects.
+
+How to preserve literal slashes in keys?
+```js
+import { Data } from "@nan0web/db"
+const obj = { 'Manage / Update': 'Керування' }
+const flat = Data.flatten(obj)
+// The slash is escaped to Unicode FRACTION SLASH '∕'
+console.info(Object.keys(flat)[0]) // ← "Manage ∕ Update"
+const unflat = Data.unflatten(flat)
+console.info(unflat['Manage / Update']) // ← "Керування"
+```
 ### `Data.merge(a, b)`
 Deep merges two objects, handling array conflicts by replacing.
 
@@ -178,6 +194,17 @@ const a = { x: { one: 1 }, arr: [0] }
 const b = { y: 'two', x: { two: 2 }, arr: [1] }
 const merged = Data.merge(a, b)
 console.info(merged) // ← { x: { one: 1, two: 2 }, y: 'two', arr: [ 1 ] }
+```
+### `Data.find(path, data)`
+
+Finds value by string path or array path. Use array path to access keys containing `/`.
+
+How to find value by path?
+```js
+import { Data } from "@nan0web/db"
+const data = { 'I/O': 'value', nested: { item: 1 } }
+console.info(Data.find('nested/item', data)) // ← 1
+console.info(Data.find(['I/O'], data)) // ← "value"
 ```
 ## Path Utilities
 

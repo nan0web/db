@@ -70,18 +70,24 @@ resolveAlias(uri) {
 ### Request #2026-03-16-01: Slash in YAML keys parsed as nested path
 
 - **Priority:** 🟡 Medium
-- **Status:** 🔴 Open
+- **Status:** ✅ DONE (16.03.2026) — v1.4.2
 
 **Problem:**
 Translation files in `data/{locale}/*/t.yaml` or `index.yaml` have an issue with keys containing slashes (e.g. `Manage / Update Agent Workflows`). When parsing YAML documents, `@nan0web/db` splits keys containing slashes, transforming them into nested sub-objects (e.g., `{"Manage ": {" Update Agent Workflows": "..."}}`).
 
 This creates friction with `createT` from `@nan0web/i18n` because `t("Manage / Update Agent Workflows")` looks for an exact string match rather than a nested object derived from slashes.
 
-**Question:** Is this intentional path-like behavior for document keys, or an unexpected parsing artifact? We need either a formalized standard or a patch for `DBFS.fetch()` / YAML parsing to preserve literal string keys containing slashes.
+**Resolution:**
+Added **escape/unescape** mechanism to `Data.flatten()`/`Data.unflatten()`:
+- `Data.escapeKey(key)` replaces literal `/` with Unicode FRACTION SLASH `∕` (U+2215)
+- `Data.unescapeKey(key)` restores it back
+- `Data._splitAndUnescape(flatKey)` used in `unflatten()` and `find()`
+- Fixed `flatSiblings()` and `_findReferenceKeys()` — removed redundant `Data.flatten()` on already-flat objects
 
 **Tasks:**
 
-- [ ] Investigate: `Data.unflatten()` — does `OBJECT_DIVIDER` trigger on `/`?
-- [ ] Decide: preserve literal keys vs. formalize path convention.
-- [ ] Fix or document the behavior.
-
+- [x] Investigate: `Data.unflatten()` — `OBJECT_DIVIDER` triggers split on `/` in key names.
+- [x] Decide: preserve literal keys ✅ (escape/unescape with Unicode FRACTION SLASH).
+- [x] Fix: `Data.flatten()` → `escapeKey()`, `Data.unflatten()` → `_splitAndUnescape()`.
+- [x] Fix: `Data.flatSiblings()` / `DB._findReferenceKeys()` — no double-flattening.
+- [x] Release: v1.4.2 contract tests (12 pass).

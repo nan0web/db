@@ -96,6 +96,8 @@ declare class Data {
     static MAX_DEEP_UNFLATTEN: number;
     /** @type {string} */
     static REFERENCE_KEY: string;
+    /** @type {string} Unicode FRACTION SLASH used as escape for literal dividers in keys */
+    static ESCAPED_DIVIDER: string;
     /**
      * Resets the array wrapper to default value.
      * @static
@@ -212,4 +214,29 @@ declare class Data {
      * @returns {string[]} Array of parent paths.
      */
     static getPathParents(path: string, suffix?: string, avoidRoot?: boolean): string[];
+    /**
+     * Escapes literal OBJECT_DIVIDER characters in a key.
+     * Replaces occurrences of the divider with ESCAPED_DIVIDER
+     * so the key survives split(OBJECT_DIVIDER) during unflatten.
+     * @static
+     * @param {string} key - The raw object key
+     * @returns {string} The escaped key
+     */
+    static escapeKey(key: string): string;
+    /**
+     * Restores escaped dividers back to the original OBJECT_DIVIDER character.
+     * @static
+     * @param {string} key - An escaped key segment
+     * @returns {string} The unescaped original key
+     */
+    static unescapeKey(key: string): string;
+    /**
+     * Splits a flat key path by OBJECT_DIVIDER and unescapes each segment.
+     * This ensures that keys which originally contained the divider character
+     * are restored to their original form after splitting.
+     * @static
+     * @param {string} flatKey - The flat key path (e.g. "menu/File ∕ Open")
+     * @returns {string[]} Array of unescaped segments
+     */
+    static _splitAndUnescape(flatKey: string): string[];
 }

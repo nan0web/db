@@ -1999,7 +1999,7 @@ export default class DB {
 	}
 
 	_findReferenceKeys(flat) {
-		if (!Array.isArray(flat)) flat = Object.entries(this.Data.flatten(flat))
+		if (!Array.isArray(flat)) flat = Object.entries(flat)
 		const inValue = this.Data.REFERENCE_KEY + ':'
 		const inKey = this.Data.REFERENCE_KEY
 		const path = this.Data.OBJECT_DIVIDER + inKey

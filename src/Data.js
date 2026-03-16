@@ -32,6 +32,8 @@ class Data {
 	static MAX_DEEP_UNFLATTEN = 99
 	/** @type {string} */
 	static REFERENCE_KEY = '$ref'
+	/** @type {string} Unicode FRACTION SLASH used as escape for literal dividers in keys */
+	static ESCAPED_DIVIDER = '\u2215'
 
 	/**
 	 * Resets the array wrapper to default value.
@@ -83,9 +85,11 @@ class Data {
 		}
 		for (let key in obj) {
 			if (Object.hasOwn(obj, key)) {
-				const corrKey = Array.isArray(obj)
+				const rawKey = Array.isArray(obj)
 					? `${Data.ARRAY_WRAPPER[0]}${key}${Data.ARRAY_WRAPPER[1]}`
 					: key
+				// Escape literal dividers inside key names so they survive split()
+				const corrKey = Data.escapeKey(rawKey)
 				const propName = parent ? `${parent}${Data.OBJECT_DIVIDER}${corrKey}` : corrKey
 				if (typeof obj[key] === 'object' && null !== obj[key]) {
 					// Check if it's an empty object or array
@@ -115,7 +119,9 @@ class Data {
 	 * @returns {*} The found value or undefined.
 	 */
 	static find(path, obj) {
-		const arrPath = Array.isArray(path) ? path : path.split(this.OBJECT_DIVIDER)
+		const arrPath = Array.isArray(path)
+			? path
+			: Data._splitAndUnescape(path)
 		let acc = obj
 		let i = 0
 		for (let key of arrPath) {
@@ -188,7 +194,7 @@ class Data {
 		const sortedKeys = Object.keys(data).sort()
 
 		for (let flatKey of sortedKeys) {
-			const keys = flatKey.split(Data.OBJECT_DIVIDER)
+			const keys = Data._splitAndUnescape(flatKey)
 			/** @type {string[]} */
 			const path = []
 			for (let i = 0; i < keys.length - 1; i++) {
@@ -212,7 +218,7 @@ class Data {
 			}
 			const { value } = Data.findValue(path, result)
 
-			const key = String(keys.pop() ?? '')
+			const key = Data.unescapeKey(String(keys.pop() ?? ''))
 			if (Array.isArray(value)) {
 				const match = key.match(noRegExp)
 				if (match) {
@@ -386,7 +392,7 @@ class Data {
 	 * @returns {Array<Array<string, any>>} Flat sibling entries.
 	 */
 	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
-		if (!Array.isArray(flat)) flat = Object.entries(Data.flatten(flat))
+		if (!Array.isArray(flat)) flat = Object.entries(flat)
 		const path = '' === parentKey ? '' : parentKey + Data.OBJECT_DIVIDER
 		const level = key.split(Data.OBJECT_DIVIDER).length
 		return flat.filter(
@@ -423,6 +429,42 @@ class Data {
 		} else {
 			return [suffix, ...result]
 		}
+	}
+
+	/**
+	 * Escapes literal OBJECT_DIVIDER characters in a key.
+	 * Replaces occurrences of the divider with ESCAPED_DIVIDER
+	 * so the key survives split(OBJECT_DIVIDER) during unflatten.
+	 * @static
+	 * @param {string} key - The raw object key
+	 * @returns {string} The escaped key
+	 */
+	static escapeKey(key) {
+		if (!key.includes(Data.OBJECT_DIVIDER)) return key
+		return key.replaceAll(Data.OBJECT_DIVIDER, Data.ESCAPED_DIVIDER)
+	}
+
+	/**
+	 * Restores escaped dividers back to the original OBJECT_DIVIDER character.
+	 * @static
+	 * @param {string} key - An escaped key segment
+	 * @returns {string} The unescaped original key
+	 */
+	static unescapeKey(key) {
+		if (!key.includes(Data.ESCAPED_DIVIDER)) return key
+		return key.replaceAll(Data.ESCAPED_DIVIDER, Data.OBJECT_DIVIDER)
+	}
+
+	/**
+	 * Splits a flat key path by OBJECT_DIVIDER and unescapes each segment.
+	 * This ensures that keys which originally contained the divider character
+	 * are restored to their original form after splitting.
+	 * @static
+	 * @param {string} flatKey - The flat key path (e.g. "menu/File ∕ Open")
+	 * @returns {string[]} Array of unescaped segments
+	 */
+	static _splitAndUnescape(flatKey) {
+		return flatKey.split(Data.OBJECT_DIVIDER).map((s) => Data.unescapeKey(s))
 	}
 }
 
