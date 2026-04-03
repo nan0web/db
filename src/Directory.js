@@ -45,7 +45,7 @@ export default class Directory {
 	 * Determines if a file is treated as structured data.
 	 * @type {string[]}
 	 */
-	static DATA_EXTNAMES = ['.json', '.yaml', '.yml', '.nano', '.csv', '.md']
+	static DATA_EXTNAMES = ['.json', '.yaml', '.yml', '.nan0', '.nano', '.csv', '.md']
 
 	/**
 	 * Checks if a given path is a global variable path.

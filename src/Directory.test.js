@@ -12,6 +12,7 @@ suite('Directory', () => {
 				'.json',
 				'.yaml',
 				'.yml',
+				'.nan0',
 				'.nano',
 				'.csv',
 				'.md',

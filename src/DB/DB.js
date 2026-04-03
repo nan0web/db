@@ -99,7 +99,7 @@ export default class DB {
 	static Index = DirectoryIndex
 	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
-	static DATA_EXTNAMES = ['.json', '.yaml', '.yml', '.nano', '.html', '.xml', '.md']
+	static DATA_EXTNAMES = ['.json', '.csv', '.yaml', '.yml', '.nan0', '.nano', '.html', '.xml', '.md']
 
 	/**
 	 * Duck-typing check for DB instances.
@@ -1870,7 +1870,7 @@ export default class DB {
 			}
 
 			// Try to find a file with one of the supported extensions
-			const extsToTry = this.Directory.DATA_EXTNAMES
+			const extsToTry = [...this.Directory.DATA_EXTNAMES.slice(), '']
 			for (const extension of extsToTry) {
 				const fullUri = uri + extension
 				const stat = await this.statDocument(fullUri, authContext)

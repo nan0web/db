@@ -1,0 +1,11 @@
+---
+metadata:
+  description: "Агностична документна база даних та VFS-роутер. Кожні дані стають базою знань через уніфіковану URI-адресацію, наслідування документів, монтування драйверів та гідрацію моделей."
+  tags: [db, core, vfs, data, driver, model, uri]
+  status: planned
+  locale: uk
+sections:
+stats:
+  totalTasks: 0
+  completedTasks: 0
+  progress: 0
