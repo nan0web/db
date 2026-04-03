@@ -1,8 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.4.5] - 2026-04-03
 
-## [1.3.3] - 2026-03-05
+### Fixed
+
+- **Root mount matching**: fixed `_findMount` to correctly handle empty path prefix (`''`) for relative paths, enabling transparent routing for root-mounted database instances.
+
+## [1.4.4] - 2026-04-03
+
+### Added
+
+- **.nan0 extension support**: officially registered `.nan0` as a valid data extension in `DB.DATA_EXTNAMES` and `Directory.DATA_EXTNAMES`.
 
 ### Fixed
 

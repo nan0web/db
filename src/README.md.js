@@ -59,9 +59,10 @@ function testRender() {
 	 * > Every data becomes a database.
 	 *
 	 * Based on real use-cases, supports:
-	 * - **VFS Routing** — `mount()` composes multiple storage backends into one tree
+	 * - **VFS Routing** — `mount()` composes multiple storage backends into one tree. Supports **Root Mount** (`prefix: ''`) for transparent catchment of all relative paths.
 	 * - **Fallback Chain** — `attach()` provides failover with transparent notifications
 	 * - **Model Hydration** — automatic transformation of plain objects into typed models
+	 * - officially registered **.nan0** as a native data extension
 	 * - object flattening/unflattening (with literal slash preservation)
 	 * - deep merging with reference handling
 	 * - async directory listing (for fs & fetch layers)
@@ -127,8 +128,43 @@ function testRender() {
 	/**
 	 * @docs
 	 * ## Quick Start
+	 * ### Example: Root Mount Support
+	 * 
+	 * You can mount a database at an empty prefix (`''`). This instance will catch
+	 * all relative paths that don't match more specific mount points. Extremely
+	 * useful for isolated playground environments.
 	 */
-	it('How to load JSON document?', async () => {
+	it('How to mount a database as virtual root?', () => {
+		//import DB from "@nan0web/db"
+		const rootDB = new DB()
+		const targetDB = new DB({ data: new Map([['doc.json', { ok: true }]]) })
+		rootDB.mount('', targetDB)
+		
+		// Accessing relative path transparently routes to targetDB
+		assert.ok(rootDB._findMount('doc.json'))
+		assert.strictEqual(rootDB._findMount('doc.json').db, targetDB)
+	})
+
+	/**
+	 * @docs
+	 * ### Native `.nan0` Data Extension
+	 * 
+	 * Since `v1.4.4`, `.nan0` is a first-class citizen alongside `.json`. It is
+	 * automatically recognized as a data-containing file.
+	 */
+	it('How to use native .nan0 data extension?', async () => {
+		//import DB from "@nan0web/db"
+		const db = new DB({ data: new Map([['vault.nan0', { secret: 42 }]]) })
+		const result = await db.get('vault.nan0')
+		console.info(result) // ← { secret: 42 }
+		assert.deepStrictEqual(console.output()[0][1], { secret: 42 })
+	})
+
+	/**
+	 * @docs
+	 * ## JSON & Data
+	 */
+	it('How to load Data document?', async () => {
 		//import DB from "@nan0web/db"
 		const db = new DB()
 		const doc = await db.loadDocumentAs('.json', 'doc', { key: 'value' })

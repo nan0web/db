@@ -16,6 +16,8 @@
 - ~~**DBDriverProtocol tests**~~: Full test suite — 26 tests covering all protocol methods + delegation
 - ~~**Knip + Audit**~~: `knip --production` and `pnpm audit --prod` in test:all pipeline
 - ~~**Logging cleanup**~~: Fixed `[object Object]` in logs (attachment, mounting, detachment) using string templates.
+20: - ~~**.nan0 extension support**~~: v1.4.4 officially registers `.nan0` as data extension
+21: - ~~**Root mount matching**~~: v1.4.5 fixed `_findMount('')` for relative paths
 
 ## Next
 

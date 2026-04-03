@@ -589,7 +589,7 @@ export default class DB {
 	_findMount(uri) {
 		const normalized = this.normalize(uri)
 		for (const [prefix, db] of this.mounts) {
-			if (normalized === prefix || normalized.startsWith(prefix + '/')) {
+			if (prefix === '' || normalized === prefix || normalized.startsWith(prefix + '/')) {
 				const subUri = normalized.slice(prefix.length) || '/'
 				return { db, subUri: subUri.startsWith('/') ? subUri : '/' + subUri }
 			}
