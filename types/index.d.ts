@@ -11,4 +11,6 @@ import { DBDriverProtocol } from './DB/index.js';
 import { GetOptions } from './DB/index.js';
 import { FetchOptions } from './DB/index.js';
 import { AuthContext } from './DB/index.js';
-export { Directory, DirectoryIndex, DocumentEntry, DocumentStat, StreamEntry, Data, DB, DBDriverProtocol, GetOptions, FetchOptions, AuthContext };
+import DBConfig from './domain/DBConfig.js';
+import RevisionInfo from './domain/RevisionInfo.js';
+export { Directory, DirectoryIndex, DocumentEntry, DocumentStat, StreamEntry, Data, DB, DBDriverProtocol, GetOptions, FetchOptions, AuthContext, DBConfig, RevisionInfo };

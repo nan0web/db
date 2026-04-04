@@ -436,6 +436,28 @@ How does DB handle unmounted reserved prefixes?
 import DB from '@nan0web/db'
 const db = new DB()
 ```
+## Domain Models
+
+`DBConfig` and `RevisionInfo` provide standard data definitions.
+
+### `DBConfig`
+
+How to securely serialize connection arguments?
+```js
+import { DBConfig } from '@nan0web/db'
+const config = new DBConfig('redis://yaro:pass123@redis.local:6379/cache')
+console.info(config.protocol) // ← redis
+console.info(config.safeDsn) // ← redis://yaro:***@redis.local:6379/cache
+```
+### `RevisionInfo`
+
+How to standardize document history?
+```js
+import { RevisionInfo } from '@nan0web/db'
+const ts = new Date('2026-04-06T00:00:00Z').toISOString()
+const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
+console.info(rev.shortSha) // ← 1234567
+```
 ## Contributing
 
 How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)

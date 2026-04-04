@@ -514,6 +514,32 @@ db._findMount('~/zones')
 //   Did you forget to call db.mount('~', targetDb)?
 ```
 
+## Доменні моделі
+
+`DBConfig` та `RevisionInfo` надають стандартні визначення даних.
+
+### `DBConfig`
+
+Як безпечно серіалізувати аргументи підключення?
+
+```js
+import { DBConfig } from '@nan0web/db'
+const config = new DBConfig('redis://yaro:pass123@redis.local:6379/cache')
+console.info(config.protocol) // ← redis
+console.info(config.safeDsn) // ← redis://yaro:***@redis.local:6379/cache
+```
+
+### `RevisionInfo`
+
+Як стандартизувати історію документа?
+
+```js
+import { RevisionInfo } from '@nan0web/db'
+const ts = new Date('2026-04-06T00:00:00Z').toISOString()
+const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
+console.info(rev.shortSha) // ← 1234567
+```
+
 ## Допомога у розвитку
 
 Як брати участь? – [див. CONTRIBUTING.md](https://github.com/nan0web/db/blob/main/CONTRIBUTING.md)

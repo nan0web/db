@@ -17,6 +17,8 @@ import DBDefault, {
 	DocumentEntry,
 	DocumentStat,
 	StreamEntry,
+	DBConfig,
+	RevisionInfo,
 } from './index.js'
 import {
 	normalize,
@@ -101,6 +103,8 @@ function testRender() {
 		assert.ok(DocumentEntry instanceof Function)
 		assert.ok(DocumentStat instanceof Function)
 		assert.ok(StreamEntry instanceof Function)
+		assert.ok(DBConfig instanceof Function)
+		assert.ok(RevisionInfo instanceof Function)
 	})
 	/**
 	 * @docs
@@ -659,6 +663,35 @@ function testRender() {
 		})
 		// Regular paths return null (normal fallback behavior)
 		assert.strictEqual(db._findMount('some/path'), null)
+	})
+
+	/**
+	 * @docs
+	 * ## Domain Models
+	 *
+	 * `DBConfig` and `RevisionInfo` provide standard data definitions.
+	 *
+	 * ### `DBConfig`
+	 */
+	it('How to securely serialize connection arguments?', () => {
+		//import { DBConfig } from '@nan0web/db'
+		const config = new DBConfig('redis://yaro:pass123@redis.local:6379/cache')
+		console.info(config.protocol) // ← redis
+		console.info(config.safeDsn) // ← redis://yaro:***@redis.local:6379/cache
+		assert.equal(console.output()[0][1], 'redis')
+		assert.equal(console.output()[1][1], 'redis://yaro:***@redis.local:6379/cache')
+	})
+
+	/**
+	 * @docs
+	 * ### `RevisionInfo`
+	 */
+	it('How to standardize document history?', () => {
+		//import { RevisionInfo } from '@nan0web/db'
+		const ts = new Date('2026-04-06T00:00:00Z').toISOString()
+		const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
+		console.info(rev.shortSha) // ← 1234567
+		assert.equal(console.output()[0][1], '1234567')
 	})
 
 	/**

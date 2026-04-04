@@ -24,6 +24,8 @@ import DocumentEntry from './DocumentEntry.js'
 import DocumentStat from './DocumentStat.js'
 import StreamEntry from './StreamEntry.js'
 import Data from './Data.js'
+import DBConfig from './domain/DBConfig.js'
+import RevisionInfo from './domain/RevisionInfo.js'
 export {
 	Directory,
 	DirectoryIndex,
@@ -36,6 +38,8 @@ export {
 	GetOptions,
 	FetchOptions,
 	AuthContext,
+	DBConfig,
+	RevisionInfo,
 }
 export * from './DB/path.js'
 export default DB
