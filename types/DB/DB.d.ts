@@ -771,6 +771,18 @@ export default class DB {
      * @returns {Promise<DirectoryIndex>} Index data.
      */
     loadIndex(dirUri?: string): Promise<DirectoryIndex>;
+    /**
+     * Browses files recursively like `ls -r`.
+     * @param {string} uri - Directory URI
+     * @param {object} [options]
+     * @param {number} [options.depth=-1] - Recursion depth (-1 unlimited)
+     * @param {boolean} [options.includeDirs=false] - Include directories
+     * @yields {DocumentEntry} File entries
+     */
+    browse(uri: string, options?: {
+        depth?: number | undefined;
+        includeDirs?: boolean | undefined;
+    }): AsyncGenerator<DocumentEntry, void, unknown>;
     #private;
 }
 import DBDriverProtocol from './DriverProtocol.js';

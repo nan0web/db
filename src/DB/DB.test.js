@@ -283,6 +283,20 @@ suite('DB', () => {
 			const result = await db.loadDocument('file')
 			assert.deepStrictEqual(result, { value: 'found' })
 		})
+
+		it('should try extensions when none provided even if a directory with the same name exists', async () => {
+			const dbInstance = new DB({
+				predefined: [
+					['index.json', { value: 'found-file' }],
+					['index/', null],
+					['index/subfile.json', { value: 'sub' }]
+				],
+			})
+			await dbInstance.connect()
+
+			const result = await dbInstance.loadDocument('index')
+			assert.deepStrictEqual(result, { value: 'found-file' })
+		})
 	})
 
 	describe('saveDocument', () => {
@@ -654,6 +668,18 @@ suite('DB', () => {
 			const opts = new FetchOptions()
 			const result = await db.fetch('test.json', opts)
 			assert.deepEqual(result, { global: 'value', value: 'test' })
+		})
+
+		it('should fetch ignoring directory with the exact same name without extension', async () => {
+			const dbInstance = new DB({
+				predefined: [
+					['dir1/', null],
+					['dir1.json', { key: 'val' }]
+				]
+			})
+			await dbInstance.connect()
+			const res = await dbInstance.fetch('dir1')
+			assert.deepStrictEqual(res, { key: 'val' })
 		})
 
 		it('should fetch with extension processing', async () => {

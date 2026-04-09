@@ -1,6 +1,28 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [1.4.7] - 2026-04-09
+
+### Added
+
+- **Recursive File Browsing**: implemented `DB.prototype.browse()` utility for `ls -r` style recursive directory iteration.
+
+### Fixed
+
+- **Directory Read Prevention**: `loadDocument` now strictly checks `stats.isFile` before attempting to read, safely falling back to extension resolution when paths clash with directories.
+- **Hydration Contracts Preserved**: Fixed metadata injection (`isFile: true`) in `DB.set()` to maintain compatibility with `v1.3.1` model hydration regressions.
+
+### Changed
+
+- **Dependencies**: synchronized all internal `@nan0web` package dependencies to use the `workspace:*` protocol.
+
+## [1.4.6] - 2026-04-09
+
+### Added
+
+- **Domain Models Integration**: Added robust support for DB DSN configuration detection and dynamic `RevisionInfo` tracking.
+
 ## [1.4.5] - 2026-04-03
 
 ### Fixed

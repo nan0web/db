@@ -721,7 +721,7 @@ export default class DB {
 	 * @returns {Promise<{ total: number, processed: number, ignored: number, updatedURIs: string[] }>}
 	 */
 	async dump(dest, options = {}) {
-		const { onProgress = () => {} } = options
+		const { onProgress = () => { } } = options
 		const total = this.meta.size
 		let current = 0
 		const updatedURIs = []
@@ -1088,7 +1088,7 @@ export default class DB {
 		await this.ensureAccess(uri, 'w', authContext)
 		this.data.set(uri, data)
 		const meta = this.meta.has(uri) ? this.meta.get(uri) : {}
-		this.meta.set(uri, new DocumentStat({ ...meta, mtimeMs: Date.now() }))
+		this.meta.set(uri, new DocumentStat({ isFile: true, ...meta, mtimeMs: Date.now() }))
 		this.emit('change', { uri, type: 'set', data })
 		return data
 	}
@@ -1244,7 +1244,7 @@ export default class DB {
 		uri = this.normalize(uri)
 		await this.ensureAccess(uri, 'r', authContext)
 		const stats = await this.statDocument(uri)
-		if (stats.exists) {
+		if (stats.exists && stats.isFile) {
 			if (this.driver) {
 				const abs = this.absolute(uri)
 				const result = await this.driver.read(abs)
@@ -1874,7 +1874,7 @@ export default class DB {
 			for (const extension of extsToTry) {
 				const fullUri = uri + extension
 				const stat = await this.statDocument(fullUri, authContext)
-				if (stat.exists) {
+				if (stat.exists && stat.isFile) {
 					return await this.fetchMerged(fullUri, opts, authContext, visited)
 				}
 			}
@@ -2195,6 +2195,21 @@ export default class DB {
 		}
 		// No index found
 		return new DirectoryIndex()
+	}
+
+	/**
+	 * Browses files recursively like `ls -r`.
+	 * @param {string} uri - Directory URI
+	 * @param {object} [options]
+	 * @param {number} [options.depth=-1] - Recursion depth (-1 unlimited)
+	 * @param {boolean} [options.includeDirs=false] - Include directories
+	 * @yields {DocumentEntry} File entries
+	 */
+	async *browse(uri, options = {}) {
+		const { depth = -1, includeDirs = false, ...readOptions } = options
+		for await (const entry of this.readDir(uri, { ...readOptions, depth, includeDirs })) {
+			if (entry.isFile || includeDirs) yield entry
+		}
 	}
 
 	/**
