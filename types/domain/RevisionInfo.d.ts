@@ -63,12 +63,12 @@ export default class RevisionInfo extends Model {
      * @param {object} [options]
      */
     constructor(data?: Partial<RevisionInfo>, options?: object);
-    /** @type {string} */ sha: string;
-    /** @type {string} */ key: string;
-    /** @type {string} */ author: string;
-    /** @type {string} */ message: string;
-    /** @type {string} */ timestamp: string;
-    /** @type {number} */ size: number;
+    /** @type {string} Hash of the revision */ sha: string;
+    /** @type {string} Document key this revision belongs to */ key: string;
+    /** @type {string} Author of the change (empty if anonymous/wiki) */ author: string;
+    /** @type {string} Commit or change description */ message: string;
+    /** @type {string} ISO 8601 timestamp of the revision */ timestamp: string;
+    /** @type {number} Document size in bytes at this revision */ size: number;
     /**
      * @returns {Date | null}
      */
@@ -79,4 +79,4 @@ export default class RevisionInfo extends Model {
      */
     get shortSha(): string;
 }
-import { Model } from '@nan0web/core';
+import { Model } from '@nan0web/types';

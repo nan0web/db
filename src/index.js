@@ -43,3 +43,5 @@ export {
 }
 export * from './DB/path.js'
 export default DB
+
+/** @typedef {import('./domain/index.js').DBProtocolName} DBProtocolName */

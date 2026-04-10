@@ -1,5 +1,6 @@
 export * from "./DB/path.js";
 export default DB;
+export type DBProtocolName = import("./domain/index.js").DBProtocolName;
 import Directory from './Directory.js';
 import DirectoryIndex from './DirectoryIndex.js';
 import DocumentEntry from './DocumentEntry.js';

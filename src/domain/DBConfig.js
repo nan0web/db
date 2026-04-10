@@ -1,4 +1,8 @@
-import { Model } from '@nan0web/core'
+import { Model } from '@nan0web/types'
+
+/**
+ * @typedef {'fs'|'redis'|'http'|'memory'} DBProtocolName
+ */
 
 /**
  * DBConfig — Model-as-Schema for database connection configuration.
@@ -14,7 +18,7 @@ import { Model } from '@nan0web/core'
  * See user-stories.md (lines 18-20)
  *
  * @property {string} url Connection URL or directory path
- * @property {'fs'|'redis'|'http'|'memory'} protocol Database adapter type
+ * @property {DBProtocolName} protocol Database adapter type
  * @property {string} username Authentication username
  * @property {string} password Authentication password (sensitive)
  * @property {string} database Logical database name or namespace
@@ -115,8 +119,8 @@ export default class DBConfig extends Model {
 	}
 
 	/**
-	 * @param {Partial<DBConfig> | string} [data]
-	 * @param {object} [options]
+	 * @param {Partial<DBConfig> | string | Record<string, any>} [data={}]
+	 * @param {Partial<import('@nan0web/types').ModelOptions>} [options={}]
 	 */
 	constructor(data = {}, options = {}) {
 		if (typeof data === 'string') data = DBConfig.parseDsn(data)
@@ -124,13 +128,13 @@ export default class DBConfig extends Model {
 
 		super(data, options)
 
-		/** @type {string} */ this.url
-		/** @type {'fs'|'redis'|'http'|'memory'} */ this.protocol
-		/** @type {string} */ this.username
-		/** @type {string} */ this.password
-		/** @type {string} */ this.database
-		/** @type {number} */ this.maxRetries
-		/** @type {number} */ this.timeoutMs
+		/** @type {string} Connection URL or directory path */ this.url
+		/** @type {DBProtocolName} Database adapter type */ this.protocol
+		/** @type {string} Authentication username (if required by adapter) */ this.username
+		/** @type {string} Authentication password (sensitive — never logged) */ this.password
+		/** @type {string} Logical database name or namespace */ this.database
+		/** @type {number} Maximum reconnection attempts before failure */ this.maxRetries
+		/** @type {number} Connection timeout in milliseconds */ this.timeoutMs
 
 		// Auto-detect protocol from URL if not explicitly set
 		if (!this.protocol && this.url) {

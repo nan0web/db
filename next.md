@@ -3,27 +3,10 @@
 **Score: {passed}/{total} ({pct}%)**
 
 ## Issues Found
-- [ ] [exports] src/index.js: `Default export found in {file} — only named exports allowed`
-- [ ] [exports] src/domain/index.js: `src/domain/ exists but src/domain/index.js is missing`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/AuthContext.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/AuthContext.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/AuthContext.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/AuthContext.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DB.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DB.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DB.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DB.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DriverProtocol.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DriverProtocol.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/DriverProtocol.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/FetchOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/FetchOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/FetchOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/FetchOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/FetchOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DB/GetOptions.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DirectoryIndex.js: `Class field outside constructor in {file} (line {line})`
-- [ ] [domain] /Users/i/src/nan.web/packages/db/src/DirectoryIndex.js: `Class field outside constructor in {file} (line {line})`
+- [x] [feature] `DB.js`: Fixed directory/file name collision natively via strict `isFile` checks
+- [skip] [exports] src/index.js: `Default export found in {file} — only named exports allowed` (cross-package dependency)
+- [x] [exports] src/domain/index.js: `src/domain/ exists but src/domain/index.js is missing`
+- [skip] [domain] Class field outside constructor (skipped for non-model files)
 
 ## Recommended Subagents
 - `@[/inspect-anti-pattern]`

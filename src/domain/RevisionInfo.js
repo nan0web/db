@@ -1,4 +1,4 @@
-import { Model } from '@nan0web/core'
+import { Model } from '@nan0web/types'
 
 /**
  * RevisionInfo — Model-as-Schema for document version history entry.
@@ -74,12 +74,12 @@ export default class RevisionInfo extends Model {
 	constructor(data = {}, options = {}) {
 		super(data, options)
 
-		/** @type {string} */ this.sha
-		/** @type {string} */ this.key
-		/** @type {string} */ this.author
-		/** @type {string} */ this.message
-		/** @type {string} */ this.timestamp
-		/** @type {number} */ this.size
+		/** @type {string} Hash of the revision */ this.sha
+		/** @type {string} Document key this revision belongs to */ this.key
+		/** @type {string} Author of the change (empty if anonymous/wiki) */ this.author
+		/** @type {string} Commit or change description */ this.message
+		/** @type {string} ISO 8601 timestamp of the revision */ this.timestamp
+		/** @type {number} Document size in bytes at this revision */ this.size
 	}
 
 	/**

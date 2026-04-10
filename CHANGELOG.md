@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.8] - 2026-04-10
+
+### Added
+
+- **Domain Types & Indexes**: Added `src/domain/index.js` to explicitly export `DBConfig` and `RevisionInfo`. Exported `DBProtocolName` JSDoc typedef from core entry point.
+
+### Changed
+
+- **Typization & Base**: Switched `Model` inheritance from `@nan0web/core` to the specialized `@nan0web/types` package for `DBConfig` and `RevisionInfo`. Refined JSDoc model schema definitions in both classes.
+
 ## [1.4.7] - 2026-04-09
 
 ### Added
