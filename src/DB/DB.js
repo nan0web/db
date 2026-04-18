@@ -249,6 +249,20 @@ export default class DB {
 	}
 
 	/**
+	 * Fetches the index document for a directory.
+	 * Returns empty object if index does not exist or Directory configuration is missing.
+	 * @param {string} [dir=''] - The directory path
+	 * @returns {Promise<Record<string, any>>}
+	 */
+	async fetchIndex(dir = '') {
+		const Class = /** @type {typeof DB} */ (this.constructor)
+		const Directory = Class.Directory
+		if (!Directory || !Directory.INDEX) return {}
+		const indexPath = dir ? this.resolveSync(dir, Directory.INDEX) : Directory.INDEX
+		return (await this.fetch(indexPath)) ?? {}
+	}
+
+	/**
 	 * Returns constructor options to save and restore database instance later.
 	 * @returns {Record<string, any>}
 	 */
@@ -1239,6 +1253,8 @@ export default class DB {
 	 * @returns {Promise<any>} The loaded document or the default value.
 	 */
 	async loadDocumentAs(ext, uri, defaultValue, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.loadDocumentAs(ext, mount.subUri, defaultValue, context)
 		this.console.debug('loadDocumentAs()', uri, { ext, defaultValue })
 		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
@@ -1267,6 +1283,32 @@ export default class DB {
 			}
 		}
 		return defaultValue
+	}
+	/**
+	 * Returns a read stream of the document.
+	 * @param {string} uri - Document URI
+	 * @param {AuthContext | object} [context=this.context] - Auth context
+	 * @returns {Promise<any>}
+	 */
+	async stream(uri, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount && typeof mount.db.stream === 'function') {
+			return mount.db.stream(mount.subUri, context)
+		}
+		this.console.debug('stream()', uri)
+		const authContext = AuthContext.from(context)
+		uri = this.normalize(uri)
+		await this.ensureAccess(uri, 'r', authContext)
+		
+		if (this.driver && typeof this.driver.stream === 'function') {
+			const abs = this.absolute(uri)
+			const _stream = await this.driver.stream(abs)
+			if (_stream) {
+				return _stream
+			}
+		}
+		
+		throw new Error('Streaming is not supported by this database or driver')
 	}
 
 	/**
@@ -1320,6 +1362,8 @@ export default class DB {
 	 * @returns {Promise<DocumentStat>}
 	 */
 	async statDocument(uri, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.statDocument(mount.subUri, context)
 		this.console.debug('statDocument()', uri)
 		const authContext = AuthContext.from(context)
 		if ('.' === uri) uri = './'
@@ -1379,11 +1423,24 @@ export default class DB {
 	}
 
 	/**
+	 * Returns physical location on the host filesystem for the provided uri.
+	 * Routes to mounts if possible.
+	 * @param {string} uri - Document URI
+	 * @returns {string} Absolute location on the drive.
+	 */
+	location(uri) {
+		const mount = this._findMount(uri)
+		if (mount && typeof mount.db.location === 'function') {
+			return mount.db.location(mount.subUri)
+		}
+		return this.absolute(uri)
+	}
+
+	/**
 	 * Delete document from storage
-	 * @note Must be overwritten by platform specific application
 	 * @param {string} uri - Document URI
 	 * @param {AuthContext | object} [context=this.context] - Auth context
-	 * @returns {Promise<boolean>}
+	 * @returns {Promise<boolean>} TRUE if success, FALSE if fail
 	 */
 	async dropDocument(uri, context = this.context) {
 		const mount = this._findMount(uri)
@@ -1526,6 +1583,9 @@ export default class DB {
 	 * @throws {Error} If directory does not exist
 	 */
 	async listDir(uri, context = this.context) {
+		const mount = this._findMount(uri)
+		if (mount) return mount.db.listDir(mount.subUri, context)
+			
 		this.console.debug('listDir()', uri)
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, 'r', authContext)
@@ -1533,6 +1593,18 @@ export default class DB {
 			const abs = this.absolute(uri)
 			try {
 				const entries = await this.driver.listDir(abs)
+				if (entries && entries.length > 0) {
+					return entries.map((name) => {
+						const isDir = name.endsWith('/')
+						return DocumentEntry.from({
+							name,
+							isDirectory: isDir,
+							isFile: !isDir,
+							uri: uri === '.' ? name : this.resolveSync(uri, name),
+							extname: isDir ? '' : this.extname(name),
+						})
+					})
+				}
 			} catch (error) {
 				this.console.error('Cannot list directory', { uri, abs, error })
 			}

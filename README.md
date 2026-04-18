@@ -84,6 +84,33 @@ const db = new DB()
 const doc = await db.loadDocumentAs('.json', 'doc', { key: 'value' })
 console.info(doc) // ← { key: "value" }
 ```
+### Stream line-by-line reading
+
+`.jsonl`, `.csv`, and `.csv0` formats safely stream line-by-line handling
+chunk fragmentation natively via the standard Driver Protocol.
+
+How to stream lines from data files?
+```js
+// Example driver implementation
+class MockDriver extends DBDriverProtocol {
+	async stream(uri) {
+		return (async function* () {
+			yield '{"uid":1}'
+			yield '{"uid":2}'
+			yield '{"uid":3}'
+		})()
+	}
+}
+// Attach your custom or imported driver
+const db = new DB({ driver: new MockDriver() })
+const stream = await db.stream('demo.jsonl')
+const lines = []
+for await (const line of stream) {
+	lines.push(line)
+}
+console.info(lines.length) // ← 3
+console.info(lines) // ← [ '{"uid":1}', '{"uid":2}', '{"uid":3}' ]
+```
 ### Example: Using `get()` with default fallback
 
 How to get or return default?

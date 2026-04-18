@@ -1,6 +1,7 @@
 import Directory from '../Directory.js'
 import DocumentStat from '../DocumentStat.js'
 import AuthContext from './AuthContext.js'
+import { extname } from './path.js'
 
 /**
  * @typedef {Object} DriverConfig
@@ -99,6 +100,48 @@ export default class DBDriverProtocol {
 	}
 
 	/**
+	 * Creates a read stream for a document.
+	 * @param {string} absoluteURI
+	 * @returns {Promise<any | void>} - Stream on success, undefined on failure
+	 */
+	async stream(absoluteURI) {
+		if (this.driver && typeof this.driver.stream === 'function') {
+			const _stream = await this.driver.stream(absoluteURI)
+			if (_stream) {
+				return this.parseStream(_stream, absoluteURI)
+			}
+		}
+		return undefined
+	}
+
+	/**
+	 * Formats a raw stream into a line-by-line stream based on extension.
+	 * @param {any} _stream - Raw stream
+	 * @param {string} absoluteURI - Document URI 
+	 * @returns {any} Formatted stream
+	 */
+	parseStream(_stream, absoluteURI) {
+		const ext = extname(absoluteURI)
+		if (ext === '.jsonl' || ext === '.csv' || ext === '.csv0') {
+			return (async function* () {
+				let remainder = ''
+				for await (const chunk of _stream) {
+					remainder += chunk.toString('utf-8')
+					const lines = remainder.split(/\r?\n/)
+					remainder = lines.pop() ?? ''
+					for (const line of lines) {
+						if (line) yield line
+					}
+				}
+				if (remainder) {
+					yield remainder
+				}
+			})()
+		}
+		return _stream
+	}
+
+	/**
 	 * Saves a document
 	 * Writes content to storage.
 	 * @param {string} absoluteURI
@@ -175,7 +218,7 @@ export default class DBDriverProtocol {
 	 * @returns {DBDriverProtocol}
 	 */
 	static from(input) {
-		if (input instanceof DBDriverProtocol) return input
+		if (input && (input instanceof DBDriverProtocol || typeof input.read === 'function')) return input
 		return new DBDriverProtocol(input)
 	}
 }

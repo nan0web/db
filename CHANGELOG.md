@@ -2,8 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.4.8] - 2026-04-10
+## [1.5.0] - 2026-04-18
 
+### Added
+
+- **Streaming Formats**: Extracted and stabilized chunk fragmentation buffering to `DBDriverProtocol`. Added native robust support for `.csv0`, `.csv`, and `.jsonl` streaming formats, resolving trailing lines seamlessly.
+
+### Fixed
+
+- **Type Contracts**: Addressed missing mapped array transforms for `listDir`, ensuring compliance with `DocumentEntry[]` typization expectations.
+
+### Changed
+
+- **Documentation**: Decoupled `DB` documentation generation sequence from the `DBFS` package. Stream examples now showcase native Driver architecture using isolated `MockDriver` to prevent cyclic reasoning and caching issues in the monorepo test suite.
+
+## [1.4.8] - 2026-04-10
 ### Added
 
 - **Domain Types & Indexes**: Added `src/domain/index.js` to explicitly export `DBConfig` and `RevisionInfo`. Exported `DBProtocolName` JSDoc typedef from core entry point.

@@ -93,6 +93,39 @@ const doc = await db.loadDocumentAs('.json', 'doc', { key: 'value' })
 console.info(doc) // ← { key: "value" }
 ```
 
+### Потокове читання рядок за рядком
+
+Формати `.jsonl`, `.csv` та `.csv0` безпечно здійснюють потокове читання рядок за рядком, нативно обробляючи фрагментацію чанків через стандартний протокол драйвера (Driver Protocol).
+
+Як читати потокові рядки з файлів даних?
+
+```js
+import DB, { DBDriverProtocol } from '@nan0web/db'
+
+// Приклад реалізації драйвера
+class MockDriver extends DBDriverProtocol {
+	async stream(uri) {
+		return (async function* () {
+			yield '{"uid":1}'
+			yield '{"uid":2}'
+			yield '{"uid":3}'
+		})()
+	}
+}
+
+// Прикріпіть свій власний або імпортований драйвер
+const db = new DB({ driver: new MockDriver() })
+
+const stream = await db.stream('demo.jsonl')
+const lines = []
+for await (const line of stream) {
+	lines.push(line)
+}
+
+console.info(lines.length) // ← 3
+console.info(lines) // ← [ '{"uid":1}', '{"uid":2}', '{"uid":3}' ]
+```
+
 ### Приклад: Використання `get()` з значенням за замовчуванням
 
 Як отримати або повернути значення за замовчуванням?

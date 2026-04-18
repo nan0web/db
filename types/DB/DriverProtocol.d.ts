@@ -66,6 +66,19 @@ export default class DBDriverProtocol {
      */
     read(absoluteURI: string, defaultValue?: any): Promise<any>;
     /**
+     * Creates a read stream for a document.
+     * @param {string} absoluteURI
+     * @returns {Promise<any | void>} - Stream on success, undefined on failure
+     */
+    stream(absoluteURI: string): Promise<any | void>;
+    /**
+     * Formats a raw stream into a line-by-line stream based on extension.
+     * @param {any} _stream - Raw stream
+     * @param {string} absoluteURI - Document URI
+     * @returns {any} Formatted stream
+     */
+    parseStream(_stream: any, absoluteURI: string): any;
+    /**
      * Saves a document
      * Writes content to storage.
      * @param {string} absoluteURI

@@ -1,9 +1,9 @@
 import { describe, it, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import fsNode from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NoConsole } from '@nan0web/log'
-import FS from '@nan0web/db-fs'
 import { DocsParser, DatasetParser } from '@nan0web/test'
 import DBDefault, {
 	DB,
@@ -32,12 +32,10 @@ import {
 	isAbsolute,
 } from './DB/path.js'
 
-const fs = new FS()
 let pkg
 
 before(async () => {
-	const doc = await fs.loadDocument('package.json', {})
-	pkg = doc || {}
+	pkg = JSON.parse(fsNode.readFileSync(join(process.cwd(), 'package.json'), 'utf-8'))
 })
 
 let console = new NoConsole()
@@ -133,7 +131,7 @@ function testRender() {
 	 * @docs
 	 * ## Quick Start
 	 * ### Example: Root Mount Support
-	 * 
+	 *
 	 * You can mount a database at an empty prefix (`''`). This instance will catch
 	 * all relative paths that don't match more specific mount points. Extremely
 	 * useful for isolated playground environments.
@@ -143,7 +141,7 @@ function testRender() {
 		const rootDB = new DB()
 		const targetDB = new DB({ data: new Map([['doc.json', { ok: true }]]) })
 		rootDB.mount('', targetDB)
-		
+
 		// Accessing relative path transparently routes to targetDB
 		assert.ok(rootDB._findMount('doc.json'))
 		assert.strictEqual(rootDB._findMount('doc.json').db, targetDB)
@@ -152,7 +150,7 @@ function testRender() {
 	/**
 	 * @docs
 	 * ### Native `.nan0` Data Extension
-	 * 
+	 *
 	 * Since `v1.4.4`, `.nan0` is a first-class citizen alongside `.json`. It is
 	 * automatically recognized as a data-containing file.
 	 */
@@ -174,6 +172,40 @@ function testRender() {
 		const doc = await db.loadDocumentAs('.json', 'doc', { key: 'value' })
 		console.info(doc) // ← { key: "value" }
 		assert.deepStrictEqual(console.output()[0][1], { key: 'value' })
+	})
+
+	/**
+	 * @docs
+	 * ### Stream line-by-line reading
+	 *
+	 * `.jsonl`, `.csv`, and `.csv0` formats safely stream line-by-line handling
+	 * chunk fragmentation natively via the standard Driver Protocol.
+	 */
+	it('How to stream lines from data files?', async () => {
+		// Example driver implementation
+		class MockDriver extends DBDriverProtocol {
+			async stream(uri) {
+				return (async function* () {
+					yield '{"uid":1}'
+					yield '{"uid":2}'
+					yield '{"uid":3}'
+				})()
+			}
+		}
+
+		// Attach your custom or imported driver
+		const db = new DB({ driver: new MockDriver() })
+
+		const stream = await db.stream('demo.jsonl')
+		const lines = []
+		for await (const line of stream) {
+			lines.push(line)
+		}
+
+		console.info(lines.length) // ← 3
+		console.info(lines) // ← [ '{"uid":1}', '{"uid":2}', '{"uid":3}' ]
+		assert.equal(console.output()[0][1], 3)
+		assert.deepStrictEqual(console.output()[1][1], ['{"uid":1}', '{"uid":2}', '{"uid":3}'])
 	})
 
 	/**
@@ -700,7 +732,7 @@ function testRender() {
 	 */
 	it('How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)', async () => {
 		/** @docs */
-		let text = await fs.loadDocument('CONTRIBUTING.md')
+		let text = fsNode.readFileSync('CONTRIBUTING.md', 'utf-8')
 		if (text && typeof text === 'object' && text.content) text = text.content
 		assert.ok(String(text).includes('# Contributing'))
 	})
@@ -711,7 +743,7 @@ function testRender() {
 	 */
 	it('ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)', async () => {
 		/** @docs */
-		const text = await fs.loadDocument('LICENSE')
+		const text = fsNode.readFileSync('LICENSE', 'utf-8')
 		assert.ok(String(text).includes('ISC'))
 	})
 }
@@ -724,12 +756,16 @@ describe('Rendering README.md', async () => {
 	const parser = new DocsParser()
 	const sourceCode = fsNode.readFileSync(fileURLToPath(import.meta.url), 'utf-8')
 	text = String(parser.decode(sourceCode))
-	await fs.saveDocument('README.md', text)
+	fsNode.writeFileSync('README.md', text)
 	const dataset = DatasetParser.parse(text, pkg.name)
-	await fs.saveDocument('.datasets/README.dataset.jsonl', dataset)
+	fsNode.mkdirSync('.datasets', { recursive: true })
+	const serializedDataset = Array.isArray(dataset)
+		? dataset.map((item) => JSON.stringify(item)).join('\n')
+		: dataset
+	fsNode.writeFileSync('.datasets/README.dataset.jsonl', serializedDataset)
 
 	it(`Document is rendered in README.md [${format(Buffer.byteLength(text))} bytes]`, async () => {
-		let text = await fs.loadDocument('README.md')
+		let text = fsNode.readFileSync('README.md', 'utf-8')
 		if (text && typeof text === 'object' && text.content) text = text.content
 		assert.ok(String(text).includes('# @nan0web/db'))
 		assert.ok(String(text).includes('## License'))

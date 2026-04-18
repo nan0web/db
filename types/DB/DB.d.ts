@@ -142,6 +142,13 @@ export default class DB {
      */
     get loaded(): boolean;
     /**
+     * Fetches the index document for a directory.
+     * Returns empty object if index does not exist or Directory configuration is missing.
+     * @param {string} [dir=''] - The directory path
+     * @returns {Promise<Record<string, any>>}
+     */
+    fetchIndex(dir?: string): Promise<Record<string, any>>;
+    /**
      * Returns constructor options to save and restore database instance later.
      * @returns {Record<string, any>}
      */
@@ -575,6 +582,13 @@ export default class DB {
      */
     loadDocumentAs(ext: string, uri: string, defaultValue: any, context?: AuthContext | object): Promise<any>;
     /**
+     * Returns a read stream of the document.
+     * @param {string} uri - Document URI
+     * @param {AuthContext | object} [context=this.context] - Auth context
+     * @returns {Promise<any>}
+     */
+    stream(uri: string, context?: AuthContext | object): Promise<any>;
+    /**
      * Saves a document.
      * Must be overwritten to have the proper file or database document save operation.
      * In a basic class it just sets a document in the db.data map and db.meta map.
@@ -604,11 +618,17 @@ export default class DB {
      */
     writeDocument(uri: string, chunk: string, context?: AuthContext | object): Promise<boolean>;
     /**
+     * Returns physical location on the host filesystem for the provided uri.
+     * Routes to mounts if possible.
+     * @param {string} uri - Document URI
+     * @returns {string} Absolute location on the drive.
+     */
+    location(uri: string): string;
+    /**
      * Delete document from storage
-     * @note Must be overwritten by platform specific application
      * @param {string} uri - Document URI
      * @param {AuthContext | object} [context=this.context] - Auth context
-     * @returns {Promise<boolean>}
+     * @returns {Promise<boolean>} TRUE if success, FALSE if fail
      */
     dropDocument(uri: string, context?: AuthContext | object): Promise<boolean>;
     /**
