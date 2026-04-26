@@ -1267,8 +1267,8 @@ export default class DB {
 				if (undefined !== result) {
 					return result
 				}
-				return this.data.get(uri)
 			}
+			return this.data.get(uri)
 		} else {
 			if (!ext) {
 				for (const ext of this.Directory.DATA_EXTNAMES) {
@@ -1584,7 +1584,22 @@ export default class DB {
 	 */
 	async listDir(uri, context = this.context) {
 		const mount = this._findMount(uri)
-		if (mount) return mount.db.listDir(mount.subUri, context)
+		if (mount) {
+			const entries = await mount.db.listDir(mount.subUri, context)
+			// Find the mount prefix to re-prefix entries
+			const normalized = this.normalize(uri)
+			let prefix = ''
+			for (const [p] of this.mounts) {
+				if (p === '' || normalized === p || normalized.startsWith(p + '/')) {
+					prefix = p
+					break
+				}
+			}
+			return entries.map((e) => {
+				e.path = this.resolveSync(prefix, e.path)
+				return e
+			})
+		}
 			
 		this.console.debug('listDir()', uri)
 		const authContext = AuthContext.from(context)

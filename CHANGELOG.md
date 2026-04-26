@@ -2,14 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.5.0] - 2026-04-18
+## [1.5.1] - 2026-04-26
 
 ### Added
 
+- **Global Store Support**: Enhanced VFS routing to support mounting global configuration directories (e.g., `~/.nan0web/store`).
+- **OLMUI Integration**: Standardized `loadDocumentAs` to support binary and text data separation for raw piping.
+
+### Fixed
+
+- **VFS Consistency**: Покращено стабільність роботи `DBFS` при глибоких вкладеннях монтувань.
+- **Architectural Fix**: Improved `listDir` to correctly re-prefix paths when routing through mounts. This ensures that `DocumentEntry` objects returned from a mounted database have paths that are resolvable by the parent database (Total Logic Isolation).
+
+## [1.5.0] - 2026-04-19
+
+### Added
+
+- **Global Store Support**: Enhanced VFS routing to support mounting global configuration directories (e.g., `~/.nan0web/store`).
+- **OLMUI Integration**: Standardized `loadDocumentAs` to support binary and text data separation for raw piping.
 - **Streaming Formats**: Extracted and stabilized chunk fragmentation buffering to `DBDriverProtocol`. Added native robust support for `.csv0`, `.csv`, and `.jsonl` streaming formats, resolving trailing lines seamlessly.
 
 ### Fixed
 
+- **VFS Consistency**: Покращено стабільність роботи `DBFS` при глибоких вкладеннях монтувань.
+- **Architectural Fix**: Improved `listDir` to correctly re-prefix paths when routing through mounts. This ensures that `DocumentEntry` objects returned from a mounted database have paths that are resolvable by the parent database (Total Logic Isolation).
 - **Type Contracts**: Addressed missing mapped array transforms for `listDir`, ensuring compliance with `DocumentEntry[]` typization expectations.
 
 ### Changed
@@ -17,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: Decoupled `DB` documentation generation sequence from the `DBFS` package. Stream examples now showcase native Driver architecture using isolated `MockDriver` to prevent cyclic reasoning and caching issues in the monorepo test suite.
 
 ## [1.4.8] - 2026-04-10
+
 ### Added
 
 - **Domain Types & Indexes**: Added `src/domain/index.js` to explicitly export `DBConfig` and `RevisionInfo`. Exported `DBProtocolName` JSDoc typedef from core entry point.

@@ -122,7 +122,42 @@ export default class DBDriverProtocol {
 	 */
 	parseStream(_stream, absoluteURI) {
 		const ext = extname(absoluteURI)
-		if (ext === '.jsonl' || ext === '.csv' || ext === '.csv0') {
+		if (ext === '.jsonl') {
+			return (async function* () {
+				let buffer = ''
+				let remainder = ''
+				for await (const chunk of _stream) {
+					remainder += chunk.toString('utf-8')
+					const lines = remainder.split(/\r?\n/)
+					remainder = lines.pop() ?? ''
+					for (const line of lines) {
+						buffer += (buffer ? '\n' : '') + line
+						if (!buffer.trim()) {
+							buffer = ''
+							continue
+						}
+						try {
+							JSON.parse(buffer)
+							yield buffer
+							buffer = ''
+						} catch (e) {
+							// line is part of a multiline string, wait for more
+						}
+					}
+				}
+				if (remainder) {
+					buffer += (buffer ? '\n' : '') + remainder
+				}
+				if (buffer.trim()) {
+					try {
+						JSON.parse(buffer)
+						yield buffer
+					} catch(e) {
+						yield buffer // flush whatever is left
+					}
+				}
+			})()
+		} else if (ext === '.csv' || ext === '.csv0') {
 			return (async function* () {
 				let remainder = ''
 				for await (const chunk of _stream) {

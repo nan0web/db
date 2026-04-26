@@ -16,7 +16,7 @@ describe('Stream Architecture Refactoring (v1.5.0)', () => {
 					if (uri.endsWith('access_denied.jsonl')) {
 						throw new Error('EACCES: permission denied')
 					}
-					
+
 					return (async function* () {
 						if (uri.endsWith('.jsonl') || uri.endsWith('.csv')) {
 							// Fragmented chunks
@@ -27,14 +27,14 @@ describe('Stream Architecture Refactoring (v1.5.0)', () => {
 							yield Buffer.from('raw_data_2')
 						}
 					})()
-				}
+				},
 			}
 		}
 	}
 
 	it('correctly buffers divided chunks into single lines for .jsonl', async () => {
 		const db = new DB({
-			driver: new FakeDriverProtocol({ cwd: '.', root: '.' })
+			driver: new FakeDriverProtocol({ cwd: '.', root: '.' }),
 		})
 
 		const stream = await db.stream('test.jsonl')
@@ -50,7 +50,7 @@ describe('Stream Architecture Refactoring (v1.5.0)', () => {
 
 	it('yields raw stream for non-jsonl/csv files', async () => {
 		const db = new DB({
-			driver: new FakeDriverProtocol({ cwd: '.', root: '.' })
+			driver: new FakeDriverProtocol({ cwd: '.', root: '.' }),
 		})
 
 		const stream = await db.stream('test.bin')
@@ -66,23 +66,55 @@ describe('Stream Architecture Refactoring (v1.5.0)', () => {
 
 	it('throws error for non-existent file', async () => {
 		const db = new DB({
-			driver: new FakeDriverProtocol({ cwd: '.', root: '.' })
+			driver: new FakeDriverProtocol({ cwd: '.', root: '.' }),
 		})
 
-		await assert.rejects(
-			async () => await db.stream('not_found.jsonl'),
-			/ENOENT: no such file/
-		)
+		await assert.rejects(async () => await db.stream('not_found.jsonl'), /ENOENT: no such file/)
 	})
 
 	it('throws error for permission denied', async () => {
 		const db = new DB({
-			driver: new FakeDriverProtocol({ cwd: '.', root: '.' })
+			driver: new FakeDriverProtocol({ cwd: '.', root: '.' }),
 		})
 
 		await assert.rejects(
 			async () => await db.stream('access_denied.jsonl'),
-			/EACCES: permission denied/
+			/EACCES: permission denied/,
 		)
+	})
+})
+
+describe('VFS Consistency & Path Resolution (v1.5.0)', () => {
+	it('listDir correctly re-prefixes paths when routing through mounts', async () => {
+		const root = new DB({ root: '/' })
+		const mount1 = new DB({ root: '/mount1' })
+
+		// Mock listDir for mount1
+		mount1.listDir = async () => [
+			{ path: 'file.txt', name: 'file.txt', isFile: true, isDirectory: false },
+		]
+
+		root.mount('/m1', mount1)
+
+		const entries = await root.listDir('/m1')
+		assert.equal(entries.length, 1)
+		assert.equal(entries[0].path, 'm1/file.txt')
+	})
+
+	it('DriverProtocol parseStream supports .jsonl and .csv', async () => {
+		const driver = new DBDriverProtocol()
+
+		// mock stream
+		async function* mockStream() {
+			yield Buffer.from('{"a":1}\n{"b":2}')
+		}
+
+		const jsonlStream = await driver.parseStream(mockStream(), 'data.jsonl')
+		const results = []
+		for await (const chunk of jsonlStream) {
+			results.push(chunk)
+		}
+
+		assert.deepEqual(results, ['{"a":1}', '{"b":2}'])
 	})
 })
