@@ -110,6 +110,18 @@ export default class Directory {
 	}
 
 	/**
+	 * Checks if a given path represents a directory's config
+	 * @param {string} path - Path to check.
+	 * @returns {boolean} True if the path is a directory's config.
+	 */
+	static isConfig(path) {
+		if ('string' !== typeof path) return false
+		if (!this.isData(path)) return false
+		const name = String(path.split('/').pop()).split('.').slice(0, -1).join('.')
+		return this.FILE === name
+	}
+
+	/**
 	 * Gets the list of directory entries.
 	 * Base implementation returns empty array (override in subclasses).
 	 * @returns {Array} An empty array representing the directory entries.

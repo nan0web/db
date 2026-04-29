@@ -113,6 +113,27 @@ suite('Directory', () => {
 		})
 	})
 
+	describe('isConfig', () => {
+		it('should return true for different config files', () => {
+			assert.strictEqual(Directory.isConfig('_.yaml'), true)
+			assert.strictEqual(Directory.isConfig('path/to/folder/_.nan0'), true)
+			assert.strictEqual(Directory.isConfig('/_.json'), true)
+		})
+
+		it('should return false for not config files', () => {
+			assert.strictEqual(Directory.isConfig('file.txt'), false)
+			assert.strictEqual(Directory.isConfig('path/to/_'), false)
+			assert.strictEqual(Directory.isConfig(''), false)
+			assert.strictEqual(Directory.isConfig('noextension'), false)
+		})
+
+		it('should handle edge cases', () => {
+			assert.strictEqual(Directory.isConfig(null), false)
+			assert.strictEqual(Directory.isConfig(undefined), false)
+			assert.strictEqual(Directory.isConfig(123), false)
+		})
+	})
+
 	describe('entries', () => {
 		it('should return an empty array', () => {
 			const directory = new Directory()

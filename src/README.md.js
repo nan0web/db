@@ -490,16 +490,17 @@ function testRender() {
 	/**
 	 * @docs
 	 * ### `extname(uri)`
-	 * Extracts file extension with dot (lowercase).
+	 * Extracts file extension with dot (lowercase). Since `v1.5.3`, correctly ignores
+	 * dots in directory names of absolute paths.
 	 */
 	it('How to extract extension?', () => {
 		//import { extname } from '@nan0web/db/path'
 		console.info(extname('file.TXT')) // ← .txt
-		console.info(extname('archive.tar.gz')) // ← .gz
-		console.info(extname('noext')) // ← ''
+		console.info(extname('/Users/user/src/nan.web/apps/t.json')) // ← .json
+		console.info(extname('.gitignore')) // ← ''
 		console.info(extname('/dir/')) // ← ''
 		assert.equal(console.output()[0][1], '.txt')
-		assert.equal(console.output()[1][1], '.gz')
+		assert.equal(console.output()[1][1], '.json')
 		assert.equal(console.output()[2][1], '')
 		assert.equal(console.output()[3][1], '')
 	})
@@ -724,6 +725,22 @@ function testRender() {
 		const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
 		console.info(rev.shortSha) // ← 1234567
 		assert.equal(console.output()[0][1], '1234567')
+	})
+
+	/**
+	 * @docs
+	 * ### `Directory.isConfig(path)`
+	 *
+	 * Checks if a path represents a directory configuration file (`_.yaml`, `_.nan0`, `_.json`).
+	 */
+	it('How to detect directory configuration file?', () => {
+		//import { Directory } from '@nan0web/db'
+		console.info(Directory.isConfig('_.yaml')) // ← true
+		console.info(Directory.isConfig('path/to/_.nan0')) // ← true
+		console.info(Directory.isConfig('file.json')) // ← false
+		assert.strictEqual(console.output()[0][1], true)
+		assert.strictEqual(console.output()[1][1], true)
+		assert.strictEqual(console.output()[2][1], false)
 	})
 
 	/**

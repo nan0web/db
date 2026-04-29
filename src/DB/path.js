@@ -222,8 +222,10 @@ export function dirname(uri) {
  * @returns {string} Extension (e.g. ".txt") or empty string
  */
 export function extname(uri) {
-	const arr = uri.split('.')
-	return arr.length > 1 ? `.${arr.pop()}`.toLowerCase() : ''
+	const base = uri.split('/').pop() || ''
+	const arr = base.split('.')
+	if (arr.length <= 1 || (arr.length === 2 && arr[0] === '')) return ''
+	return `.${arr.pop()}`.toLowerCase()
 }
 
 /**

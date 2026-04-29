@@ -77,6 +77,12 @@ export default class Directory {
      */
     static isDirectory(path: string): boolean;
     /**
+     * Checks if a given path represents a directory's config
+     * @param {string} path - Path to check.
+     * @returns {boolean} True if the path is a directory's config.
+     */
+    static isConfig(path: string): boolean;
+    /**
      * Gets the list of directory entries.
      * Base implementation returns empty array (override in subclasses).
      * @returns {Array} An empty array representing the directory entries.

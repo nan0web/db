@@ -310,14 +310,15 @@ console.info(dirname('/file')) // ← /
 console.info(dirname('file.txt')) // ← .
 ```
 ### `extname(uri)`
-Extracts file extension with dot (lowercase).
+Extracts file extension with dot (lowercase). Since `v1.5.3`, correctly ignores
+dots in directory names of absolute paths.
 
 How to extract extension?
 ```js
 import { extname } from '@nan0web/db/path'
 console.info(extname('file.TXT')) // ← .txt
-console.info(extname('archive.tar.gz')) // ← .gz
-console.info(extname('noext')) // ← ''
+console.info(extname('/Users/user/src/nan.web/apps/t.json')) // ← .json
+console.info(extname('.gitignore')) // ← ''
 console.info(extname('/dir/')) // ← ''
 ```
 ### `resolveSync(cwd, root, ...segments)`
@@ -484,6 +485,17 @@ import { RevisionInfo } from '@nan0web/db'
 const ts = new Date('2026-04-06T00:00:00Z').toISOString()
 const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
 console.info(rev.shortSha) // ← 1234567
+```
+### `Directory.isConfig(path)`
+
+Checks if a path represents a directory configuration file (`_.yaml`, `_.nan0`, `_.json`).
+
+How to detect directory configuration file?
+```js
+import { Directory } from '@nan0web/db'
+console.info(Directory.isConfig('_.yaml')) // ← true
+console.info(Directory.isConfig('path/to/_.nan0')) // ← true
+console.info(Directory.isConfig('file.json')) // ← false
 ```
 ## Contributing
 

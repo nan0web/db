@@ -366,15 +366,15 @@ console.info(dirname('file.txt')) // ← .
 
 ### `extname(uri)`
 
-Витягує розширення файлу з крапкою (у нижньому регістрі).
+Витягує розширення файлу з крапкою (у нижньому регістрі). Починаючи з `v1.5.3`, правильно ігнорує крапки в назвах каталогів абсолютних шляхів.
 
 Як витягти розширення?
 
 ```js
 import { extname } from '@nan0web/db/path'
 console.info(extname('file.TXT')) // ← .txt
-console.info(extname('archive.tar.gz')) // ← .gz
-console.info(extname('noext')) // ← ''
+console.info(extname('/Users/user/src/nan.web/apps/t.json')) // ← .json
+console.info(extname('.gitignore')) // ← ''
 console.info(extname('/dir/')) // ← ''
 ```
 
@@ -571,6 +571,19 @@ import { RevisionInfo } from '@nan0web/db'
 const ts = new Date('2026-04-06T00:00:00Z').toISOString()
 const rev = new RevisionInfo({ sha: '1234567890abcdef', timestamp: ts })
 console.info(rev.shortSha) // ← 1234567
+```
+
+### `Directory.isConfig(path)`
+
+Перевіряє, чи шлях представляє конфігураційний файл каталогу (`_.yaml`, `_.nan0`, `_.json`).
+
+Як виявити конфігураційний файл каталогу?
+
+```js
+import { Directory } from '@nan0web/db'
+console.info(Directory.isConfig('_.yaml')) // ← true
+console.info(Directory.isConfig('path/to/_.nan0')) // ← true
+console.info(Directory.isConfig('file.json')) // ← false
 ```
 
 ## Допомога у розвитку
