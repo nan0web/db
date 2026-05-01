@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.4] - 2026-05-01
+
+### Fixed
+
+- **Internal Referencing**: Updated `Data.js` to use `this` instead of `Data` for static methods, improving class extensibility and strictness.
+- **Path Imports**: Fixed relative path imports in the v1.5.3 release regression test suite.
+
 ## [1.5.1] - 2026-04-26
 
 ### Added

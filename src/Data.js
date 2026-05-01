@@ -40,7 +40,7 @@ class Data {
 	 * @static
 	 */
 	static resetArrayWrapper() {
-		Data.ARRAY_WRAPPER = '[]'
+		this.ARRAY_WRAPPER = '[]'
 	}
 
 	/**
@@ -48,7 +48,7 @@ class Data {
 	 * @static
 	 */
 	static resetObjectDivider() {
-		Data.OBJECT_DIVIDER = '/'
+		this.OBJECT_DIVIDER = '/'
 	}
 
 	/**
@@ -57,7 +57,7 @@ class Data {
 	 * @param {string} wrapper - The new array wrapper.
 	 */
 	static setArrayWrapper(wrapper) {
-		Data.ARRAY_WRAPPER = wrapper
+		this.ARRAY_WRAPPER = wrapper
 	}
 
 	/**
@@ -66,7 +66,7 @@ class Data {
 	 * @param {string} divider - The new object divider.
 	 */
 	static setObjectDivider(divider) {
-		Data.OBJECT_DIVIDER = divider
+		this.OBJECT_DIVIDER = divider
 	}
 
 	/**
@@ -86,11 +86,11 @@ class Data {
 		for (let key in obj) {
 			if (Object.hasOwn(obj, key)) {
 				const rawKey = Array.isArray(obj)
-					? `${Data.ARRAY_WRAPPER[0]}${key}${Data.ARRAY_WRAPPER[1]}`
+					? `${this.ARRAY_WRAPPER[0]}${key}${this.ARRAY_WRAPPER[1]}`
 					: key
 				// Escape literal dividers inside key names so they survive split()
-				const corrKey = Data.escapeKey(rawKey)
-				const propName = parent ? `${parent}${Data.OBJECT_DIVIDER}${corrKey}` : corrKey
+				const corrKey = this.escapeKey(rawKey)
+				const propName = parent ? `${parent}${this.OBJECT_DIVIDER}${corrKey}` : corrKey
 				if (typeof obj[key] === 'object' && null !== obj[key]) {
 					// Check if it's an empty object or array
 					if (
@@ -99,7 +99,7 @@ class Data {
 					) {
 						res[propName] = obj[key]
 					} else {
-						Data.flatten(obj[key], propName, res, visited)
+						this.flatten(obj[key], propName, res, visited)
 					}
 				} else {
 					res[propName] = obj[key]
@@ -119,9 +119,7 @@ class Data {
 	 * @returns {*} The found value or undefined.
 	 */
 	static find(path, obj) {
-		const arrPath = Array.isArray(path)
-			? path
-			: Data._splitAndUnescape(path)
+		const arrPath = Array.isArray(path) ? path : this._splitAndUnescape(path)
 		let acc = obj
 		let i = 0
 		for (let key of arrPath) {
@@ -129,7 +127,7 @@ class Data {
 			if (acc === undefined || acc === null) return undefined
 			if (typeof key?.match === 'function') {
 				const arrayMatch = key.match(
-					new RegExp(`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`),
+					new RegExp(`^\\${this.ARRAY_WRAPPER[0] || ''}(\\d+)\\${this.ARRAY_WRAPPER[1] || ''}$`),
 				)
 				if (arrayMatch) {
 					key = String(parseInt(arrayMatch[1], 10))
@@ -162,7 +160,7 @@ class Data {
 		let parentPath = path.slice()
 		let i = 0
 		do {
-			value = Data.find(parentPath, obj)
+			value = this.find(parentPath, obj)
 			if (skipScalar && !['object', 'function'].includes(typeof value)) {
 				value = undefined
 				parentPath = []
@@ -172,7 +170,7 @@ class Data {
 				// @todo cover with a test.
 				parentPath.pop()
 			}
-		} while (undefined === value && parentPath.length && ++i < Data.MAX_DEEP_UNFLATTEN)
+		} while (undefined === value && parentPath.length && ++i < this.MAX_DEEP_UNFLATTEN)
 		return { value, path: parentPath }
 	}
 
@@ -187,20 +185,20 @@ class Data {
 	static unflatten(data) {
 		const result = {}
 		const noRegExp = new RegExp(
-			`^\\${Data.ARRAY_WRAPPER[0] || ''}(\\d+)\\${Data.ARRAY_WRAPPER[1] || ''}$`,
+			`^\\${this.ARRAY_WRAPPER[0] || ''}(\\d+)\\${this.ARRAY_WRAPPER[1] || ''}$`,
 		)
 
 		// Sort keys to ensure we create objects before assigning properties to them
 		const sortedKeys = Object.keys(data).sort()
 
 		for (let flatKey of sortedKeys) {
-			const keys = Data._splitAndUnescape(flatKey)
+			const keys = this._splitAndUnescape(flatKey)
 			/** @type {string[]} */
 			const path = []
 			for (let i = 0; i < keys.length - 1; i++) {
 				let curr = keys[i]
 				const next = keys[i + 1] || null
-				const parent = Data.find(path, result) || result
+				const parent = this.find(path, result) || result
 				const match = curr.match(noRegExp)
 				if (match) {
 					curr = String(parseInt(match[1], 10))
@@ -212,13 +210,13 @@ class Data {
 				}
 				// @todo cover with a test
 				else if (parent !== result) {
-					throw new TypeError(`Element is not an object in ${path.join(Data.OBJECT_DIVIDER)}`)
+					throw new TypeError(`Element is not an object in ${path.join(this.OBJECT_DIVIDER)}`)
 				}
 				path.push(curr)
 			}
-			const { value } = Data.findValue(path, result)
+			const { value } = this.findValue(path, result)
 
-			const key = Data.unescapeKey(String(keys.pop() ?? ''))
+			const key = this.unescapeKey(String(keys.pop() ?? ''))
 			if (Array.isArray(value)) {
 				const match = key.match(noRegExp)
 				if (match) {
@@ -234,20 +232,20 @@ class Data {
 			} else {
 				// @todo cover with a test
 				const parentPath = path.slice(0, -1)
-				const { value: v, path: p } = Data.findValue(parentPath, result, true)
+				const { value: v, path: p } = this.findValue(parentPath, result, true)
 				if ('object' === typeof v) {
-					const pathKey = flatKey.slice(p.join(Data.OBJECT_DIVIDER).length + 1)
-					const parentValue = Data.find(p, result)
+					const pathKey = flatKey.slice(p.join(this.OBJECT_DIVIDER).length + 1)
+					const parentValue = this.find(p, result)
 					// Check if parentValue is actually an object before trying to set property
 					if (typeof parentValue === 'object' && parentValue !== null) {
 						parentValue[pathKey] = data[flatKey]
 					} else {
 						throw new TypeError(
-							`Cannot set property '${pathKey}' on non-object value '${parentValue}' at path '${p.join(Data.OBJECT_DIVIDER)}'`,
+							`Cannot set property '${pathKey}' on non-object value '${parentValue}' at path '${p.join(this.OBJECT_DIVIDER)}'`,
 						)
 					}
 				} else {
-					const parentValue = Data.find(path, result)
+					const parentValue = this.find(path, result)
 					// @todo cover with a test
 					if (typeof parentValue === 'object' && parentValue !== null) {
 						parentValue[key] = data[flatKey]
@@ -293,7 +291,7 @@ class Data {
 
 		for (const key in source) {
 			if (!Object.hasOwn(source, key)) continue
-			result[key] = Data.merge(result[key], source[key], visited)
+			result[key] = this.merge(result[key], source[key], visited)
 		}
 		return result
 	}
@@ -309,7 +307,7 @@ class Data {
 	 * @param {{ referenceKey?: string }} options - Merge options.
 	 * @returns {Array<Array<string, any>>} Merged flat entries.
 	 */
-	static mergeFlat(target, source, { referenceKey = Data.REFERENCE_KEY } = {}) {
+	static mergeFlat(target, source, { referenceKey = this.REFERENCE_KEY } = {}) {
 		const map = new Map()
 
 		/**
@@ -321,13 +319,13 @@ class Data {
 			const [rawKey, rawVal] = entry
 
 			// Handle references $ref – merge object into parent path.
-			if (referenceKey && rawKey.endsWith(Data.OBJECT_DIVIDER + referenceKey)) {
-				const baseKey = rawKey.slice(0, -referenceKey.length - Data.OBJECT_DIVIDER.length)
+			if (referenceKey && rawKey.endsWith(this.OBJECT_DIVIDER + referenceKey)) {
+				const baseKey = rawKey.slice(0, -referenceKey.length - this.OBJECT_DIVIDER.length)
 				if (rawVal && typeof rawVal === 'object' && !Array.isArray(rawVal)) {
 					// @ts-ignore
 					for (const prop in rawVal) {
 						if (Object.hasOwn(rawVal, prop)) {
-							const fullKey = `${baseKey}${Data.OBJECT_DIVIDER}${prop}`
+							const fullKey = `${baseKey}${this.OBJECT_DIVIDER}${prop}`
 							if (overwrite || !map.has(fullKey)) {
 								map.set(fullKey, rawVal[prop])
 							}
@@ -343,7 +341,7 @@ class Data {
 				// @ts-ignore
 				for (const prop in rawVal) {
 					if (Object.hasOwn(rawVal, prop)) {
-						const fullKey = `${baseKey}${Data.OBJECT_DIVIDER}${prop}`
+						const fullKey = `${baseKey}${this.OBJECT_DIVIDER}${prop}`
 						if (overwrite || !map.has(fullKey)) {
 							map.set(fullKey, rawVal[prop])
 						}
@@ -377,9 +375,9 @@ class Data {
 	 * @returns {string} The parent key path.
 	 */
 	static getParentKey(key) {
-		const arr = key.split(Data.OBJECT_DIVIDER)
+		const arr = key.split(this.OBJECT_DIVIDER)
 		arr.pop()
-		return arr.join(Data.OBJECT_DIVIDER)
+		return arr.join(this.OBJECT_DIVIDER)
 	}
 
 	/**
@@ -391,12 +389,12 @@ class Data {
 	 * @param {string} [parentKey] - Optional parent key to avoid recomputation.
 	 * @returns {Array<Array<string, any>>} Flat sibling entries.
 	 */
-	static flatSiblings(flat, key, parentKey = Data.getParentKey(key)) {
+	static flatSiblings(flat, key, parentKey = this.getParentKey(key)) {
 		if (!Array.isArray(flat)) flat = Object.entries(flat)
-		const path = '' === parentKey ? '' : parentKey + Data.OBJECT_DIVIDER
-		const level = key.split(Data.OBJECT_DIVIDER).length
+		const path = '' === parentKey ? '' : parentKey + this.OBJECT_DIVIDER
+		const level = key.split(this.OBJECT_DIVIDER).length
 		return flat.filter(
-			([k]) => k.startsWith(path) && k !== key && k.split(Data.OBJECT_DIVIDER).length >= level,
+			([k]) => k.startsWith(path) && k !== key && k.split(this.OBJECT_DIVIDER).length >= level,
 		)
 	}
 
@@ -440,8 +438,8 @@ class Data {
 	 * @returns {string} The escaped key
 	 */
 	static escapeKey(key) {
-		if (!key.includes(Data.OBJECT_DIVIDER)) return key
-		return key.replaceAll(Data.OBJECT_DIVIDER, Data.ESCAPED_DIVIDER)
+		if (!key.includes(this.OBJECT_DIVIDER)) return key
+		return key.replaceAll(this.OBJECT_DIVIDER, this.ESCAPED_DIVIDER)
 	}
 
 	/**
@@ -451,8 +449,8 @@ class Data {
 	 * @returns {string} The unescaped original key
 	 */
 	static unescapeKey(key) {
-		if (!key.includes(Data.ESCAPED_DIVIDER)) return key
-		return key.replaceAll(Data.ESCAPED_DIVIDER, Data.OBJECT_DIVIDER)
+		if (!key.includes(this.ESCAPED_DIVIDER)) return key
+		return key.replaceAll(this.ESCAPED_DIVIDER, this.OBJECT_DIVIDER)
 	}
 
 	/**
@@ -464,7 +462,7 @@ class Data {
 	 * @returns {string[]} Array of unescaped segments
 	 */
 	static _splitAndUnescape(flatKey) {
-		return flatKey.split(Data.OBJECT_DIVIDER).map((s) => Data.unescapeKey(s))
+		return flatKey.split(this.OBJECT_DIVIDER).map((s) => this.unescapeKey(s))
 	}
 }
 

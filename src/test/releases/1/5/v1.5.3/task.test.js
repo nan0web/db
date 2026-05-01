@@ -1,10 +1,9 @@
 import { suite, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { extname } from '../../../../src/DB/path.js'
-import Directory from '../../../../src/Directory.js'
+import { extname } from '../../../../../DB/path.js'
+import Directory from '../../../../../Directory.js'
 
 suite('Release v1.5.3: Path & Config Verification', () => {
-
 	suite('extname() logic', () => {
 		test('should ignore dots in directory names', () => {
 			assert.strictEqual(extname('/Users/user/src/nan.web/apps/t.json'), '.json')
@@ -42,5 +41,4 @@ suite('Release v1.5.3: Path & Config Verification', () => {
 			assert.strictEqual(Directory.isConfig(123), false)
 		})
 	})
-
 })
