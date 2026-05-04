@@ -1,10 +1,10 @@
 import { describe, it, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import fsNode from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+
 import { NoConsole } from '@nan0web/log'
 import { DocsParser, DatasetParser } from '@nan0web/test'
+import { DBFS } from '@nan0web/db-fs'
+
 import DBDefault, {
 	DB,
 	Data,
@@ -19,7 +19,7 @@ import DBDefault, {
 	StreamEntry,
 	DBConfig,
 	RevisionInfo,
-} from './index.js'
+} from '../index.js'
 import {
 	normalize,
 	basename,
@@ -30,12 +30,13 @@ import {
 	absolute,
 	isRemote,
 	isAbsolute,
-} from './DB/path.js'
+} from '../DB/path.js'
 
+const fs = new DBFS()
 let pkg
 
 before(async () => {
-	pkg = JSON.parse(fsNode.readFileSync(join(process.cwd(), 'package.json'), 'utf-8'))
+	pkg = await fs.loadDocument('package.json')
 })
 
 let console = new NoConsole()
@@ -749,7 +750,7 @@ function testRender() {
 	 */
 	it('How to participate? – [see CONTRIBUTING.md]($pkgURL/blob/main/CONTRIBUTING.md)', async () => {
 		/** @docs */
-		let text = fsNode.readFileSync('CONTRIBUTING.md', 'utf-8')
+		let text = await fs.loadDocument('CONTRIBUTING.md')
 		if (text && typeof text === 'object' && text.content) text = text.content
 		assert.ok(String(text).includes('# Contributing'))
 	})
@@ -760,7 +761,7 @@ function testRender() {
 	 */
 	it('ISC LICENSE – [see full text]($pkgURL/blob/main/LICENSE)', async () => {
 		/** @docs */
-		const text = fsNode.readFileSync('LICENSE', 'utf-8')
+		const text = await fs.loadDocument('LICENSE')
 		assert.ok(String(text).includes('ISC'))
 	})
 }
@@ -771,20 +772,17 @@ describe('Rendering README.md', async () => {
 	let text = ''
 	const format = new Intl.NumberFormat('en-US').format
 	const parser = new DocsParser()
-	const sourceCode = fsNode.readFileSync(fileURLToPath(import.meta.url), 'utf-8')
+	const sourceCode = await fs.loadDocument('src/docs/README.md.js')
 	text = String(parser.decode(sourceCode))
-	fsNode.writeFileSync('README.md', text)
-	const dataset = DatasetParser.parse(text, pkg.name)
-	fsNode.mkdirSync('.datasets', { recursive: true })
-	const serializedDataset = Array.isArray(dataset)
-		? dataset.map((item) => JSON.stringify(item)).join('\n')
-		: dataset
-	fsNode.writeFileSync('.datasets/README.dataset.jsonl', serializedDataset)
 
 	it(`Document is rendered in README.md [${format(Buffer.byteLength(text))} bytes]`, async () => {
-		let text = fsNode.readFileSync('README.md', 'utf-8')
-		if (text && typeof text === 'object' && text.content) text = text.content
-		assert.ok(String(text).includes('# @nan0web/db'))
-		assert.ok(String(text).includes('## License'))
+		await fs.saveDocument('README.md', text)
+		const dataset = DatasetParser.parse(text, pkg.name)
+		await fs.saveDocument('.datasets/README.dataset.jsonl', dataset)
+
+		let textSaved = await fs.loadDocument('README.md')
+		const content = typeof textSaved === 'string' ? textSaved : (textSaved?.content || JSON.stringify(textSaved))
+		assert.ok(content.includes('# @nan0web/db'))
+		assert.ok(content.includes('## License'))
 	})
 })

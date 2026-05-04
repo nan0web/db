@@ -4,7 +4,7 @@ src/test/
 types/test/
 
 # ProvenDoc generator
-src/README.md.js
+src/docs/
 
 # Dev files
 play/

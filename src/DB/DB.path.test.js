@@ -295,15 +295,15 @@ suite('DB URI Core', () => {
 			assert.strictEqual(result, 'api')
 		})
 
-		it('should return uri if from and to are absolute and from do not starts with to', () => {
+		it('should return uri if from and to are absolute and from does not start with to', () => {
 			const db = new DB()
-			const result = db.relative('/root/api', '/root2/')
+			const result = db.relative('/root2/', '/root/api')
 			assert.strictEqual(result, '/root2/')
 		})
 
 		it('should return uri if to is relative', () => {
 			const db = new DB()
-			const result = db.relative('root/api', 'sibling')
+			const result = db.relative('sibling', 'root/api')
 			assert.strictEqual(result, 'sibling')
 		})
 
@@ -311,7 +311,7 @@ suite('DB URI Core', () => {
 			const db = new DB()
 			const from = '/api/users/list'
 			const to = '/api/posts/recent'
-			assert.strictEqual(db.relative(from, to), '../posts/recent')
+			assert.strictEqual(db.relative(to, from), '../../posts/recent')
 		})
 	})
 

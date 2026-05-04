@@ -99,7 +99,17 @@ export default class DB {
 	static Index = DirectoryIndex
 	static GetOptions = GetOptions
 	static FetchOptions = FetchOptions
-	static DATA_EXTNAMES = ['.json', '.csv', '.yaml', '.yml', '.nan0', '.nano', '.html', '.xml', '.md']
+	static DATA_EXTNAMES = [
+		'.json',
+		'.csv',
+		'.yaml',
+		'.yml',
+		'.nan0',
+		'.nano',
+		'.html',
+		'.xml',
+		'.md',
+	]
 
 	/**
 	 * Duck-typing check for DB instances.
@@ -613,7 +623,7 @@ export default class DB {
 			const prefix = normalized.split('/')[0]
 			throw new Error(
 				`Mount point "${prefix}" not found for URI "${uri}". ` +
-				`Did you forget to call db.mount('${prefix}', targetDb)?`
+					`Did you forget to call db.mount('${prefix}', targetDb)?`,
 			)
 		}
 		return null
@@ -709,13 +719,14 @@ export default class DB {
 
 	/**
 	 * Relative path resolver for file systems.
-	 * Must be implemented by platform specific code
-	 * @param {string} from Base directory path
-	 * @param {string} [to=this.root] Target directory path
+	 * Returns path relative to database root.
+	 * @param {string} to Target directory path
+	 * @param {string} [from=this.root] Base directory path
 	 * @returns {string} Relative path
 	 */
-	relative(from, to = this.root) {
-		return relative(from, to)
+	relative(to, from = this.root) {
+		const base = from.endsWith('/') ? from : from + '/'
+		return relative(base, to)
 	}
 
 	/**
@@ -735,7 +746,7 @@ export default class DB {
 	 * @returns {Promise<{ total: number, processed: number, ignored: number, updatedURIs: string[] }>}
 	 */
 	async dump(dest, options = {}) {
-		const { onProgress = () => { } } = options
+		const { onProgress = () => {} } = options
 		const total = this.meta.size
 		let current = 0
 		const updatedURIs = []
@@ -1021,7 +1032,7 @@ export default class DB {
 			}
 			if (!this.meta.has(dir)) {
 				const children = Array.from(this.meta.entries()).filter(
-					([m, stat]) => stat.isFile && (m.startsWith(dir + '/') || '.' === dir),
+					([m, stat]) => stat.isFile && (m.startsWith(dir) || '.' === dir),
 				)
 				let size = 0
 				let mtimeMs = 0
@@ -1299,7 +1310,7 @@ export default class DB {
 		const authContext = AuthContext.from(context)
 		uri = this.normalize(uri)
 		await this.ensureAccess(uri, 'r', authContext)
-		
+
 		if (this.driver && typeof this.driver.stream === 'function') {
 			const abs = this.absolute(uri)
 			const _stream = await this.driver.stream(abs)
@@ -1307,7 +1318,7 @@ export default class DB {
 				return _stream
 			}
 		}
-		
+
 		throw new Error('Streaming is not supported by this database or driver')
 	}
 
@@ -1368,8 +1379,8 @@ export default class DB {
 		const authContext = AuthContext.from(context)
 		if ('.' === uri) uri = './'
 		await this.ensureAccess(uri, 'r', authContext)
-		const isDir = uri.endsWith('/')
-		const abs = (this.normalize(await this.resolve(uri)) || '.') + (isDir ? '/' : '')
+		let abs = this.normalize(await this.resolve(uri)) || '.'
+		if (uri.endsWith('/') && !abs.endsWith('/')) abs += '/'
 
 		if (this.driver) {
 			const abs = this.absolute(uri)
@@ -1600,7 +1611,7 @@ export default class DB {
 				return e
 			})
 		}
-			
+
 		this.console.debug('listDir()', uri)
 		const authContext = AuthContext.from(context)
 		await this.ensureAccess(uri, 'r', authContext)

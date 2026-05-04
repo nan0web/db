@@ -1,6 +1,6 @@
 {
 	"name": "@nan0web/db",
-	"version": "1.5.4",
+	"version": "1.5.5",
 	"description": "Every data becomes a database. Agnostic document database and data manipulation utilities.",
 	"main": "./src/index.js",
 	"types": "./types/index.d.ts",
@@ -8,7 +8,7 @@
 	"files": [
 		"src/**/*.js",
 		"!src/**/*.test.js",
-		"!src/README.md.js",
+		"!src/docs/",
 		"types/**/*.d.ts"
 	],
 	"scripts": {
@@ -18,7 +18,7 @@
 		"clean:modules": "rm -rf node_modules",
 		"test": "node --test --test-timeout=3333 \"src/**/*.test.js\"",
 		"test1": "node --test \"src/**/*.test.js\" | nan0test parse --fail",
-		"test:docs": "node --test src/README.md.js",
+		"test:docs": "node --test 'src/docs/**/*.md.js'",
 		"test:release": "node --test \"releases/**/*.test.js\"",
 		"release:spec": "node --test \"releases/**/*.spec.js\"",
 		"release:verify": "node --test \"src/test/releases/**/*.test.js\"",

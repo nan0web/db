@@ -361,12 +361,12 @@ export default class DB {
     extname(uri: string): string;
     /**
      * Relative path resolver for file systems.
-     * Must be implemented by platform specific code
-     * @param {string} from Base directory path
-     * @param {string} [to=this.root] Target directory path
+     * Returns path relative to database root.
+     * @param {string} to Target directory path
+     * @param {string} [from=this.root] Base directory path
      * @returns {string} Relative path
      */
-    relative(from: string, to?: string): string;
+    relative(to: string, from?: string): string;
     /**
      * Get string representation of the database
      * @returns {string} Formatted string like "DB /root [utf-8]"
